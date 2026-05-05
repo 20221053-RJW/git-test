@@ -1,4 +1,48 @@
 import { useState, useEffect } from 'react';
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyA0c7LJmkNap67_snwfAlMCnwf6daus14k",
+  authDomain: "awesome-69d30.firebaseapp.com",
+  projectId: "awesome-69d30",
+  storageBucket: "awesome-69d30.firebasestorage.app",
+  messagingSenderId: "306370177530",
+  appId: "1:306370177530:web:1a93a7d09b61c92a6d1c43",
+  measurementId: "G-BJ6YXMK8QF"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
+const handleSignup = (event: React.FormEvent) => {
+  event.preventDefault(); // 폼 제출 방지
+
+  // 이제 getElementById 없이도 email, password 변수를 바로 쓸 수 있어요!
+  console.log("이메일:", email);
+  console.log("비밀번호:", password);
+};
+
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+
+const auth = getAuth();
+createUserWithEmailAndPassword(auth, email, password)
+  .then((userCredential) => {
+    // Signed up 
+    const user = userCredential.user;
+    // ...
+  })
+  .catch((error) => {
+    const errorCode = error.code;
+    const errorMessage = error.message;
+    // ..
+  });
 
 interface Classmate {
   id: number;
@@ -44,7 +88,9 @@ interface Class {
 }
 
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoggedIn, setIsLoggedIn] = useState<'login' | 'signup' | 'authed'>('login');
   const [activeTab, setActiveTab] = useState<'team' | 'classmates' | 'qna' | 'mypage' | 'myteam' | 'classes'>('team');
   const [showPopularModal, setShowPopularModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -205,11 +251,8 @@ export default function App() {
 
   const sortedQna = [...qnaData].sort((a, b) => b.likes - a.likes || b.views - a.views);
 
-  const handleLogin = () => {
-    setIsLoggedIn(true);
-  };
-
-  if (!isLoggedIn) {
+  //첫 방문시 로그인 안된 상태에서 보이는 화면
+  if (isLoggedIn === 'login') {
     return (
       <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex flex-col">
         <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
@@ -280,7 +323,7 @@ export default function App() {
               </button>
 
               <button
-                onClick={handleLogin}
+                onClick={() => setIsLoggedIn('authed')}
                 className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold rounded-lg transition border-2 border-dashed border-gray-300"
                 title="개발용 임시 접속"
               >
@@ -290,19 +333,23 @@ export default function App() {
               <div className="mt-6 text-center text-sm">
                 <a href="#" className="text-blue-600 hover:underline">비밀번호를 잊으셨나요?</a>
                 <span className="text-gray-400 mx-2">|</span>
-                <a href="#" className="text-blue-600 hover:underline">회원가입</a>
+                <a href="#" onClick={(e) => {
+                  e.preventDefault();   // 클릭 시 페이지가 새로고침되는 것을 방지
+                  setIsLoggedIn('signup'); // 상태를 'signup'으로 변경하여 화면 전환 유도
+                }}
+                  className="text-blue-600 hover:underline">회원가입</a>
               </div>
             </div>
           </div>
 
           <style>{`
-            .bg-grid-pattern {
-              background-image:
-                linear-gradient(to right, #e5e7eb 1px, transparent 1px),
-                linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
-              background-size: 40px 40px;
-            }
-          `}</style>
+              .bg-grid-pattern {
+                background-image:
+                  linear-gradient(to right, #e5e7eb 1px, transparent 1px),
+                  linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
+                background-size: 40px 40px;
+              }
+            `}</style>
         </div>
 
         <footer className="bg-[#0f172a] text-gray-300">
@@ -340,11 +387,136 @@ export default function App() {
           </div>
         </footer>
       </div>
-    );
+    )
   }
+  else if (isLoggedIn === 'signup') {
+    return (
+      <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex flex-col">
+        <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+          <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
+
+          <div className="absolute top-20 left-10 text-gray-400 text-9xl font-black opacity-30">WELCOME</div>
+          <div className="absolute bottom-20 right-10 text-gray-400 text-9xl font-black opacity-30">환영합니다</div>
+
+          <div className="absolute top-32 left-16 bg-white/90 backdrop-blur-sm rounded-2xl p-5 shadow-lg w-56 fade-in">
+            <div className="text-center">
+              <div className="text-3xl mb-2">👥</div>
+              <h3 className="font-bold text-gray-800 mb-1">수강자 네트워크</h3>
+              <p className="text-xs text-gray-600">팀원을 찾고 프로필 확인</p>
+            </div>
+          </div>
+
+          <div className="absolute bottom-32 left-24 bg-white/90 backdrop-blur-sm rounded-2xl p-5 shadow-lg w-56 fade-in" style={{ animationDelay: '0.2s' }}>
+            <div className="text-center">
+              <div className="text-3xl mb-2">🚀</div>
+              <h3 className="font-bold text-gray-800 mb-1">팀 프로젝트</h3>
+              <p className="text-xs text-gray-600">진행상황 관리 및 공유</p>
+            </div>
+          </div>
+
+          <div className="absolute top-40 right-20 bg-white/90 backdrop-blur-sm rounded-2xl p-5 shadow-lg w-56 fade-in" style={{ animationDelay: '0.4s' }}>
+            <div className="text-center">
+              <div className="text-3xl mb-2">💬</div>
+              <h3 className="font-bold text-gray-800 mb-1">Q&A 게시판</h3>
+              <p className="text-xs text-gray-600">질문하고 답변 공유</p>
+            </div>
+          </div>
+          {/* 회원가입 폼 */}
+          <div className="max-w-md w-full relative z-20">
+            <div className="text-center mb-8 fade-in">
+              <h1 className="text-5xl font-black text-gray-800 mb-2">CampusConnect</h1>
+              <p className="text-gray-600">웹개발 수업 협업 플랫폼</p>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-2xl p-8 fade-in">
+              <div className="text-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">회원가입</h2>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">이메일</label>
+                  <input
+                    type="email"
+                    placeholder="student@example.com"
+                    id="signupEmail"
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">비밀번호</label>
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    id="signupPassword"
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition text-sm"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsLoggedIn('login')}
+                id="SignupButton"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition shadow-md hover:shadow-lg mb-3"
+              >
+                회원가입하기
+              </button>
+            </div>
+          </div>
+
+          <style>{`
+              .bg-grid-pattern {
+                background-image:
+                  linear-gradient(to right, #e5e7eb 1px, transparent 1px),
+                  linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
+                background-size: 40px 40px;
+              }
+            `}</style>
+        </div>
+
+        <footer className="bg-[#0f172a] text-gray-300">
+          <div className="max-w-7xl mx-auto px-4 py-12">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+              <div>
+                <h3 className="text-white font-bold text-xl mb-4">CampusConnect</h3>
+                <p className="text-sm text-gray-400 leading-relaxed">
+                  학생들의 팀 프로젝트 협업을 위한<br />
+                  올인원 플랫폼
+                </p>
+              </div>
+              <div>
+                <h4 className="text-white font-bold mb-4">연락처</h4>
+                <ul className="space-y-2 text-sm">
+                  <li>📧 support@campusconnect.com</li>
+                  <li>📞 02-1234-5678</li>
+                  <li>📍 서울특별시 광진구 능동로 209</li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="text-white font-bold mb-4">바로가기</h4>
+                <ul className="space-y-2 text-sm">
+                  <li><a href="#" className="hover:text-white transition">이용약관</a></li>
+                  <li><a href="#" className="hover:text-white transition">개인정보처리방침</a></li>
+                  <li><a href="#" className="hover:text-white transition">공지사항</a></li>
+                  <li><a href="#" className="hover:text-white transition">FAQ</a></li>
+                </ul>
+              </div>
+            </div>
+            <div className="border-t border-gray-700 pt-6 text-center text-sm text-gray-500">
+              <p>© 2026 CampusConnect. All rights reserved.</p>
+              <p className="mt-2">본 서비스는 교육 목적으로 제작된 프로젝트입니다.</p>
+            </div>
+          </div>
+        </footer>
+      </div>
+    )
+  };
+
   // 로그인 후 메인 화면 방출 부분
   return (
-    
+    //전체 페이지 감싸는 div
     <div className="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
       // 전체 css
       <style>{`
@@ -412,7 +584,7 @@ export default function App() {
           </div>
         </div>
       </nav>
-      //전체 화면 div
+      //전체div감싸는div, 왜 있는지 사실 잘 모르겠다. 무슨 레이아웃 처리같은데
       <div className="flex flex-row flex-1">
         <div className="flex flex-col flex-1 w-full">
           //진짜 전체 div
@@ -423,8 +595,8 @@ export default function App() {
                 <button
                   onClick={() => changeTab('team')}
                   className={`w-16 h-16 rounded-xl font-bold transition-all duration-200 flex flex-col items-center justify-center gap-1 ${activeTab === 'team'
-                      ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg scale-105'
-                      : 'bg-white text-gray-700 hover:bg-gradient-to-br hover:from-blue-400 hover:to-blue-500 hover:text-white hover:shadow-md hover:scale-105'
+                    ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg scale-105'
+                    : 'bg-white text-gray-700 hover:bg-gradient-to-br hover:from-blue-400 hover:to-blue-500 hover:text-white hover:shadow-md hover:scale-105'
                     }`}
                 >
                   <span className="text-xl">👥</span>
@@ -433,8 +605,8 @@ export default function App() {
                 <button
                   onClick={() => changeTab('myteam')}
                   className={`w-16 h-16 rounded-xl font-bold transition-all duration-200 flex flex-col items-center justify-center gap-1 ${activeTab === 'myteam'
-                      ? 'bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg scale-105'
-                      : 'bg-white text-gray-700 hover:bg-gradient-to-br hover:from-purple-400 hover:to-purple-500 hover:text-white hover:shadow-md hover:scale-105'
+                    ? 'bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg scale-105'
+                    : 'bg-white text-gray-700 hover:bg-gradient-to-br hover:from-purple-400 hover:to-purple-500 hover:text-white hover:shadow-md hover:scale-105'
                     }`}
                 >
                   <span className="text-xl">⭐</span>
@@ -443,8 +615,8 @@ export default function App() {
                 <button
                   onClick={() => changeTab('classmates')}
                   className={`w-16 h-16 rounded-xl font-bold transition-all duration-200 flex flex-col items-center justify-center gap-1 ${activeTab === 'classmates'
-                      ? 'bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg scale-105'
-                      : 'bg-white text-gray-700 hover:bg-gradient-to-br hover:from-green-400 hover:to-green-500 hover:text-white hover:shadow-md hover:scale-105'
+                    ? 'bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg scale-105'
+                    : 'bg-white text-gray-700 hover:bg-gradient-to-br hover:from-green-400 hover:to-green-500 hover:text-white hover:shadow-md hover:scale-105'
                     }`}
                 >
                   <span className="text-xl">🎓</span>
@@ -1029,8 +1201,8 @@ export default function App() {
                         <button
                           onClick={() => setMypageView('report')}
                           className={`px-4 py-2 rounded-lg font-bold transition ${mypageView === 'report'
-                              ? 'bg-blue-600 text-white shadow-md'
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                             }`}
                         >
                           리포트
@@ -1038,8 +1210,8 @@ export default function App() {
                         <button
                           onClick={() => setMypageView('info')}
                           className={`px-4 py-2 rounded-lg font-bold transition ${mypageView === 'info'
-                              ? 'bg-blue-600 text-white shadow-md'
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                             }`}
                         >
                           개인정보
