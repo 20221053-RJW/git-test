@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -21,28 +23,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 
-const handleSignup = (event: React.FormEvent) => {
-  event.preventDefault(); // 폼 제출 방지
 
-  // 이제 getElementById 없이도 email, password 변수를 바로 쓸 수 있어요!
-  console.log("이메일:", email);
-  console.log("비밀번호:", password);
-};
-
-import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-
-const auth = getAuth();
-createUserWithEmailAndPassword(auth, email, password)
-  .then((userCredential) => {
-    // Signed up 
-    const user = userCredential.user;
-    // ...
-  })
-  .catch((error) => {
-    const errorCode = error.code;
-    const errorMessage = error.message;
-    // ..
-  });
 
 interface Classmate {
   id: number;
@@ -251,6 +232,50 @@ export default function App() {
 
   const sortedQna = [...qnaData].sort((a, b) => b.likes - a.likes || b.views - a.views);
 
+  const handleSignup = (event: React.FormEvent) => {
+    event.preventDefault(); // 폼 제출 방지
+
+    createUserWithEmailAndPassword(auth, email, password)
+      .then((userCredential) => {
+        // Signed up 
+        const user = userCredential.user;
+        // ...
+      })
+      .catch((error) => {
+        const errorCode = error.code;
+        const errorMessage = error.message;
+        // ..
+      });
+
+    // 이제 getElementById 없이도 email, password 변수를 바로 쓸 수 있어요!
+    console.log("이메일:", email);
+    console.log("비밀번호:", password);
+  };
+
+  const auth = getAuth();
+
+  const handleSignin = (event: React.FormEvent) => {
+    event.preventDefault(); // 폼 제출 방지
+
+    signInWithEmailAndPassword(auth, email, password)
+      .then((userCredential) => {
+        // Signed in 
+        const user = userCredential.user;
+        // ...
+        setIsLoggedIn('authed'); // 로그인 성공 시 상태 변경
+      })
+      .catch((error) => {
+        const errorCode = error.code;
+        const errorMessage = error.message;
+      });
+
+    // 이제 getElementById 없이도 email, password 변수를 바로 쓸 수 있어요!
+    console.log("이메일:", email);
+    console.log("비밀번호:", password);
+  };
+
+
+
   //첫 방문시 로그인 안된 상태에서 보이는 화면
   if (isLoggedIn === 'login') {
     return (
@@ -285,62 +310,67 @@ export default function App() {
             </div>
           </div>
           {/* 로그인 폼 */}
-          <div className="max-w-md w-full relative z-20">
-            <div className="text-center mb-8 fade-in">
-              <h1 className="text-5xl font-black text-gray-800 mb-2">CampusConnect</h1>
-              <p className="text-gray-600">웹개발 수업 협업 플랫폼</p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-2xl p-8 fade-in">
-              <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">로그인</h2>
+          <form onSubmit={handleSignin}> {/* form에 onSubmit 연결 */}
+            <div className="max-w-md w-full relative z-20">
+              <div className="text-center mb-8 fade-in">
+                <h1 className="text-5xl font-black text-gray-800 mb-2">CampusConnect</h1>
+                <p className="text-gray-600">웹개발 수업 협업 플랫폼</p>
               </div>
 
-              <div className="space-y-4 mb-6">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">학번 또는 이메일</label>
-                  <input
-                    type="text"
-                    placeholder="student@example.com"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition text-sm"
-                  />
+              <div className="bg-white rounded-xl shadow-2xl p-8 fade-in">
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">로그인</h2>
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">비밀번호</label>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition text-sm"
-                  />
+
+                <div className="space-y-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">이메일</label>
+                    <input
+                      type="email"
+                      placeholder="student@example.com"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">비밀번호</label>
+                    <input
+                      type="password"
+                      placeholder="••••••••"
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition text-sm"
+                    />
+                  </div>
+                </div>
+
+
+                <button
+                  onClick={(e) => {
+                    handleSignin(e);        // 1. 회원가입 로직 실행 // 2. 상태 변경 실행
+                  }}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition shadow-md hover:shadow-lg mb-3"
+                >
+                  로그인
+                </button>
+
+                <button
+                  // onClick={() => setIsLoggedIn('authed')}
+                  className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold rounded-lg transition border-2 border-dashed border-gray-300"
+                  title="개발용 임시 접속"
+                >
+                  (개발용임시로그인패스)
+                </button>
+
+                <div className="mt-6 text-center text-sm">
+                  <a href="#" className="text-blue-600 hover:underline">비밀번호를 잊으셨나요?</a>
+                  <span className="text-gray-400 mx-2">|</span>
+                  <a href="#" onClick={(e) => {
+                    e.preventDefault();   // 클릭 시 페이지가 새로고침되는 것을 방지
+                    setIsLoggedIn('signup'); // 상태를 'signup'으로 변경하여 화면 전환 유도
+                  }}
+                    className="text-blue-600 hover:underline">회원가입</a>
                 </div>
               </div>
-
-              <button
-                onClick={() => alert('실제 로그인 기능은 아직 구현되지 않았습니다.')}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition shadow-md hover:shadow-lg mb-3"
-              >
-                로그인
-              </button>
-
-              <button
-                onClick={() => setIsLoggedIn('authed')}
-                className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-bold rounded-lg transition border-2 border-dashed border-gray-300"
-                title="개발용 임시 접속"
-              >
-                (개발용임시로그인패스)
-              </button>
-
-              <div className="mt-6 text-center text-sm">
-                <a href="#" className="text-blue-600 hover:underline">비밀번호를 잊으셨나요?</a>
-                <span className="text-gray-400 mx-2">|</span>
-                <a href="#" onClick={(e) => {
-                  e.preventDefault();   // 클릭 시 페이지가 새로고침되는 것을 방지
-                  setIsLoggedIn('signup'); // 상태를 'signup'으로 변경하여 화면 전환 유도
-                }}
-                  className="text-blue-600 hover:underline">회원가입</a>
-              </div>
             </div>
-          </div>
+          </form>
 
           <style>{`
               .bg-grid-pattern {
@@ -422,50 +452,55 @@ export default function App() {
             </div>
           </div>
           {/* 회원가입 폼 */}
-          <div className="max-w-md w-full relative z-20">
-            <div className="text-center mb-8 fade-in">
-              <h1 className="text-5xl font-black text-gray-800 mb-2">CampusConnect</h1>
-              <p className="text-gray-600">웹개발 수업 협업 플랫폼</p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-2xl p-8 fade-in">
-              <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">회원가입</h2>
+          <form onSubmit={handleSignup}> {/* form에 onSubmit 연결 */}
+            <div className="max-w-md w-full relative z-20">
+              <div className="text-center mb-8 fade-in">
+                <h1 className="text-5xl font-black text-gray-800 mb-2">CampusConnect</h1>
+                <p className="text-gray-600">웹개발 수업 협업 플랫폼</p>
               </div>
 
-              <div className="space-y-4 mb-6">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">이메일</label>
-                  <input
-                    type="email"
-                    placeholder="student@example.com"
-                    id="signupEmail"
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition text-sm"
-                  />
+              <div className="bg-white rounded-xl shadow-2xl p-8 fade-in">
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">회원가입</h2>
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">비밀번호</label>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    id="signupPassword"
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition text-sm"
-                  />
+
+                <div className="space-y-4 mb-6">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">이메일</label>
+                    <input
+                      type="email"
+                      placeholder="student@example.com"
+                      id="signupEmail"
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">비밀번호</label>
+                    <input
+                      type="password"
+                      placeholder="••••••••"
+                      id="signupPassword"
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition text-sm"
+                    />
+                  </div>
                 </div>
+
+                <button
+                  onClick={(e) => {
+                    handleSignup(e);        // 1. 회원가입 로직 실행
+                    setIsLoggedIn('login'); // 2. 상태 변경 실행
+                  }}
+                  id="SignupButton"
+                  type="submit" // 버튼을 submit 타입으로 변경
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition shadow-md hover:shadow-lg mb-3"
+                >
+                  회원가입하기
+                </button>
               </div>
-
-              <button
-                onClick={() => setIsLoggedIn('login')}
-                id="SignupButton"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition shadow-md hover:shadow-lg mb-3"
-              >
-                회원가입하기
-              </button>
             </div>
-          </div>
-
+          </form>
           <style>{`
               .bg-grid-pattern {
                 background-image:
