@@ -505,11 +505,11 @@ function MyInfoEditModal({
 /* ─────────── 랜덤 팀 생성 ─────────── */
 
 const TEAM_KEYWORDS = [
-  { id: "size4", label: "4명",              group: "size" },
-  { id: "size3", label: "3명",              group: "size" },
-  { id: "even",  label: "비 작성자 균등 배분", group: "rule" },
-  { id: "career",label: "상반된 진로 분야",   group: "rule" },
-  { id: "mbti",  label: "상반된 성격",        group: "rule" },
+  { id: "size4", label: "4명", group: "size" },
+  { id: "size3", label: "3명", group: "size" },
+  { id: "even", label: "비 작성자 균등 배분", group: "rule" },
+  { id: "career", label: "상반된 진로 분야", group: "rule" },
+  { id: "mbti", label: "상반된 성격", group: "rule" },
 ];
 
 function MiniStudentCard({ student }: { student: Student }) {
@@ -624,11 +624,10 @@ function RandomTeamModal({ allStudents, onClose }: { allStudents: Student[]; onC
               <button
                 key={kw.id}
                 onClick={() => toggleKeyword(kw.id, kw.group)}
-                className={`px-4 py-1.5 rounded-[8px] text-sm font-medium transition-all ${
-                  activeKeywords.includes(kw.id)
-                    ? "bg-[#155dfc] text-white"
-                    : "bg-[#f3f4f6] text-[#4a5565] hover:bg-gray-200"
-                }`}
+                className={`px-4 py-1.5 rounded-[8px] text-sm font-medium transition-all ${activeKeywords.includes(kw.id)
+                  ? "bg-[#155dfc] text-white"
+                  : "bg-[#f3f4f6] text-[#4a5565] hover:bg-gray-200"
+                  }`}
               >
                 {kw.label}
               </button>
@@ -711,11 +710,10 @@ function StudentCard({ student, onClick }: { student: Student; onClick?: () => v
   return (
     <button
       onClick={onClick}
-      className={`rounded-[14px] border-2 p-6 flex flex-col gap-3 hover:shadow-md transition-all cursor-pointer text-left w-full ${
-        isSelf
-          ? "bg-white border-[#2b7fff] hover:border-[#155dfc]"
-          : "bg-white border-[#e5e7eb] hover:border-[#bedbff]"
-      }`}
+      className={`rounded-[14px] border-2 p-6 flex flex-col gap-3 hover:shadow-md transition-all cursor-pointer text-left w-full ${isSelf
+        ? "bg-white border-[#2b7fff] hover:border-[#155dfc]"
+        : "bg-white border-[#e5e7eb] hover:border-[#bedbff]"
+        }`}
     >
       <div className="flex justify-center">
         <StudentAvatar student={student} />
@@ -815,6 +813,7 @@ export default function StudentsNetworkPage() {
   const allDisplayStudents = isStudent ? [selfStudent, ...filteredOthers] : filteredOthers;
 
   return (
+    // 전체 페이지 컨테이너
     <div className="min-h-screen flex flex-col bg-gray-50">
       <div className="flex-1 max-w-6xl mx-auto w-full px-8 py-8">
         <h2 className="text-[#155dfc] text-2xl font-bold mb-6">수강자들 네트워크</h2>

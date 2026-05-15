@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
+import { useState } from "react";
 
 interface NavItem {
   label: string;
@@ -15,6 +16,7 @@ const navItems: NavItem[] = [
 export default function Navigation() {
   const location = useLocation();
   const { user, isProfessor, isStudent, setUserRole } = useAuth();
+  const [isOpen, setIsOpen] = useState(false);
 
   const isActive = (path: string) => {
     if (path === "/app/teams") {
@@ -26,53 +28,57 @@ export default function Navigation() {
     return location.pathname === path;
   };
 
-  return (
-    <div className="bg-black w-full h-16 px-8 md:px-32 flex items-center justify-between shadow-lg border-b-3 border-[#3676ff]">
+  return (/*gap-2 h-16 → md:h-16  flex-col md:flex-row md:justify-between pb-4 md:pb-0*/
+    <div className="bg-black w-full gap-2 md:h-16 px-8 pb-4 md:pb-0 md:px-32 flex flex-col md:flex-row md:justify-between items-center shadow-lg border-b-3 border-[#3676ff]">
       <Link to="/" className="flex items-center">
         <h1 className="text-2xl font-bold text-white tracking-wide">
           CampusConnect
         </h1>
       </Link>
-
-      <div className="flex items-center gap-8">
-        <nav className="flex gap-8">
+      <div className="block md:hidden">
+        <button className="text-white" onClick={() => setIsOpen(!isOpen)}>
+          {isOpen ? "▲" : "▼"}
+        </button>
+      </div>
+      {/* /*flex-col md:flex-row gap-8ㄱgap-4*/}
+      <div className={`flex flex-col md:flex-row items-center gap-4 md:gap-0 ${isOpen ? "block" : "hidden md:flex"}`}>
+        {/* /*flex-col md:flex-row gap-1 md:gap-8 items-center */}
+        <nav className="flex flex-col md:flex-row gap-1 md:gap-8 items-center ">
           {navItems.map((item) => (
             <Link
               key={item.path}
               to={item.path}
-              className={`relative transition-colors font-semibold ${
-                isActive(item.path) ? "text-[#3676ff]" : "text-gray-400 hover:text-white"
-              }`}
+              className={`relative transition-colors font-semibold ${isActive(item.path) ? "text-[#3676ff]" : "text-gray-400 hover:text-white"
+                }`}
             >
               <span>{item.label}</span>
               {isActive(item.path) && (
-                <div className="absolute -bottom-5 left-0 right-0 h-0.5 bg-[#3676ff]" />
+                /*hidden md:block*/
+                <div className="hidden md:block absolute -bottom-5 left-0 right-0 h-0.5 bg-[#3676ff]" />
               )}
             </Link>
           ))}
         </nav>
-
-        <div className="flex items-center gap-4">
+/* flex-col md:flex-row */
+        <div className="flex flex-col md:flex-row items-center gap-4">
           {/* 개발용 역할 전환 버튼 */}
           <div className="flex gap-2">
             <button
               onClick={() => setUserRole("student")}
-              className={`px-3 py-1 text-xs rounded ${
-                isStudent
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-              }`}
+              className={`px-3 py-1 text-xs rounded ${isStudent
+                ? "bg-blue-600 text-white"
+                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                }`}
               title="학생 모드로 전환"
             >
               학생
             </button>
             <button
               onClick={() => setUserRole("professor")}
-              className={`px-3 py-1 text-xs rounded ${
-                isProfessor
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-              }`}
+              className={`px-3 py-1 text-xs rounded ${isProfessor
+                ? "bg-blue-600 text-white"
+                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                }`}
               title="교수 모드로 전환"
             >
               교수
@@ -87,9 +93,8 @@ export default function Navigation() {
             </div>
             <div className="relative">
               <span
-                className={`text-sm font-medium ${
-                  location.pathname === "/app/mypage" ? "text-[#1862ff]" : "text-white"
-                }`}
+                className={`text-sm font-medium ${location.pathname === "/app/mypage" ? "text-[#1862ff]" : "text-white"
+                  }`}
               >
                 {user?.name || "사용자"}
               </span>

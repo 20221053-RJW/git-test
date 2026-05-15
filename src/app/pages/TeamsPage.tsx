@@ -164,9 +164,8 @@ function StageProgress({ completedStages }: { completedStages: number }) {
             <div className="flex items-center gap-2">
               {/* Dot */}
               <div
-                className={`w-[18px] h-[18px] rounded-full flex-shrink-0 ${
-                  isDone ? "bg-[#3676ff]" : "bg-black"
-                }`}
+                className={`w-[18px] h-[18px] rounded-full flex-shrink-0 ${isDone ? "bg-[#3676ff]" : "bg-black"
+                  }`}
               />
               {/* Label */}
               <div className="flex-1 bg-[#d2e0ff] border border-[#0143d2] rounded-[5px] px-2 py-[3px]">
@@ -178,9 +177,8 @@ function StageProgress({ completedStages }: { completedStages: number }) {
             {/* Connector line between stages */}
             {i < STAGES.length - 1 && (
               <div
-                className={`ml-[5.5px] w-[7px] h-[10px] ${
-                  isLineBlue ? "bg-[#3676ff]" : "bg-[#c8c8c8]"
-                } rounded-sm`}
+                className={`ml-[5.5px] w-[7px] h-[10px] ${isLineBlue ? "bg-[#3676ff]" : "bg-[#c8c8c8]"
+                  } rounded-sm`}
               />
             )}
           </div>

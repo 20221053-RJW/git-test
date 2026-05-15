@@ -159,9 +159,9 @@ export default function MyPage() {
         <h1 className="text-[30px] font-bold text-black mb-10">마이페이지</h1>
 
         {/* 프로필 섹션 */}
-        <div className="bg-[rgba(255,255,255,0.9)] rounded-[14px] p-8 mb-8 shadow-md relative min-h-[400px]">
+        <div className="items-center flex flex-col md:flex-row bg-[rgba(255,255,255,0.9)] rounded-[14px] p-8 mb-8 shadow-md relative min-h-[400px]">
           {/* 프로필 아바타 */}
-          <div className="absolute left-[95px] top-[40px]">
+          <div className="md:absolute md:left-[95px] md:top-[40px]">
             <div className="bg-[#1862ff] rounded-full w-[170px] h-[171px] flex items-center justify-center text-[35px] font-bold text-white relative">
               류
               <button className="absolute bottom-0 right-0 bg-black border border-black rounded-[6px] w-[33px] h-[33px] flex items-center justify-center">
@@ -179,9 +179,9 @@ export default function MyPage() {
           </div>
 
           {/* 프로필 정보 */}
-          <div className="ml-[318px] space-y-6 pt-2">
+          <div className="w-full md:ml-[318px] space-y-6 pt-2">
             {/* 이름과 이메일 행 */}
-            <div className="flex gap-8">
+            <div className="flex flex-col md:flex-row gap-8">
               {/* 이름 */}
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-2">
@@ -228,7 +228,7 @@ export default function MyPage() {
             {/* 학교 및 학과 */}
             <div>
               <p className="text-[20px] font-bold text-black mb-2">학교 및 학과</p>
-              <div className="bg-[rgba(255,255,255,0.9)] rounded-[10px] h-[48px] px-5 flex items-center border border-[#e5e7eb]">
+              <div className="bg-[rgba(255,255,255,0.9)] rounded-[10px] md:h-[48px] px-5 flex items-center border border-[#e5e7eb]">
                 <p className="text-[18px] font-bold text-black">
                   숭실대학교 벤처중소기업학과/ 복수전공: 글로벌미디어학부
                 </p>
@@ -346,11 +346,10 @@ export default function MyPage() {
                 <button
                   key={dot}
                   onClick={() => setCurrentSlide(dot)}
-                  className={`rounded-full transition-all ${
-                    dot === currentSlide
-                      ? "w-[15px] h-[15px] bg-[#004AE6]"
-                      : "w-[12px] h-[12px] bg-[#9FC1FF]"
-                  }`}
+                  className={`rounded-full transition-all ${dot === currentSlide
+                    ? "w-[15px] h-[15px] bg-[#004AE6]"
+                    : "w-[12px] h-[12px] bg-[#9FC1FF]"
+                    }`}
                 />
               ))}
             </div>
