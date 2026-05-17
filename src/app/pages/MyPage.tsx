@@ -155,7 +155,7 @@ export default function MyPage() {
 
   return (
     <div className="min-h-screen bg-[#f0f0f0]">
-      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-4 py-8 lg:flex-row lg:items-start">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4 px-4 py-6 sm:gap-6 sm:px-6 lg:flex-row lg:items-start lg:px-8">
         {/* 사이드 네비게이션 바 */}
         <aside className="w-full rounded-[14px] bg-white p-5 shadow-md lg:sticky lg:top-8 lg:w-[240px] lg:shrink-0">
           <p className="mb-4 text-[18px] font-bold text-black">마이페이지 메뉴</p>
@@ -256,7 +256,7 @@ export default function MyPage() {
         </div>
 
         {/* 포트폴리오 리포트 */}
-        <div className="bg-[rgba(255,255,255,0.95)] border-2 border-[#f0f0f0] rounded-[14px] shadow-[0px_20px_25px_0px_rgba(0,0,0,0.1),0px_8px_10px_0px_rgba(0,0,0,0.1)] p-8 max-w-[980px] mx-auto">
+        <div className="mx-auto max-w-[980px] rounded-[14px] border-2 border-[#f0f0f0] bg-[rgba(255,255,255,0.95)] p-4 shadow-[0px_20px_25px_0px_rgba(0,0,0,0.1),0px_8px_10px_0px_rgba(0,0,0,0.1)] sm:p-6 lg:p-8">
           {/* 리포트 헤더 */}
           <div className="border-b-4 border-[#1862ff] pb-8 mb-8">
             <h2 className="text-[30px] font-black text-[#101828] mb-2">
@@ -280,7 +280,7 @@ export default function MyPage() {
               <span className="text-[20px] font-bold text-[#1c398e]">🎯</span>
               <h3 className="text-[20px] font-bold text-black">프로젝트 참여 현황</h3>
             </div>
-            <div className="grid grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
               <div className="bg-white rounded-[10px] shadow-[2px_2px_4px_1px_rgba(0,0,0,0.47)] p-6 text-center">
                 <p className="text-[30px] font-black text-[#1862ff] mb-2">30</p>
                 <p className="text-[12px] font-medium text-[#4a5565]">참여 프로젝트</p>
@@ -318,7 +318,7 @@ export default function MyPage() {
               </button>
 
               {/* 프로젝트 카드 그리드 */}
-              <div className="grid grid-cols-2 gap-8 px-8">
+              <div className="grid grid-cols-1 gap-5 px-0 md:grid-cols-2 md:gap-8 md:px-8">
                 {projects.slice(currentSlide * 2, currentSlide * 2 + 2).map((project, index) => (
                   <button
                     key={index}
@@ -380,7 +380,7 @@ export default function MyPage() {
               <h3 className="text-[20px] font-bold text-[#101828]">핵심 역량 및 성과</h3>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
               {/* 기술 역량 */}
               <div className="bg-white border-2 border-[#e5e7eb] rounded-[10px] p-6 drop-shadow-[0px_4px_2px_rgba(0,0,0,0.25)]">
                 <h4 className="text-[16px] font-bold text-[#0052ff] mb-4">기술 역량</h4>
@@ -420,7 +420,7 @@ export default function MyPage() {
           </div>
 
           {/* 성장 그래프 */}
-          <div className="bg-white border-2 border-[#e5e7eb] rounded-[14px] p-6 drop-shadow-[0px_4px_2px_rgba(0,0,0,0.25)] mb-8 max-w-[422px] ml-auto">
+          <div className="mb-8 ml-0 max-w-full rounded-[14px] border-2 border-[#e5e7eb] bg-white p-5 drop-shadow-[0px_4px_2px_rgba(0,0,0,0.25)] sm:p-6 lg:ml-auto lg:max-w-[422px]">
             <div className="flex items-center gap-2 mb-4">
               <span className="text-[16px]">📈</span>
               <h4 className="text-[16px] font-bold text-[#101828]">성장 그래프</h4>

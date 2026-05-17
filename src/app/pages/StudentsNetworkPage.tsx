@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useParams } from "react-router";
 import { Search, BookOpen, Clock, MapPin, FlaskConical, User, Pencil, Shuffle } from "lucide-react";
 import { api } from "../api/mock-data";
 import { useAuth } from "../contexts/AuthContext";
@@ -741,47 +742,10 @@ function StudentCard({ student, onClick }: { student: Student; onClick?: () => v
   );
 }
 
-/* ─────────── 푸터 ─────────── */
-
-function Footer() {
-  return (
-    <footer className="bg-[#111827] text-white mt-16">
-      <div className="max-w-6xl mx-auto px-8 py-12 grid grid-cols-1 md:grid-cols-3 gap-10">
-        <div>
-          <p className="text-xl font-bold mb-2">CampusConnect</p>
-          <p className="text-gray-400 text-sm leading-relaxed">
-            학생들의 팀 프로젝트 협업을 위한<br />올인원 플랫폼
-          </p>
-        </div>
-        <div>
-          <p className="font-semibold mb-3">연락처</p>
-          <ul className="text-gray-400 text-sm space-y-2">
-            <li>✉ support@campusconnect.com</li>
-            <li>📞 02-1234-5678</li>
-            <li>📍 서울특별시 광진구 능동로 209</li>
-          </ul>
-        </div>
-        <div>
-          <p className="font-semibold mb-3">바로가기</p>
-          <ul className="text-gray-400 text-sm space-y-2">
-            <li><a href="#" className="hover:text-white transition-colors">이용약관</a></li>
-            <li><a href="#" className="hover:text-white transition-colors">개인정보처리방침</a></li>
-            <li><a href="#" className="hover:text-white transition-colors">공지사항</a></li>
-            <li><a href="#" className="hover:text-white transition-colors">FAQ</a></li>
-          </ul>
-        </div>
-      </div>
-      <div className="border-t border-gray-800 py-6 text-center text-gray-500 text-xs space-y-1">
-        <p>© 2026 CampusConnect. All rights reserved.</p>
-        <p>본 서비스는 교육 목적으로 제작된 프로젝트입니다.</p>
-      </div>
-    </footer>
-  );
-}
-
 /* ─────────── 페이지 ─────────── */
 
 export default function StudentsNetworkPage() {
+  const { courseId } = useParams<{ courseId?: string }>();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showMyProfileModal, setShowMyProfileModal] = useState(false);
@@ -805,8 +769,9 @@ export default function StudentsNetworkPage() {
   const otherStudents = students.filter((s) => !s.isSelf);
 
   useEffect(() => {
+    setLoading(true);
     Promise.all([
-      api.studentNetwork.getStudents(),
+      api.studentNetwork.getStudents(courseId),
       api.studentNetwork.getExtras(),
       api.studentNetwork.getEditForm(),
     ])
@@ -823,7 +788,7 @@ export default function StudentsNetworkPage() {
         });
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [courseId]);
 
   if (loading) {
     return (
@@ -856,14 +821,14 @@ export default function StudentsNetworkPage() {
 
   return (
     // 전체 페이지 컨테이너
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      <div className="flex-1 max-w-6xl mx-auto w-full px-8 py-8">
-        <h2 className="text-[#155dfc] text-2xl font-bold mb-6">수강자들 네트워크</h2>
+    <div className="flex min-h-screen flex-col bg-gray-50">
+      <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <h2 className="mb-6 text-2xl font-black text-[#155dfc] sm:text-3xl">수강자들 네트워크</h2>
 
         {/* 교수 프로필 배너 */}
         {isProfessor && professor && (
           <div className="bg-[#f0f5ff] border border-[#c7d9f8] rounded-2xl shadow-sm p-6 mb-6">
-            <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-full bg-[#dbe8fb] flex items-center justify-center flex-shrink-0 ring-2 ring-[#b8d0f5]">
                   <span className="text-xl font-bold text-[#2b5db5]">{professor.name.charAt(0)}</span>
@@ -876,7 +841,7 @@ export default function StudentsNetworkPage() {
                   <p className="text-[#4a6fa5] text-sm">{professor.department}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm text-[#4a6fa5]">
+              <div className="grid grid-cols-1 gap-x-8 gap-y-2 text-sm text-[#4a6fa5] sm:grid-cols-2">
                 {professor.office && (
                   <div className="flex items-center gap-1.5">
                     <MapPin className="w-3.5 h-3.5 text-[#7a9fd4] flex-shrink-0" />
@@ -911,11 +876,11 @@ export default function StudentsNetworkPage() {
         {/* 학생 본인 프로필 배너 */}
         {isStudent && (
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 mb-6">
-            <div className="flex items-start justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-3">
-                  <span className="text-[#101828] text-xl font-bold">류지원 (나)</span>
-                  <span className="text-[#6a7282] text-sm">4학년</span>
+                  <span className="text-[#101828] text-xl font-bold">{selfStudent.name} (나)</span>
+                  {selfStudent.year && <span className="text-[#6a7282] text-sm">{selfStudent.year}</span>}
                 </div>
                 <p className="text-[#6a7282] text-sm">{editForm.major}</p>
                 <div className="flex flex-wrap gap-2 mt-1">
@@ -936,15 +901,15 @@ export default function StudentsNetworkPage() {
         )}
 
         {/* 검색 + 랜덤 팀 생성 */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <button
             onClick={() => setShowRandomTeamModal(true)}
-            className="bg-[#155dfc] text-white px-5 py-2 rounded-[8px] font-bold text-sm hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+            className="flex w-full items-center justify-center gap-2 rounded-[8px] bg-[#155dfc] px-5 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700 sm:w-auto"
           >
             <Shuffle className="w-4 h-4" />
             랜덤 팀 생성 +
           </button>
-          <div className="relative w-64">
+          <div className="relative w-full sm:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
@@ -957,7 +922,7 @@ export default function StudentsNetworkPage() {
         </div>
 
         {/* 학생 그리드 */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {allDisplayStudents.map((student) => (
             <StudentCard
               key={student.id}
@@ -977,8 +942,6 @@ export default function StudentsNetworkPage() {
           </div>
         )}
       </div>
-
-      <Footer />
 
       {selectedStudent && (
         <StudentProfileModal

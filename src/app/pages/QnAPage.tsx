@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router";
 import type { Question } from "../types";
 import { api } from "../api/mock-data";
@@ -24,40 +24,38 @@ export default function QnAPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <p className="text-gray-600">로딩 중...</p>
+      <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
+        <p className="text-gray-600">{"\uB85C\uB529 \uC911..."}</p>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-5xl">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Q&A 게시판</h1>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
-          + 질문하기
+    <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-black tracking-tight text-gray-900 sm:text-3xl">Q&A {"\uAC8C\uC2DC\uD310"}</h1>
+        <button className="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700 sm:w-auto">
+          + {"\uC9C8\uBB38\uD558\uAE30"}
         </button>
       </div>
 
-      {/* 검색 바 */}
-      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+      <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="질문 검색..."
+          placeholder="\uC9C8\uBB38 \uAC80\uC0C9..."
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
-      {/* 질문 목록 */}
       <div className="space-y-4">
         {filteredQuestions.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-md p-12 text-center">
+          <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm sm:p-12">
             <p className="text-gray-600">
               {searchQuery
-                ? "검색 결과가 없습니다."
-                : "아직 질문이 없습니다."}
+                ? "\uAC80\uC0C9 \uACB0\uACFC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4."
+                : "\uC544\uC9C1 \uC9C8\uBB38\uC774 \uC5C6\uC2B5\uB2C8\uB2E4."}
             </p>
           </div>
         ) : (
@@ -65,7 +63,7 @@ export default function QnAPage() {
             <Link
               key={question.id}
               to={`/app/qna/${question.id}`}
-              className="block bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+              className="block rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-lg sm:p-6"
             >
               <h2 className="text-xl font-bold text-gray-900 mb-2">
                 {question.title}
@@ -75,15 +73,15 @@ export default function QnAPage() {
                 {question.content}
               </p>
 
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-4 text-gray-600">
-                  <span>👤 {question.authorName}</span>
-                  <span>👁️ {question.views}</span>
-                  <span>💬 {question.answers.length}</span>
-                  <span>👍 {question.likes}</span>
+              <div className="flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap items-center gap-3 text-gray-600 sm:gap-4">
+                  <span>{"\uC791\uC131\uC790"} {question.authorName}</span>
+                  <span>{"\uC870\uD68C"} {question.views}</span>
+                  <span>{"\uB2F5\uBCC0"} {question.answers.length}</span>
+                  <span>{"\uC88B\uC544\uC694"} {question.likes}</span>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {question.tags.map((tag) => (
                     <span
                       key={tag}

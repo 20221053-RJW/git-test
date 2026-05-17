@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import type { Team, TeamMember } from "../types";
-// api.students.getAll은 Supabase의 ai_students 테이블에서 학생 목록을 가져옵니다.
 import { api } from "../api/mock-data";
 
 export default function RandomTeamPage() {
@@ -9,7 +8,7 @@ export default function RandomTeamPage() {
   const [students, setStudents] = useState<TeamMember[]>([]);
 
   useEffect(() => {
-    // Supabase에서 가져온 학생 목록을 팀원 형태로 바꾸는 코드입니다.
+    // Supabase의 ai_users와 수강 관계에서 가져온 학생 목록을 팀원 형태로 바꿉니다.
     api.students.getAll().then((data) => {
       const members: TeamMember[] = data.map((s) => ({
         id: s.id,
@@ -41,11 +40,11 @@ export default function RandomTeamPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6 text-gray-900">랜덤 팀 생성</h1>
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <h1 className="mb-6 text-2xl font-black text-gray-900 sm:text-3xl">랜덤 팀 생성</h1>
 
-      <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-        <div className="flex items-center gap-4 mb-4">
+      <div className="mb-8 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center">
           <label className="text-gray-700 font-medium">팀당 인원:</label>
           <input
             type="number"
@@ -57,7 +56,7 @@ export default function RandomTeamPage() {
           />
           <button
             onClick={generateRandomTeams}
-            className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors font-medium"
+            className="w-full rounded bg-blue-600 px-6 py-2 font-medium text-white transition-colors hover:bg-blue-700 sm:w-auto"
           >
             팀 생성하기
           </button>
@@ -65,9 +64,9 @@ export default function RandomTeamPage() {
       </div>
 
       {teams.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 lg:gap-6">
           {teams.map((team) => (
-            <div key={team.id} className="bg-white rounded-lg shadow-md p-6">
+            <div key={team.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4">
                 {team.name}
               </h2>
@@ -78,10 +77,10 @@ export default function RandomTeamPage() {
                     className="flex items-center gap-3 text-gray-700"
                   >
                     <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
-                      {member.name.charAt(0)}
+                      {(member.name ?? "").charAt(0)}
                     </div>
                     <div>
-                      <div className="font-medium">{member.name}</div>
+                      <div className="font-medium">{member.name ?? ""}</div>
                       <div className="text-sm text-gray-500">
                         {member.studentId}
                       </div>

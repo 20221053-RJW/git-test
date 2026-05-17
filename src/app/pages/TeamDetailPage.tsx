@@ -1,22 +1,12 @@
-import { useState, useRef, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router";
+import React, { useState, useRef, useEffect } from "react";
+import { useParams, Link } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
-import imgRectangle50 from "../../imports/파일출력및실행교수버전-4-1/f8a8278a96ee8032ab097bc243897bc7a171292a.png";
-import imgRectangle51 from "../../imports/파일출력및실행교수버전-4-1/490a3c963f38b4f53d45d819ca5a37b5d06c9ffa.png";
-
-interface TroubleshootingLog {
-  id: string;
-  author: string;
-  status: "resolved" | "in-progress" | "reported";
-  timestamp: string;
-  problem: string;
-  plan?: string;
-  solution?: string;
-}
+import { api } from "../api/mock-data";
+import type { ChatMessage, PeerReviewStudent, PeerReviewTeammate, TroubleshootingLog } from "../types";
 
 export default function TeamDetailPage() {
-  const { id } = useParams();
-  const navigate = useNavigate();
+  const { id, teamId, courseId } = useParams<{ id?: string; teamId?: string; courseId?: string }>();
+  const selectedTeamId = teamId ?? id ?? "";
   const { isProfessor, isStudent, user } = useAuth();
   const [showEvalModal, setShowEvalModal] = useState(false);
   const [showStudentEvalModal, setShowStudentEvalModal] = useState(false);
@@ -27,8 +17,8 @@ export default function TeamDetailPage() {
   const [planInput, setPlanInput] = useState("");
 
   // 피드백 상태
-  const FEEDBACK_OPTIONS = ["참신해요", "퀄리티가 좋아요", "실용적이에요", "실제로 사용해보고 싶어요"];
-  const [selectedFeedbacks, setSelectedFeedbacks] = useState<string[]>(["참신해요", "실제로 사용해보고 싶어요"]);
+  const [feedbackOptions, setFeedbackOptions] = useState<string[]>([]);
+  const [selectedFeedbacks, setSelectedFeedbacks] = useState<string[]>([]);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [showFeedbackCustomModal, setShowFeedbackCustomModal] = useState(false);
   const [customFeedbackText, setCustomFeedbackText] = useState("");
@@ -41,32 +31,7 @@ export default function TeamDetailPage() {
   };
 
   // 채팅 상태
-  interface ChatMessage {
-    id: string;
-    sender: string;
-    text: string;
-    time: string;
-    isMine: boolean;
-    isAnon: boolean;
-  }
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    {
-      id: "c1",
-      sender: "익명",
-      text: "몽고 DB말고 다른 DB 사이트를 이용하시면 해결될 수도 있습니다.",
-      time: "10분 전",
-      isMine: false,
-      isAnon: true,
-    },
-    {
-      id: "c2",
-      sender: "성보경 교수님",
-      text: "위 학생의 의견과 마찬가지로 다른 사이트를 한번 이용해보세요.",
-      time: "8분 전",
-      isMine: false,
-      isAnon: false,
-    },
-  ]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatAnon, setChatAnon] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
@@ -103,68 +68,15 @@ export default function TeamDetailPage() {
     s1: "", s2: "", s3: "", s4: "",
   });
 
-  // 학생별 피어리뷰 데이터 (mock)
-  const allStudents = [
-    {
-      id: "s1",
-      name: "홍길동",
-      contribution: 30,
-      peerKeywords: ["다시 팀하고 싶어요", "디자인을 잘 해요", "끝까지 책임감을 가지고 완성해요"],
-      peerComment: "항상 맡은 역할��� 시간 안에 완수했습니다.",
-      roles: ["DB 문제 해결", "웹 디자인 및 프론트 엔드 css"],
-    },
-    {
-      id: "s2",
-      name: "류지원",
-      contribution: 25,
-      peerKeywords: ["다시 팀하고 싶어요", "디자인을 잘 해요", "끝까지 책임감을 가지고 완성해요"],
-      peerComment: "항상 맡은 역할을 시간 안에 완수했습니다.",
-      roles: ["DB 문제 해결", "웹 디자인 및 백엔드 서버 개발"],
-    },
-    {
-      id: "s3",
-      name: "최지민",
-      contribution: 35,
-      peerKeywords: ["다시 팀하고 싶어요", "디자인을 잘 해요", "끝까지 책임감을 가지고 완성해요"],
-      peerComment: "항상 맡은 역할을 시간 안에 완수했습니다.",
-      roles: ["DB 문제 해결", "웹 디자인 및 프론트 엔드 css"],
-    },
-    {
-      id: "s4",
-      name: "김철수",
-      contribution: 10,
-      peerKeywords: ["맡은 역할을 안해요", "시간을 안지켜요", "후반부엔 참여를 안했어요"],
-      peerComment: "처음부터 끝까지 기여한 바가 없습니다.",
-      roles: ["DB 문제 해결", "웹 디자인 및 프론트 엔드 css"],
-    },
-  ];
-
-  const GOOD_KEYWORDS = [
-    "다시 팀하고 싶어요",
-    "시간 약속을 잘 지켜요",
-    "디자인을 잘 해요",
-    "끝까지 책임감을 가지고 완성해요",
-  ];
-  const BAD_KEYWORDS = [
-    "연락을 잘 안봐요",
-    "시간 약속을 잘 못지켜요",
-    "참여도가 낮아요",
-    "맡은 역할을 다 하지 않았어요",
-  ];
-
-  const teammates = [
-    { id: "t1", name: "홍길동", contribution: 30 },
-    { id: "t2", name: "김철수", contribution: 30 },
-    { id: "t3", name: "최수민", contribution: 10 },
-  ];
+  const [allStudents, setAllStudents] = useState<PeerReviewStudent[]>([]);
+  const [goodKeywords, setGoodKeywords] = useState<string[]>([]);
+  const [badKeywords, setBadKeywords] = useState<string[]>([]);
+  const [teammates, setTeammates] = useState<PeerReviewTeammate[]>([]);
+  const [troubleshootingLogs, setTroubleshootingLogs] = useState<TroubleshootingLog[]>([]);
 
   const [peerReviews, setPeerReviews] = useState<
     Record<string, { good: string[]; bad: string[]; comment: string; submitted: boolean }>
-  >(
-    Object.fromEntries(
-      teammates.map((m) => [m.id, { good: [], bad: [], comment: "", submitted: false }])
-    )
-  );
+  >({});
 
   const toggleKeyword = (memberId: string, type: "good" | "bad", keyword: string) => {
     setPeerReviews((prev) => {
@@ -179,41 +91,48 @@ export default function TeamDetailPage() {
     });
   };
 
-  const troubleshootingLogs: TroubleshootingLog[] = [
-    {
-      id: "1",
-      author: "김규민",
-      status: "resolved",
-      timestamp: "어제 14:30",
-      problem: "메인 페이지 레이아웃이 모바일 환경에서 깨짐 현상 발생.",
-      plan: "개발자 도구(F12)로 HTML 구조 확인 후 CSS 클래스 충 여부 점검 예정.",
-      solution: ".login-container와 .wrapper 클래스 이름이 다른 컴포넌트와 겹쳐서 발생한 문제였음. 클래스명을 명확히 분리하여 레이아웃 복구 완료!",
-    },
-    {
-      id: "2",
-      author: "류지원",
-      status: "in-progress",
-      timestamp: "방금 전",
-      problem: "프론트(로컬)에서 백엔드 서버로 로그인 요청 시 계속 CORS 에러 발생 중.",
-      plan: "프론트엔드 프록시(Proxy) 설정을 추가하거나, 백엔드 담당자에게 헤더 설정 변경을 요청하여 테스트할 예정.",
-    },
-  ];
+  useEffect(() => {
+    if (!selectedTeamId) return;
+
+    Promise.all([
+      api.teamDetail.getFeedbackOptions(selectedTeamId),
+      api.teamDetail.getChatMessages(selectedTeamId),
+      api.teamDetail.getPeerReviewStudents(selectedTeamId),
+      api.teamDetail.getReviewKeywords(selectedTeamId),
+      api.teamDetail.getTeammates(selectedTeamId),
+      api.teamDetail.getTroubleshootingLogs(selectedTeamId),
+    ]).then(([feedbackData, chatData, reviewStudents, reviewKeywords, teammateData, logData]) => {
+      setFeedbackOptions(feedbackData);
+      setSelectedFeedbacks(feedbackData.slice(0, 2));
+      setChatMessages(chatData);
+      setAllStudents(reviewStudents);
+      setGoodKeywords(reviewKeywords.good);
+      setBadKeywords(reviewKeywords.bad);
+      setTeammates(teammateData);
+      setTroubleshootingLogs(logData);
+      setPeerReviews(
+        Object.fromEntries(
+          teammateData.map((member) => [member.id, { good: [], bad: [], comment: "", submitted: false }])
+        )
+      );
+    });
+  }, [selectedTeamId]);
 
   return (
     <div className="min-h-screen bg-[#f0f0f0]">
-      <div className="container mx-auto px-4 py-8 max-w-[1504px]">
+      <div className="mx-auto w-full max-w-[1504px] px-4 py-6 sm:px-6 lg:px-8">
         {/* 헤더 */}
         <div className="mb-10">
           <Link
-            to="/app/teams"
+            to={courseId ? `/app/courses/${courseId}/teams` : "/app/teams"}
             className="text-[#155dfc] text-base font-medium hover:underline mb-4 inline-block"
           >
             ← 뒤로가기
           </Link>
-          <div className="flex justify-between items-center">
-            <h1 className="text-[30px] font-bold text-[#155dfc]">{id}조</h1>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <h1 className="break-words text-2xl font-black text-[#155dfc] sm:text-[30px]">{selectedTeamId}</h1>
             {isProfessor ? (
-              <div className="flex gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <button
                   onClick={() => setShowStudentEvalModal(true)}
                   className="bg-white border-2 border-[#155dfc] text-[#155dfc] px-6 py-2.5 rounded-[10px] font-bold text-base hover:bg-blue-50 transition-colors"
@@ -228,7 +147,7 @@ export default function TeamDetailPage() {
                 </button>
               </div>
             ) : (
-              <div className="flex gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <button
                   onClick={() => setShowPeerReviewModal(true)}
                   className="bg-white border-2 border-[#155dfc] text-[#155dfc] px-6 py-2.5 rounded-[10px] font-bold text-base hover:bg-blue-50 transition-colors"
@@ -295,13 +214,9 @@ export default function TeamDetailPage() {
             </div>
 
             {/* 프로젝트 스크린샷 */}
-            <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="relative rounded-[10px] shadow-md overflow-hidden h-[137px]">
-                <img
-                  src={imgRectangle50}
-                  alt="1조 - FIGMA"
-                  className="w-full h-full object-cover"
-                />
+                <div className="h-full w-full bg-gradient-to-br from-[#dbeafe] to-[#bfdbfe]" />
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="bg-white px-4 py-1 rounded-[10px]">
                     <p className="text-lg font-semibold text-black">1조 - FIGMA</p>
@@ -309,11 +224,7 @@ export default function TeamDetailPage() {
                 </div>
               </div>
               <div className="relative rounded-[10px] shadow-md overflow-hidden h-[137px]">
-                <img
-                  src={imgRectangle51}
-                  alt="1조 - 중간발표"
-                  className="w-full h-full object-cover"
-                />
+                <div className="h-full w-full bg-gradient-to-br from-[#ede9fe] to-[#c4b5fd]" />
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="bg-white px-4 py-1 rounded-[10px]">
                     <p className="text-lg font-semibold text-black">1조 - 중간발표</p>
@@ -359,7 +270,7 @@ export default function TeamDetailPage() {
 
           {/* 오른쪽: 트러블슈팅 로그 */}
           <div className="bg-white rounded-[14px] shadow-md border border-[rgba(0,0,0,0.1)] p-5">
-            <div className="flex justify-between items-center mb-4">
+            <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-lg font-bold text-[#1c398e]">
                 🛠️ 트러블슈팅 로그
               </h2>
@@ -406,7 +317,7 @@ export default function TeamDetailPage() {
                     }`}
                   >
                     {/* 헤더 */}
-                    <div className="flex justify-between items-center mb-3">
+                    <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-2">
                         {log.status === "resolved" ? (
                           <span className="bg-[#dcfce7] border border-[#b9f8cf] text-[#008236] text-[10px] font-bold px-2 py-1 rounded-full">
@@ -449,7 +360,7 @@ export default function TeamDetailPage() {
                     </div>
 
                     {/* 액션 버튼 */}
-                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[#f3f4f6]">
+                    <div className="mt-3 flex flex-col gap-2 border-t border-[#f3f4f6] pt-3 sm:flex-row sm:items-center">
                       <button
                         onClick={() => setShowChatModal(true)}
                         className="bg-[#155dfc] text-white text-xs font-bold px-4 py-2 rounded-[20px] hover:bg-blue-700 transition-colors"
@@ -488,7 +399,7 @@ export default function TeamDetailPage() {
                     placeholder="🏃 원인을 어떻게 파악하고, 어떻게 해결할 계획인가요?"
                     className="w-full bg-white border border-[#e5e7eb] rounded p-2 text-xs text-[#1e2939] placeholder:text-[rgba(30,41,57,0.5)] mb-3"
                   />
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <label className="flex items-center gap-2 text-xs text-[#6a7282]">
                       <input type="checkbox" className="w-3.5 h-3.5" />
                       <span>익명</span>
@@ -537,7 +448,7 @@ export default function TeamDetailPage() {
                   setCustomFeedbackText("");
                   setCustomFeedbackDraft("");
                 }}
-                className="mt-2 bg-white border border-gray-300 text-[#364153] px-8 py-2 rounded-[14px] font-medium text-sm hover:bg-gray-50 transition-colors"
+                className="mt-2 rounded-[14px] border border-gray-300 bg-white px-6 py-2 text-sm font-medium text-[#364153] transition-colors hover:bg-gray-50 sm:px-8"
               >
                 🔄 피드백 다시하기
               </button>
@@ -546,7 +457,7 @@ export default function TeamDetailPage() {
             /* ── 입력 상태 ── */
             <>
               <div className="flex justify-center gap-3 flex-wrap mb-4">
-                {FEEDBACK_OPTIONS.map((option) => (
+                {feedbackOptions.map((option) => (
                   <button
                     key={option}
                     className={`${
@@ -576,7 +487,7 @@ export default function TeamDetailPage() {
               <div className="flex justify-center">
                 <button
                   disabled={selectedFeedbacks.length === 0 && !customFeedbackText}
-                  className="bg-black disabled:bg-gray-400 text-white px-8 py-2 rounded-[14px] border border-[rgba(0,0,0,0.1)] font-medium hover:bg-gray-800 transition-colors"
+                  className="rounded-[14px] border border-[rgba(0,0,0,0.1)] bg-black px-6 py-2 font-medium text-white transition-colors hover:bg-gray-800 disabled:bg-gray-400 sm:px-8"
                   onClick={() => setFeedbackSubmitted(true)}
                 >
                   완료
@@ -1074,12 +985,12 @@ export default function TeamDetailPage() {
 
                       {/* 키워드 그리드 */}
                       <div className="bg-white border-2 border-[rgba(59,128,255,0.32)] rounded-[10px] p-3">
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                           {/* 좋아요 */}
                           <div className="space-y-2">
                             <p className="text-sm font-medium text-black">좋아요</p>
                             <div className="flex flex-wrap gap-1.5">
-                              {GOOD_KEYWORDS.map((kw) => {
+                              {goodKeywords.map((kw) => {
                                 const selected = review.good.includes(kw);
                                 return (
                                   <button
@@ -1102,7 +1013,7 @@ export default function TeamDetailPage() {
                           <div className="space-y-2">
                             <p className="text-sm font-medium text-black">아쉬워요</p>
                             <div className="flex flex-wrap gap-1.5">
-                              {BAD_KEYWORDS.map((kw) => {
+                              {badKeywords.map((kw) => {
                                 const selected = review.bad.includes(kw);
                                 return (
                                   <button

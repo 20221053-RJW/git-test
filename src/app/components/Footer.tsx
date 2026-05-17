@@ -7,8 +7,8 @@ type FooterProps = {
 export default function Footer({ variant = "default" }: FooterProps) {
   if (variant === "compact") {
     return (
-      <footer className="bg-[#0f172a] py-6 px-8">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6 text-sm">
+      <footer className="bg-[#0f172a] px-4 py-6 sm:px-8">
+        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 text-sm sm:grid-cols-3">
           <div>
             <h3 className="font-bold text-white mb-2">CampusConnect</h3>
             <p className="text-gray-400 text-xs">
@@ -43,7 +43,7 @@ export default function Footer({ variant = "default" }: FooterProps) {
 
   return (
     <footer className="bg-[#111827] text-white mt-16">
-      <div className="max-w-6xl mx-auto px-8 py-12 grid grid-cols-1 md:grid-cols-3 gap-10">
+      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-4 py-10 sm:px-6 md:grid-cols-3 md:gap-10 lg:px-8">
         <div>
           <p className="text-xl font-bold mb-2">CampusConnect</p>
           <p className="text-gray-400 text-sm leading-relaxed">

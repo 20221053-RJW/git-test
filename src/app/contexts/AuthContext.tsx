@@ -27,6 +27,60 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+type AiUserRow = {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  student_number?: string | null;
+  major?: string | null;
+  skills?: unknown;
+  bio?: string | null;
+  department?: string | null;
+  office?: string | null;
+  office_hours?: string | null;
+  research_areas?: unknown;
+};
+
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function toProfile(userData: AiUserRow): AdminProfile | StudentProfile | ProfessorProfile {
+  if (userData.role === "student") {
+    return {
+      id: userData.id,
+      name: userData.name,
+      email: userData.email,
+      role: "student",
+      studentId: userData.student_number ?? "",
+      major: userData.major ?? "",
+      skills: asArray<string>(userData.skills),
+      bio: userData.bio ?? undefined,
+    };
+  }
+
+  if (userData.role === "professor") {
+    return {
+      id: userData.id,
+      name: userData.name,
+      email: userData.email,
+      role: "professor",
+      department: userData.department ?? "",
+      office: userData.office ?? "",
+      officeHours: userData.office_hours ?? "",
+      researchAreas: asArray<string>(userData.research_areas),
+    };
+  }
+
+  return {
+    id: userData.id,
+    name: userData.name,
+    email: userData.email,
+    role: "admin",
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AdminProfile | StudentProfile | ProfessorProfile | null>(null);
 
@@ -49,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .eq("firebase_uid", firebaseUser.uid)
           .single();
 
-        if (userData) setUser(userData);
+        if (userData) setUser(toProfile(userData as AiUserRow));
         setIsAuthenticated(true);
       } else {
         setUser(null);
@@ -83,6 +137,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         firebase_uid: firebaseUid,
         name,
         role,
+        skills: [],
+        tags: [],
+        research_areas: [],
       };
 
       // 위에서 만든 userData를 Supabase의 ai_users 테이블에 한 줄 추가합니다.
@@ -115,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (userData) {
         // AuthContext의 user 업데이트
-        setUser(userData);
+        setUser(toProfile(userData as AiUserRow));
         setIsAuthenticated(true);
       }
     } catch (error) {

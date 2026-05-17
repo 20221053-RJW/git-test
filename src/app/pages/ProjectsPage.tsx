@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router";
 import type { Project } from "../types";
 import { api } from "../api/mock-data";
@@ -11,10 +11,10 @@ const statusColors = {
 };
 
 const statusLabels = {
-  planning: "계획 중",
-  "in-progress": "진행 중",
-  review: "검토 중",
-  completed: "완료",
+  planning: "\uACC4\uD68D \uC911",
+  "in-progress": "\uC9C4\uD589 \uC911",
+  review: "\uAC80\uD1A0 \uC911",
+  completed: "\uC644\uB8CC",
 };
 
 export default function ProjectsPage() {
@@ -30,39 +30,39 @@ export default function ProjectsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <p className="text-gray-600">로딩 중...</p>
+      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <p className="text-gray-600">{"\uB85C\uB529 \uC911..."}</p>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">팀 프로젝트</h1>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
-          + 새 프로젝트
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-black tracking-tight text-gray-900 sm:text-3xl">{"\uD300 \uD504\uB85C\uC81D\uD2B8"}</h1>
+        <button className="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700 sm:w-auto">
+          + {"\uC0C8 \uD504\uB85C\uC81D\uD2B8"}
         </button>
       </div>
 
       {projects.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-md p-12 text-center">
+        <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm sm:p-12">
           <p className="text-gray-600 mb-4">
-            진행 중인 프로젝트가 없습니다.
+            {"\uC9C4\uD589 \uC911\uC778 \uD504\uB85C\uC81D\uD2B8\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4."}
           </p>
-          <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
-            프로젝트 시작하기
+          <button className="rounded-lg bg-blue-600 px-6 py-2 font-medium text-white transition-colors hover:bg-blue-700">
+            {"\uD504\uB85C\uC81D\uD2B8 \uC2DC\uC791\uD558\uAE30"}
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
           {projects.map((project) => (
             <Link
               key={project.id}
               to={`/app/projects/${project.id}`}
-              className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-all hover:-translate-y-1"
+              className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg sm:p-6"
             >
-              <div className="flex justify-between items-start mb-3">
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <h2 className="text-xl font-bold text-gray-900">
                   {project.title}
                 </h2>
@@ -82,12 +82,12 @@ export default function ProjectsPage() {
               <div className="space-y-2 text-sm">
                 {project.deadline && (
                   <p className="text-gray-600">
-                    📅 마감일:{" "}
+                    {"\uB9C8\uAC10\uC77C"}:{" "}
                     {new Date(project.deadline).toLocaleDateString("ko-KR")}
                   </p>
                 )}
                 <p className="text-gray-500 text-xs">
-                  최종 업데이트:{" "}
+                  {"\uCD5C\uC885 \uC5C5\uB370\uC774\uD2B8"}:{" "}
                   {new Date(project.updatedAt).toLocaleDateString("ko-KR")}
                 </p>
               </div>

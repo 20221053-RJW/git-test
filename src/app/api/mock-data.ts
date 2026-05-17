@@ -39,7 +39,45 @@ type AiUser = {
   email: string;
   name: string;
   role: "student" | "professor" | "admin";
+  student_number?: string | null;
+  major?: string | null;
+  year?: string | null;
+  skills?: unknown;
+  bio?: string | null;
+  tags?: unknown;
+  avatar?: string | null;
+  image?: string | null;
+  department?: string | null;
+  office?: string | null;
+  office_hours?: string | null;
+  research_areas?: unknown;
 };
+
+function toStudentProfile(user: AiUser): StudentProfile {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: "student",
+    studentId: user.student_number ?? "",
+    major: user.major ?? "",
+    skills: asArray<string>(user.skills),
+    bio: user.bio ?? undefined,
+  };
+}
+
+function toProfessorProfile(user: AiUser): ProfessorProfile {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: "professor",
+    department: user.department ?? "",
+    office: user.office ?? "",
+    officeHours: user.office_hours ?? "",
+    researchAreas: asArray<string>(user.research_areas),
+  };
+}
 
 async function getCurrentAiUser(): Promise<AiUser | null> {
   const firebaseUid = auth.currentUser?.uid;
@@ -47,7 +85,7 @@ async function getCurrentAiUser(): Promise<AiUser | null> {
 
   const { data, error } = await supabase
     .from("ai_users")
-    .select("id, firebase_uid, email, name, role")
+    .select("*")
     .eq("firebase_uid", firebaseUid)
     .maybeSingle();
 
@@ -86,29 +124,49 @@ async function getPrimaryCourseId(): Promise<string | null> {
   return courseIds[0] ?? null;
 }
 
-async function getStudentsFromDb(): Promise<StudentProfile[]> {
-  const courseId = await getPrimaryCourseId();
-  let query = supabase
-    .from("ai_students")
-    .select("id, name, email, student_id, major, skills, bio, course_id")
-    .order("id", { ascending: true });
+async function getSelectedCourseId(courseId?: string): Promise<string | null> {
+  return courseId ?? getPrimaryCourseId();
+}
 
-  if (courseId) query = query.eq("course_id", courseId);
+async function getUsersByIds(userIds: string[]): Promise<AiUser[]> {
+  if (userIds.length === 0) return [];
 
-  const { data, error } = await query;
+  const { data, error } = await supabase
+    .from("ai_users")
+    .select("*")
+    .in("id", userIds);
 
   if (error) throw error;
+  return (data ?? []) as AiUser[];
+}
 
-  return (data ?? []).map((student) => ({
-    id: student.id,
-    name: student.name,
-    email: student.email,
-    role: "student",
-    studentId: student.student_id,
-    major: student.major,
-    skills: asArray<string>(student.skills),
-    bio: student.bio ?? undefined,
-  }));
+async function getCourseUsers(courseId: string, role?: "student" | "professor" | "assistant"): Promise<AiUser[]> {
+  let membershipQuery = supabase
+    .from("ai_course_memberships")
+    .select("user_id, role")
+    .eq("course_id", courseId);
+
+  if (role) membershipQuery = membershipQuery.eq("role", role);
+
+  const { data: memberships, error } = await membershipQuery;
+  if (error) throw error;
+
+  const users = await getUsersByIds((memberships ?? []).map((membership) => membership.user_id));
+  const order = new Map((memberships ?? []).map((membership, index) => [membership.user_id, index]));
+
+  return users.sort((a, b) => {
+    const numberCompare = (a.student_number ?? "").localeCompare(b.student_number ?? "");
+    if (numberCompare !== 0) return numberCompare;
+    return (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0);
+  });
+}
+
+async function getStudentsFromDb(courseId?: string): Promise<StudentProfile[]> {
+  const selectedCourseId = await getSelectedCourseId(courseId);
+  if (!selectedCourseId) return [];
+
+  const users = await getCourseUsers(selectedCourseId, "student");
+  return users.map(toStudentProfile);
 }
 
 async function getStudentByIdFromDb(id: string): Promise<StudentProfile | undefined> {
@@ -118,22 +176,14 @@ async function getStudentByIdFromDb(id: string): Promise<StudentProfile | undefi
 
 async function getProfessorsFromDb(): Promise<ProfessorProfile[]> {
   const { data, error } = await supabase
-    .from("ai_professors")
-    .select("id, name, email, department, office, office_hours, research_areas")
-    .order("id", { ascending: true });
+    .from("ai_users")
+    .select("*")
+    .eq("role", "professor")
+    .order("name", { ascending: true });
 
   if (error) throw error;
 
-  return (data ?? []).map((professor) => ({
-    id: professor.id,
-    name: professor.name,
-    email: professor.email,
-    role: "professor",
-    department: professor.department,
-    office: professor.office,
-    officeHours: professor.office_hours,
-    researchAreas: asArray<string>(professor.research_areas),
-  }));
+  return ((data ?? []) as AiUser[]).map(toProfessorProfile);
 }
 
 async function getProfessorByIdFromDb(id: string): Promise<ProfessorProfile | undefined> {
@@ -145,29 +195,39 @@ async function getCoursesFromDb(): Promise<Course[]> {
   const accessibleCourseIds = await getAccessibleCourseIds();
   let query = supabase
     .from("ai_courses")
-    .select("id, name, code, professor_id, schedule, room, students_count, max_students, semester, description")
+    .select("id, name, code, instructor_user_id, schedule, room, students_count, max_students, semester, description")
     .order("id", { ascending: true });
 
   if (accessibleCourseIds.length > 0) {
     query = query.in("id", accessibleCourseIds);
   }
 
-  const [coursesResult, professors] = await Promise.all([query, getProfessorsFromDb()]);
+  const [coursesResult, professors, membershipsResult] = await Promise.all([
+    query,
+    getProfessorsFromDb(),
+    supabase.from("ai_course_memberships").select("course_id, role").eq("role", "student"),
+  ]);
 
   if (coursesResult.error) throw coursesResult.error;
+  if (membershipsResult.error) throw membershipsResult.error;
+
+  const studentCounts = (membershipsResult.data ?? []).reduce<Record<string, number>>((result, membership) => {
+    result[membership.course_id] = (result[membership.course_id] ?? 0) + 1;
+    return result;
+  }, {});
 
   return (coursesResult.data ?? []).map((course) => {
-    const professor = professors.find((item) => item.id === course.professor_id);
+    const professor = professors.find((item) => item.id === course.instructor_user_id);
 
     return {
       id: course.id,
       name: course.name,
       code: course.code,
       professor: professor?.name ?? "",
-      professorId: course.professor_id,
+      professorId: course.instructor_user_id ?? "",
       schedule: course.schedule,
       room: course.room ?? undefined,
-      students: course.students_count,
+      students: studentCounts[course.id] ?? course.students_count,
       maxStudents: course.max_students ?? undefined,
       semester: course.semester,
       description: course.description ?? undefined,
@@ -180,21 +240,20 @@ async function getCourseByIdFromDb(id: string): Promise<Course | undefined> {
   return courses.find((course) => course.id === id);
 }
 
-async function getTeamCardsFromDb(): Promise<TeamCard[]> {
-  const courseId = await getPrimaryCourseId();
-  if (!courseId) return [];
+async function getTeamCardsFromDb(courseId?: string): Promise<TeamCard[]> {
+  const selectedCourseId = await getSelectedCourseId(courseId);
+  if (!selectedCourseId) return [];
 
   const [teamsResult, membersResult, activitiesResult] = await Promise.all([
     supabase
       .from("ai_teams")
       .select("id, name, badge, project_title, progress, completed_stages, sort_order")
-      .eq("course_id", courseId)
+      .eq("course_id", selectedCourseId)
       .not("project_title", "is", null)
       .order("sort_order", { ascending: true }),
     supabase
       .from("ai_team_members")
-      .select("id, team_id, initial, color, sort_order")
-      .not("initial", "is", null)
+      .select("id, team_id, user_id, initial, color, role, sort_order")
       .order("sort_order", { ascending: true }),
     supabase
       .from("ai_team_activities")
@@ -209,6 +268,9 @@ async function getTeamCardsFromDb(): Promise<TeamCard[]> {
   const teams = teamsResult.data ?? [];
   const members = membersResult.data ?? [];
   const activities = activitiesResult.data ?? [];
+  const memberUsers = await getUsersByIds(
+    Array.from(new Set(members.map((member) => member.user_id).filter(Boolean)))
+  );
 
   return teams.map((team) => ({
     id: team.id,
@@ -219,11 +281,18 @@ async function getTeamCardsFromDb(): Promise<TeamCard[]> {
     completedStages: team.completed_stages,
     members: members
       .filter((member) => member.team_id === team.id)
-      .map((member) => ({
-        id: member.id,
-        initial: member.initial ?? "",
-        color: member.color ?? "",
-      })),
+      .map((member) => {
+        const user = memberUsers.find((item) => item.id === member.user_id);
+
+        return {
+          id: user?.id ?? member.id,
+          name: user?.name,
+          studentId: user?.student_number ?? undefined,
+          initial: member.initial ?? user?.avatar ?? user?.name.slice(0, 1) ?? "",
+          color: member.color ?? "",
+          role: member.role ?? undefined,
+        };
+      }),
     activities: activities
       .filter((activity) => activity.team_id === team.id)
       .map((activity) => ({
@@ -246,14 +315,14 @@ async function getTeamStagesFromDb(): Promise<string[]> {
   return (data ?? []).map((stage) => stage.name);
 }
 
-async function getAnnouncementsFromDb(): Promise<Announcement[]> {
-  const courseId = await getPrimaryCourseId();
-  if (!courseId) return [];
+async function getAnnouncementsFromDb(courseId?: string): Promise<Announcement[]> {
+  const selectedCourseId = await getSelectedCourseId(courseId);
+  if (!selectedCourseId) return [];
 
   const { data, error } = await supabase
     .from("ai_announcements")
     .select("id, title, description, d_day, sort_order, course_id")
-    .eq("course_id", courseId)
+    .eq("course_id", selectedCourseId)
     .order("sort_order", { ascending: true });
 
   if (error) throw error;
@@ -265,25 +334,19 @@ async function getAnnouncementsFromDb(): Promise<Announcement[]> {
   }));
 }
 
-async function getNetworkStudentsFromDb(): Promise<NetworkStudent[]> {
-  const [currentUser, courseId] = await Promise.all([getCurrentAiUser(), getPrimaryCourseId()]);
-  if (!courseId) return [];
+async function getNetworkStudentsFromDb(courseId?: string): Promise<NetworkStudent[]> {
+  const [currentUser, selectedCourseId] = await Promise.all([getCurrentAiUser(), getSelectedCourseId(courseId)]);
+  if (!selectedCourseId) return [];
 
-  const { data, error } = await supabase
-    .from("ai_network_students")
-    .select("id, user_id, name, is_self, year, major, bio, tags, avatar, image, sort_order, course_id")
-    .eq("course_id", courseId)
-    .order("sort_order", { ascending: true });
+  const students = await getCourseUsers(selectedCourseId, "student");
 
-  if (error) throw error;
-
-  return (data ?? []).map((student) => ({
+  return students.map((student) => ({
     id: student.id,
     name: student.name,
-    isSelf: currentUser ? student.user_id === currentUser.id : student.is_self,
+    isSelf: currentUser ? student.id === currentUser.id : false,
     year: student.year ?? undefined,
-    major: student.major,
-    bio: student.bio,
+    major: student.major ?? "",
+    bio: student.bio ?? "",
     tags: asArray<string>(student.tags),
     avatar: student.avatar ?? undefined,
     image: student.image ?? undefined,
@@ -292,13 +355,13 @@ async function getNetworkStudentsFromDb(): Promise<NetworkStudent[]> {
 
 async function getStudentExtrasFromDb(): Promise<Record<string, StudentExtra>> {
   const { data, error } = await supabase
-    .from("ai_student_extras")
-    .select("student_id, temperature, team_project_count, portfolio_file, detailed_bio, keywords");
+    .from("ai_user_learning_profiles")
+    .select("user_id, temperature, team_project_count, portfolio_file, detailed_bio, keywords");
 
   if (error) throw error;
 
   return (data ?? []).reduce<Record<string, StudentExtra>>((result, extra) => {
-    result[extra.student_id] = {
+    result[extra.user_id] = {
       temperature: Number(extra.temperature),
       teamProjectCount: extra.team_project_count,
       portfolioFile: extra.portfolio_file,
@@ -467,11 +530,13 @@ async function getMyPageProjectsFromDb(): Promise<MyPageProject[]> {
   }));
 }
 
-async function getTeamDetailConfigFromDb() {
+async function getTeamDetailConfigFromDb(teamId?: string) {
+  if (!teamId) throw new Error("Team id is required for team detail config.");
+
   const { data, error } = await supabase
     .from("ai_team_detail_config")
     .select("feedback_options, good_keywords, bad_keywords")
-    .eq("id", "default")
+    .eq("team_id", teamId)
     .maybeSingle();
 
   if (error) throw error;
@@ -480,10 +545,13 @@ async function getTeamDetailConfigFromDb() {
   return data;
 }
 
-async function getTeamDetailChatMessagesFromDb(): Promise<ChatMessage[]> {
+async function getTeamDetailChatMessagesFromDb(teamId?: string): Promise<ChatMessage[]> {
+  if (!teamId) return [];
+
   const { data, error } = await supabase
     .from("ai_team_detail_chat_messages")
-    .select("id, sender, text, display_time, is_mine, is_anon, sort_order")
+    .select("id, sender, text, display_time, is_mine, is_anon, sort_order, team_id")
+    .eq("team_id", teamId)
     .order("sort_order", { ascending: true });
 
   if (error) throw error;
@@ -498,10 +566,13 @@ async function getTeamDetailChatMessagesFromDb(): Promise<ChatMessage[]> {
   }));
 }
 
-async function getTeamDetailPeerReviewStudentsFromDb(): Promise<PeerReviewStudent[]> {
+async function getTeamDetailPeerReviewStudentsFromDb(teamId?: string): Promise<PeerReviewStudent[]> {
+  if (!teamId) return [];
+
   const { data, error } = await supabase
     .from("ai_team_detail_peer_review_students")
-    .select("id, name, contribution, peer_keywords, peer_comment, roles, sort_order")
+    .select("id, name, contribution, peer_keywords, peer_comment, roles, sort_order, team_id")
+    .eq("team_id", teamId)
     .order("sort_order", { ascending: true });
 
   if (error) throw error;
@@ -516,8 +587,8 @@ async function getTeamDetailPeerReviewStudentsFromDb(): Promise<PeerReviewStuden
   }));
 }
 
-async function getTeamDetailReviewKeywordsFromDb() {
-  const config = await getTeamDetailConfigFromDb();
+async function getTeamDetailReviewKeywordsFromDb(teamId?: string) {
+  const config = await getTeamDetailConfigFromDb(teamId);
 
   return {
     good: asArray<string>(config.good_keywords),
@@ -525,15 +596,18 @@ async function getTeamDetailReviewKeywordsFromDb() {
   };
 }
 
-async function getTeamDetailFeedbackOptionsFromDb(): Promise<string[]> {
-  const config = await getTeamDetailConfigFromDb();
+async function getTeamDetailFeedbackOptionsFromDb(teamId?: string): Promise<string[]> {
+  const config = await getTeamDetailConfigFromDb(teamId);
   return asArray<string>(config.feedback_options);
 }
 
-async function getTeamDetailTeammatesFromDb(): Promise<PeerReviewTeammate[]> {
+async function getTeamDetailTeammatesFromDb(teamId?: string): Promise<PeerReviewTeammate[]> {
+  if (!teamId) return [];
+
   const { data, error } = await supabase
     .from("ai_team_detail_teammates")
-    .select("id, name, contribution, sort_order")
+    .select("id, name, contribution, sort_order, team_id")
+    .eq("team_id", teamId)
     .order("sort_order", { ascending: true });
 
   if (error) throw error;
@@ -541,10 +615,13 @@ async function getTeamDetailTeammatesFromDb(): Promise<PeerReviewTeammate[]> {
   return data ?? [];
 }
 
-async function getTeamDetailTroubleshootingLogsFromDb(): Promise<TroubleshootingLog[]> {
+async function getTeamDetailTroubleshootingLogsFromDb(teamId?: string): Promise<TroubleshootingLog[]> {
+  if (!teamId) return [];
+
   const { data, error } = await supabase
     .from("ai_team_detail_troubleshooting_logs")
-    .select("id, author, status, display_timestamp, problem, plan, solution, sort_order")
+    .select("id, author, status, display_timestamp, problem, plan, solution, sort_order, team_id")
+    .eq("team_id", teamId)
     .order("sort_order", { ascending: true });
 
   if (error) throw error;
@@ -564,7 +641,7 @@ async function getQuestionsFromDb(): Promise<Question[]> {
   const accessibleCourseIds = await getAccessibleCourseIds();
   let query = supabase
     .from("ai_questions")
-    .select("id, title, content, author_id, author_name, course_id, tags, answers, views, likes, created_at, updated_at")
+    .select("id, title, content, author_user_id, author_id, author_name, course_id, tags, answers, views, likes, created_at, updated_at")
     .order("created_at", { ascending: true });
 
   if (accessibleCourseIds.length > 0) query = query.in("course_id", accessibleCourseIds);
@@ -573,12 +650,20 @@ async function getQuestionsFromDb(): Promise<Question[]> {
 
   if (error) throw error;
 
-  return (data ?? []).map((question) => ({
+  const questions = data ?? [];
+  const authors = await getUsersByIds(
+    Array.from(new Set(questions.map((question) => question.author_user_id).filter(Boolean)))
+  );
+
+  return questions.map((question) => {
+    const author = authors.find((user) => user.id === question.author_user_id);
+
+    return {
     id: question.id,
     title: question.title,
     content: question.content,
-    authorId: question.author_id,
-    authorName: question.author_name,
+    authorId: author?.id ?? question.author_id,
+    authorName: author?.name ?? question.author_name,
     courseId: question.course_id,
     tags: asArray<string>(question.tags),
     answers: asArray(question.answers),
@@ -586,7 +671,8 @@ async function getQuestionsFromDb(): Promise<Question[]> {
     likes: question.likes,
     createdAt: asDate(question.created_at),
     updatedAt: asDate(question.updated_at),
-  }));
+    };
+  });
 }
 
 async function getAuthPageSummaryFromDb(): Promise<AuthPageSummary> {

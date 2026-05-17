@@ -1,7 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, useLocation } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
-import { useState } from "react";
 
 interface NavItem {
   label: string;
@@ -14,10 +13,11 @@ const navItems: NavItem[] = [
 
 export default function Navigation() {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const isCourseListPage = location.pathname === "/app/courses";
   const shouldShowTopNav = !isCourseListPage;
+  const logoPath = isAuthenticated ? "/app/courses" : "/";
 
   const isActive = (path: string) => {
     if (path === "/app/courses") {
@@ -26,28 +26,29 @@ export default function Navigation() {
     return location.pathname === path;
   };
 
-  return (/*gap-2 h-16 → md:h-16  flex-col md:flex-row md:justify-between pb-4 md:pb-0*/
-    <div className="bg-black w-full gap-2 md:h-16 px-8 pb-4 md:pb-0 md:px-32 flex flex-col md:flex-row md:justify-between items-center shadow-lg border-b-3 border-[#3676ff]">
-      <Link to="/" className="flex items-center">
-        <h1 className="text-2xl font-bold text-white tracking-wide">
+  return (
+    <header className="sticky top-0 z-40 w-full border-b-3 border-[#3676ff] bg-black/95 shadow-lg backdrop-blur">
+      <div className="mx-auto flex min-h-16 w-full max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+      <Link to={logoPath} className="flex min-w-0 items-center">
+        <h1 className="truncate text-xl font-bold tracking-wide text-white sm:text-2xl">
           CampusConnect
         </h1>
       </Link>
-      <div className="block md:hidden">
-        <button className="text-white" onClick={() => setIsOpen(!isOpen)}>
-          {isOpen ? "▲" : "▼"}
-        </button>
-      </div>
-      {/* /*flex-col md:flex-row gap-8ㄱgap-4*/}
-      <div className={`flex flex-col md:flex-row items-center gap-4 md:gap-0 ${isOpen ? "block" : "hidden md:flex"}`}>
-        {/* /*flex-col md:flex-row gap-1 md:gap-8 items-center */}
+      <button
+        className="rounded-lg border border-white/15 px-3 py-2 text-sm font-bold text-white md:hidden"
+        onClick={() => setIsOpen(!isOpen)}
+        aria-label="메뉴 열기"
+      >
+        {isOpen ? "닫기" : "메뉴"}
+      </button>
+      <div className={`w-full flex-col items-stretch gap-3 md:flex md:w-auto md:flex-row md:items-center md:gap-8 ${isOpen ? "flex" : "hidden"}`}>
         {shouldShowTopNav && (
-          <nav className="flex flex-col md:flex-row gap-1 md:gap-8 items-center ">
+          <nav className="flex flex-col gap-2 md:flex-row md:items-center md:gap-8">
             {navItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`relative transition-colors font-semibold ${isActive(item.path) ? "text-[#3676ff]" : "text-gray-400 hover:text-white"
+                className={`relative rounded-lg px-3 py-2 text-center font-semibold transition-colors md:px-0 md:py-0 ${isActive(item.path) ? "bg-white/10 text-[#3676ff] md:bg-transparent" : "text-gray-400 hover:bg-white/10 hover:text-white md:hover:bg-transparent"
                   }`}
               >
                 <span>{item.label}</span>
@@ -59,10 +60,9 @@ export default function Navigation() {
             ))}
           </nav>
         )}
-/* flex-col md:flex-row */
-        <div className="flex flex-col md:flex-row items-center gap-4">
-          <Link to="/app/mypage" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[#2f67df] rounded-full flex items-center justify-center">
+        <div className="flex flex-col items-stretch gap-4 md:flex-row md:items-center">
+          <Link to="/app/mypage" className="flex items-center justify-center gap-2 rounded-lg px-3 py-2 hover:bg-white/10 md:px-0 md:py-0">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#2f67df]">
               <span className="text-white text-sm font-bold">
                 {user?.name.charAt(0) || "U"}
               </span>
@@ -81,6 +81,7 @@ export default function Navigation() {
           </Link>
         </div>
       </div>
-    </div>
+      </div>
+    </header>
   );
 }

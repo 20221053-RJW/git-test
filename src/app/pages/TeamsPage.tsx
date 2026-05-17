@@ -1,181 +1,46 @@
-import { useNavigate } from "react-router";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router";
+import { api } from "../api/mock-data";
 
-const STAGES = [
-  "아이디어 기획",
-  "서비스 디자인",
-  "프론트 개발",
-  "백앤드 개발",
-  "배포 & 고객 테스트",
-];
+import type { Activity, Announcement, Course, TeamCard } from "../types";
 
-interface TeamMember {
-  id: string;
-  initial: string;
-  color: string;
-}
 
-interface Activity {
-  tag: string;
-  title: string;
-  description: string;
-  time: string;
-}
 
-interface TeamCard {
-  id: string;
-  name: string;
-  badge?: string;
-  projectTitle: string;
-  members: TeamMember[];
-  progress: number;
+// 한 팀이 현재 어느 단계까지 완료했는지 세로 진행바로 보여주는 컴포넌트입니다.
+// completedStages가 3이면 0, 1, 2번째 단계까지 완료된 것으로 처리합니다.
+function StageProgress({
+  completedStages,
+  stages,
+}: {
   completedStages: number;
-  activities: Activity[];
-}
-
-interface Announcement {
-  title: string;
-  description: string;
-  dDay: number;
-}
-
-const teams: TeamCard[] = [
-  {
-    id: "1",
-    name: "1조",
-    badge: "🔥 🚀 가장 조회수가 높은 조",
-    projectTitle: "캠퍼스 카풀 웹서비스",
-    members: [
-      { id: "1", initial: "김", color: "bg-[#e5e7eb]" },
-      { id: "2", initial: "이", color: "bg-[#d1d5dc]" },
-      { id: "3", initial: "박", color: "bg-[#99a1af]" },
-    ],
-    progress: 50,
-    completedStages: 3,
-    activities: [
-      {
-        tag: "트러블슈팅",
-        title: "트러블슈팅 로그 추가",
-        description: "API 아이디어 추가가 필요합니다. 오류 관련해서 추가적인 검토가 필요한 사항입니다.",
-        time: "방금 전",
-      },
-      {
-        tag: "진행사항",
-        title: "API 오류 해결",
-        description: "인증 토큰 만료 문제 수정 완료. 로그인 흐름 전반 재점검이 필요합니다.",
-        time: "방금 전",
-      },
-    ],
-  },
-  {
-    id: "2",
-    name: "2조",
-    badge: "",
-    projectTitle: "중고 전공책 거래 커뮤니티",
-    members: [
-      { id: "4", initial: "김", color: "bg-[#e5e7eb]" },
-      { id: "5", initial: "이", color: "bg-[#d1d5dc]" },
-      { id: "6", initial: "박", color: "bg-[#99a1af]" },
-    ],
-    progress: 25,
-    completedStages: 1,
-    activities: [],
-  },
-  {
-    id: "3",
-    name: "3조",
-    badge: "🔥 🚀 교수님께서 가장 오래 머무른 조",
-    projectTitle: "AI 학식 메뉴 추천",
-    members: [
-      { id: "7", initial: "한", color: "bg-[#e5e7eb]" },
-      { id: "8", initial: "오", color: "bg-[#d1d5dc]" },
-      { id: "9", initial: "임", color: "bg-[#99a1af]" },
-    ],
-    progress: 75,
-    completedStages: 4,
-    activities: [
-      {
-        tag: "제출",
-        title: "print.py 제출 완료",
-        description: "데이터 전처리 코드를 제출했습니다. 다음 단계로 모델 학습을 진행할 예정입니다.",
-        time: "방금 전",
-      },
-    ],
-  },
-  {
-    id: "4",
-    name: "4조",
-    badge: "데이터 관련 도움이 필요한 조, sos",
-    projectTitle: "스터디 매칭 시스템",
-    members: [
-      { id: "10", initial: "배", color: "bg-[#e5e7eb]" },
-      { id: "11", initial: "송", color: "bg-[#d1d5dc]" },
-      { id: "12", initial: "김", color: "bg-[#99a1af]" },
-    ],
-    progress: 50,
-    completedStages: 3,
-    activities: [
-      {
-        tag: "이슈",
-        title: "데이터 연동이 안되는 문제발생",
-        description: "서버와 클라이언트 간 데이터 연동 오류. 현재 디버깅 중이며 내일까지 해결 예정입니다.",
-        time: "방금 전",
-      },
-    ],
-  },
-  {
-    id: "5",
-    name: "5조",
-    badge: "",
-    projectTitle: "유학생 튜터링 플랫폼",
-    members: [
-      { id: "13", initial: "박", color: "bg-[#e5e7eb]" },
-      { id: "14", initial: "아", color: "bg-[#d1d5dc]" },
-    ],
-    progress: 50,
-    completedStages: 3,
-    activities: [],
-  },
-];
-
-const announcements: Announcement[] = [
-  {
-    title: "중간발표 관련 공지",
-    description:
-      "해결방안에 맞는 POC 초안설계(핵심기능위주, Figma 활용), 검토 및 수정(10주차까지 2주의 시간이 있으므로 수업 이외시간에 진행가능보임)",
-    dDay: 3,
-  },
-  {
-    title: "주제 발표 공지 (11주차, 12주차 진행)",
-    description:
-      "이번 주제발표는 \"우리 프로젝트를 더 좋게 만들기 위한 실전 적용 발표\"이며, 다른 팀도 바로 활용할 수 있게 만드는 발표, 그리고 발표 후 서로 자연스럽게 묻고 배우는 시간까지 포함한 활동입니다.",
-    dDay: 18,
-  },
-];
-
-function StageProgress({ completedStages }: { completedStages: number }) {
+  stages: string[];
+}) {
   return (
     <div className="flex flex-col">
-      {STAGES.map((stage, i) => {
+      {stages.map((stage, i) => {
+        // i는 현재 단계의 순서입니다. 배열은 0부터 시작하므로 첫 번째 단계의 i는 0입니다.
+        // completedStages보다 작은 순서의 단계는 완료된 단계로 표시합니다.
         const isDone = i < completedStages;
+        // 단계와 단계 사이의 연결선은 "다음 단계까지 완료된 경우"에만 파란색으로 표시합니다.
         const isLineBlue = i < completedStages - 1;
         return (
           <div key={stage}>
-            {/* Stage row */}
+            {/* 단계 한 줄: 왼쪽 점 + 오른쪽 단계 이름 박스를 한 줄로 배치합니다. */}
             <div className="flex items-center gap-2">
-              {/* Dot */}
+              {/* 완료된 단계면 파란 점, 아직 안 끝난 단계면 검은 점입니다. */}
               <div
                 className={`w-[18px] h-[18px] rounded-full flex-shrink-0 ${isDone ? "bg-[#3676ff]" : "bg-black"
                   }`}
               />
-              {/* Label */}
+              {/* 단계 이름이 들어가는 파란 테두리 박스입니다. */}
               <div className="flex-1 bg-[#d2e0ff] border border-[#0143d2] rounded-[5px] px-2 py-[3px]">
                 <span className="text-[#101828] text-[11px] font-medium">
                   {stage}
                 </span>
               </div>
             </div>
-            {/* Connector line between stages */}
-            {i < STAGES.length - 1 && (
+            {/* 마지막 단계 아래에는 연결선이 필요 없으므로 마지막 전까지만 선을 그립니다. */}
+            {i < stages.length - 1 && (
               <div
                 className={`ml-[5.5px] w-[7px] h-[10px] ${isLineBlue ? "bg-[#3676ff]" : "bg-[#c8c8c8]"
                   } rounded-sm`}
@@ -188,9 +53,12 @@ function StageProgress({ completedStages }: { completedStages: number }) {
   );
 }
 
+// 활동 기록 카드 1개를 그리는 작은 컴포넌트입니다.
+// TeamCardComponent 안에서 activity 배열을 map으로 돌리며 여러 개 생성합니다.
 function ActivityCard({ activity }: { activity: Activity }) {
   return (
     <div className="bg-white border border-[#d2e0ff] rounded-[10px] p-3 shadow-sm">
+      {/* 위쪽 줄에는 활동 종류(tag)와 작성 시간을 양쪽 끝에 배치합니다. */}
       <div className="flex items-center justify-between mb-1">
         <span className="text-[10px] font-bold text-[#3676ff] bg-[#eff6ff] px-2 py-0.5 rounded-full">
           {activity.tag}
@@ -205,23 +73,29 @@ function ActivityCard({ activity }: { activity: Activity }) {
   );
 }
 
+// 팀 카드 전체를 담당하는 컴포넌트입니다.
+// 목록 페이지는 teams 배열을 반복하면서 이 컴포넌트를 팀 개수만큼 만들어냅니다.
 function TeamCardComponent({
   team,
+  stages,
   onClick,
 }: {
   team: TeamCard;
+  stages: string[];
   onClick: () => void;
 }) {
   return (
     <div
+      // 카드 아무 곳이나 눌러도 해당 팀 상세 페이지로 이동하게 합니다.
       onClick={onClick}
       className="bg-white rounded-[14px] border border-gray-200 shadow-[2px_4px_4px_2px_rgba(224,224,224,0.28)] overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all cursor-pointer flex flex-col"
     >
-      {/* Blue gradient header */}
+      {/* 카드 상단의 파란 그라데이션 영역입니다. 팀 이름과 뱃지를 보여줍니다. */}
       <div className="bg-gradient-to-r from-[#3676ff] to-[#003ecc] px-5 py-5 border-b border-black/10 flex-shrink-0">
         <p className="text-white font-black text-3xl leading-none mb-1">
           {team.name}
         </p>
+        {/* badge 값이 있으면 뱃지 문구를 보여주고, 없으면 아래에서 빈 높이만 맞춥니다. */}
         {team.badge && (
           <p className="text-white text-xs font-bold leading-snug mt-1">
             {team.badge}
@@ -230,16 +104,17 @@ function TeamCardComponent({
         {!team.badge && <div className="h-4" />}
       </div>
 
-      {/* Card body */}
+      {/* 카드 본문 영역입니다. 프로젝트명, 입장 버튼, 진행률, 단계, 활동 기록이 들어갑니다. */}
       <div className="p-5 flex flex-col gap-4 flex-1">
-        {/* Project title */}
+        {/* 팀이 진행 중인 프로젝트 제목입니다. */}
         <p className="text-[#101828] font-bold text-base text-center">
           {team.projectTitle}
         </p>
 
-        {/* Enter button */}
+        {/* 입장 버튼입니다. 카드 클릭과 같은 이동 동작을 하지만 버튼처럼 보이게 따로 만들었습니다. */}
         <button
           onClick={(e) => {
+            // 버튼을 눌렀을 때 부모 카드의 onClick까지 중복 실행되지 않도록 막습니다.
             e.stopPropagation();
             onClick();
           }}
@@ -257,7 +132,7 @@ function TeamCardComponent({
           입장하기
         </button>
 
-        {/* Progress label */}
+        {/* 숫자로 보는 전체 진행률입니다. 실제 막대는 아니고 텍스트로만 보여줍니다. */}
         <div className="flex items-center gap-1.5">
           <div className="w-2 h-2 rounded-full bg-[#3676ff]" />
           <span className="text-[#3676ff] text-xs font-bold">
@@ -265,16 +140,17 @@ function TeamCardComponent({
           </span>
         </div>
 
-        {/* Stage progress */}
-        <StageProgress completedStages={team.completedStages} />
+        {/* completedStages 값을 넘겨서 완료된 단계 개수만큼 파란색으로 표시합니다. */}
+        <StageProgress completedStages={team.completedStages} stages={stages} />
 
-        {/* Recent activity */}
+        {/* 최근 활동 목록입니다. 활동이 없으면 빈 상태 메시지를 대신 보여줍니다. */}
         <div>
           <p className="text-xs font-bold text-gray-600 mb-2 flex items-center gap-1">
             📋 최근 업데이트 & 활동
           </p>
           {team.activities.length > 0 ? (
             <div className="flex flex-col gap-2">
+              {/* 활동 배열을 하나씩 ActivityCard로 바꿔서 화면에 표시합니다. */}
               {team.activities.map((activity, idx) => (
                 <ActivityCard key={idx} activity={activity} />
               ))}
@@ -287,7 +163,7 @@ function TeamCardComponent({
         </div>
       </div>
 
-      {/* Member avatars at bottom */}
+      {/* 카드 맨 아래의 팀원 아바타 목록입니다. */}
       <div className="px-5 pb-4 flex items-center gap-1 flex-shrink-0">
         {team.members.map((member) => (
           <div
@@ -304,81 +180,70 @@ function TeamCardComponent({
   );
 }
 
-function Footer() {
-  return (
-    <footer className="bg-[#111827] text-white mt-16">
-      <div className="max-w-6xl mx-auto px-8 py-12 grid grid-cols-1 md:grid-cols-3 gap-10">
-        <div>
-          <p className="text-xl font-bold mb-2">CampusConnect</p>
-          <p className="text-gray-400 text-sm leading-relaxed">
-            학생들의 팀 프로젝트 협업을 위한
-            <br />
-            올인원 플랫폼
-          </p>
-        </div>
-        <div>
-          <p className="font-semibold mb-3">연락처</p>
-          <ul className="text-gray-400 text-sm space-y-2">
-            <li>✉ support@campusconnect.com</li>
-            <li>📞 02-1234-5678</li>
-            <li>📍 서울특별시 광진구 능동로 209</li>
-          </ul>
-        </div>
-        <div>
-          <p className="font-semibold mb-3">바로가기</p>
-          <ul className="text-gray-400 text-sm space-y-2">
-            <li><a href="#" className="hover:text-white transition-colors">이용약관</a></li>
-            <li><a href="#" className="hover:text-white transition-colors">개인정보처리방침</a></li>
-            <li><a href="#" className="hover:text-white transition-colors">공지사항</a></li>
-            <li><a href="#" className="hover:text-white transition-colors">FAQ</a></li>
-          </ul>
-        </div>
-      </div>
-      <div className="border-t border-gray-800 py-6 text-center text-gray-500 text-xs space-y-1">
-        <p>© 2026 CampusConnect. All rights reserved.</p>
-        <p>본 서비스는 교육 목적으로 제작된 프로젝트입니다.</p>
-      </div>
-    </footer>
-  );
-}
-
+// 팀 목록 페이지의 실제 시작점입니다.
+// 이 컴포넌트가 팀 카드 목록, 공지 목록, 푸터를 한 화면에 조립합니다.
 export default function TeamsPage() {
+  // useNavigate는 react-router가 제공하는 페이지 이동 함수입니다.
+  // navigate("/주소")를 호출하면 해당 주소의 페이지로 이동합니다.
   const navigate = useNavigate();
+  const { courseId } = useParams<{ courseId?: string }>();
+  const [teams, setTeams] = useState<TeamCard[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [stages, setStages] = useState<string[]>([]);
+  const [course, setCourse] = useState<Course | null>(null);
+
+  useEffect(() => {
+    Promise.all([
+      api.teamCards.getAll(courseId),
+      api.announcements.getAll(courseId),
+      api.teamStages.getAll(),
+      courseId ? api.courses.getById(courseId) : Promise.resolve(undefined),
+    ]).then(([teamData, announcementData, stageData, courseData]) => {
+      setTeams(teamData);
+      setAnnouncements(announcementData);
+      setStages(stageData);
+      setCourse(courseData ?? null);
+    });
+  }, [courseId]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <div className="flex-1 max-w-7xl mx-auto w-full px-8 py-8">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-black text-[#155dfc] tracking-tight">
-            [2026-1] [웹프로그래밍] [가반]
+    <div className="flex min-h-screen flex-col bg-gray-50">
+      {/* 가운데 정렬된 메인 콘텐츠 영역입니다. max-w-7xl로 너무 넓어지지 않게 제한합니다. */}
+      <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        {/* 페이지 제목과 새 팀 만들기 버튼이 있는 상단 영역입니다. */}
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-2xl font-black tracking-tight text-[#155dfc] sm:text-3xl">
+            {course ? `[${course.semester}] [${course.name}]` : "[2026-1] [팀 프로젝트]"}
           </h1>
-          <button className="bg-[#1962ff] text-white px-5 py-2.5 rounded-[10px] font-bold hover:bg-[#1450e0] transition-colors shadow-md text-sm">
+          <button className="w-full rounded-[10px] bg-[#1962ff] px-5 py-2.5 text-sm font-bold text-white shadow-md transition-colors hover:bg-[#1450e0] sm:w-auto">
             + 새 팀 만들기
           </button>
         </div>
 
-        {/* Team cards grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
+        {/* 팀 카드들을 반응형 그리드로 배치합니다. 화면이 넓어질수록 한 줄에 더 많이 보입니다. */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {teams.map((team) => (
             <TeamCardComponent
               key={team.id}
               team={team}
-              onClick={() => navigate(`/app/teams/${team.id}`)}
+              stages={stages}
+              // 팀 카드를 누르면 /app/teams/팀id 주소로 이동합니다.
+              onClick={() => navigate(courseId ? `/app/courses/${courseId}/teams/${team.id}` : `/app/teams/${team.id}`)}
             />
           ))}
         </div>
 
-        {/* Announcements */}
+        {/* 중요 공지와 마감일 목록입니다. announcements 배열을 반복해서 카드로 보여줍니다. */}
         <div className="mt-12">
           <h2 className="text-xl font-black text-[#101828] mb-5 flex items-center gap-2">
             📌 중요 공지 &amp; 마감일
           </h2>
           <div className="flex flex-col gap-4">
             {announcements.map((ann, i) => (
+              // 공지 하나를 흰색 카드로 표시합니다.
               <div
                 key={i}
-                className="bg-white rounded-[14px] border border-gray-200 shadow-sm p-6 flex items-start justify-between gap-6"
+                className="flex flex-col gap-4 rounded-[14px] border border-gray-200 bg-white p-5 shadow-sm sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:p-6"
               >
                 <div className="flex-1">
                   <p className="font-bold text-[#101828] text-base mb-2">
@@ -389,6 +254,7 @@ export default function TeamsPage() {
                   </p>
                 </div>
                 <div className="flex-shrink-0">
+                  {/* D-숫자 형태로 마감까지 남은 날짜를 강조해서 보여줍니다. */}
                   <span className="bg-[#fee2e2] text-[#dc2626] text-sm font-bold px-3 py-1 rounded-full">
                     D-{ann.dDay}
                   </span>
@@ -398,8 +264,6 @@ export default function TeamsPage() {
           </div>
         </div>
       </div>
-
-      <Footer />
     </div>
   );
 }

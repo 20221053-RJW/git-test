@@ -40,6 +40,18 @@ export const router = createBrowserRouter([
         Component: CourseDetailPage,
       },
       {
+        path: "courses/:courseId/students",
+        Component: StudentsNetworkPage,
+      },
+      {
+        path: "courses/:courseId/teams",
+        Component: TeamsPage,
+      },
+      {
+        path: "courses/:courseId/teams/:teamId",
+        Component: TeamDetailPage,
+      },
+      {
         path: "profile",
         Component: StudentProfilePage,
       },
