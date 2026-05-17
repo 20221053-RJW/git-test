@@ -193,14 +193,14 @@ async function getProfessorByIdFromDb(id: string): Promise<ProfessorProfile | un
 
 async function getCoursesFromDb(): Promise<Course[]> {
   const accessibleCourseIds = await getAccessibleCourseIds();
+  if (accessibleCourseIds.length === 0) return [];
+
   let query = supabase
     .from("ai_courses")
     .select("id, name, code, instructor_user_id, schedule, room, students_count, max_students, semester, description")
     .order("id", { ascending: true });
 
-  if (accessibleCourseIds.length > 0) {
-    query = query.in("id", accessibleCourseIds);
-  }
+  query = query.in("id", accessibleCourseIds);
 
   const [coursesResult, professors, membershipsResult] = await Promise.all([
     query,
@@ -410,12 +410,14 @@ async function getStudentNetworkEditFormFromDb(): Promise<StudentNetworkEditForm
 
 async function getProjectsFromDb(): Promise<Project[]> {
   const accessibleCourseIds = await getAccessibleCourseIds();
+  if (accessibleCourseIds.length === 0) return [];
+
   let query = supabase
     .from("ai_projects")
     .select("id, title, description, course_id, team_id, status, deadline, created_at, updated_at")
     .order("created_at", { ascending: true });
 
-  if (accessibleCourseIds.length > 0) query = query.in("course_id", accessibleCourseIds);
+  query = query.in("course_id", accessibleCourseIds);
 
   const { data, error } = await query;
 
@@ -639,12 +641,14 @@ async function getTeamDetailTroubleshootingLogsFromDb(teamId?: string): Promise<
 
 async function getQuestionsFromDb(): Promise<Question[]> {
   const accessibleCourseIds = await getAccessibleCourseIds();
+  if (accessibleCourseIds.length === 0) return [];
+
   let query = supabase
     .from("ai_questions")
     .select("id, title, content, author_user_id, author_id, author_name, course_id, tags, answers, views, likes, created_at, updated_at")
     .order("created_at", { ascending: true });
 
-  if (accessibleCourseIds.length > 0) query = query.in("course_id", accessibleCourseIds);
+  query = query.in("course_id", accessibleCourseIds);
 
   const { data, error } = await query;
 

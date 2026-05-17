@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import svgPaths from "../../imports/Group43/svg-bqpgzlg1zb";
+import { useAuth } from "../contexts/AuthContext";
 
 interface PeerReview {
   text: string;
@@ -28,8 +29,9 @@ interface Project {
 }
 
 export default function MyPage() {
-  const [currentSlide, setCurrentSlide] = useState(0);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [reportPage, setReportPage] = useState(1);
+  const { user } = useAuth();
 
   const projects: Project[] = [
     {
@@ -150,8 +152,17 @@ export default function MyPage() {
     },
   ];
 
-  const totalSlides = Math.ceil(projects.length / 2);
   const sideNavItems = ["요약 리포트", "상세 리포트", "내 정보 조회", "내 정보 수정"];
+  const reportPageTitles = ["역량 및 활동 요약", "주요 팀플 상세", "문제해결 경험"];
+  const profileName = user?.name ?? "로그인 사용자";
+  const profileEmail = user?.email ?? "-";
+  const profileInitial = profileName.slice(0, 1);
+  const profileSchoolAndMajor =
+    user?.role === "student"
+      ? `숭실대학교 ${user.major || "전공 미입력"}`
+      : user?.role === "professor"
+        ? `숭실대학교 ${user.department || "소속 미입력"} 교수`
+        : "로그인 사용자";
 
   return (
     <div className="min-h-screen bg-[#f0f0f0]">
@@ -181,7 +192,7 @@ export default function MyPage() {
           {/* 프로필 아바타 */}
           <div className="md:absolute md:left-[95px] md:top-[40px]">
             <div className="bg-[#1862ff] rounded-full w-[170px] h-[171px] flex items-center justify-center text-[35px] font-bold text-white relative">
-              류
+              {profileInitial}
               <button className="absolute bottom-0 right-0 bg-black border border-black rounded-[6px] w-[33px] h-[33px] flex items-center justify-center">
                 <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24.1667 22.9233">
                   <path
@@ -217,7 +228,7 @@ export default function MyPage() {
                   </button>
                 </div>
                 <div className="bg-[rgba(255,255,255,0.9)] rounded-[10px] h-[48px] px-5 flex items-center border border-[#e5e7eb]">
-                  <p className="text-[20px] font-bold text-black">류지원</p>
+                  <p className="text-[20px] font-bold text-black">{profileName}</p>
                 </div>
               </div>
 
@@ -238,7 +249,7 @@ export default function MyPage() {
                   </button>
                 </div>
                 <div className="bg-[rgba(255,255,255,0.9)] rounded-[10px] h-[48px] px-5 flex items-center border border-[#e5e7eb]">
-                  <p className="text-[20px] font-bold text-black">rujione@naver.com</p>
+                  <p className="text-[20px] font-bold text-black">{profileEmail}</p>
                 </div>
               </div>
             </div>
@@ -248,238 +259,278 @@ export default function MyPage() {
               <p className="text-[20px] font-bold text-black mb-2">학교 및 학과</p>
               <div className="bg-[rgba(255,255,255,0.9)] rounded-[10px] md:h-[48px] px-5 flex items-center border border-[#e5e7eb]">
                 <p className="text-[18px] font-bold text-black">
-                  숭실대학교 벤처중소기업학과/ 복수전공: 글로벌미디어학부
+                  {profileSchoolAndMajor}
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* 포트폴리오 리포트 */}
-        <div className="mx-auto max-w-[980px] rounded-[14px] border-2 border-[#f0f0f0] bg-[rgba(255,255,255,0.95)] p-4 shadow-[0px_20px_25px_0px_rgba(0,0,0,0.1),0px_8px_10px_0px_rgba(0,0,0,0.1)] sm:p-6 lg:p-8">
-          {/* 리포트 헤더 */}
-          <div className="border-b-4 border-[#1862ff] pb-8 mb-8">
-            <h2 className="text-[30px] font-black text-[#101828] mb-2">
-              📊 팀 프로젝트 경력 요약 리포트
-            </h2>
-            <p className="text-[14px] text-[#4a5565] mb-1">
-              학교 팀 프로젝트 경험을 체계적으로 정리한 취업 포트폴리오 자료
+        <div className="mx-auto flex w-full max-w-[794px] flex-col gap-3 rounded-2xl border border-[#dbe7ff] bg-white px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <div>
+            <p className="text-[12px] font-black text-[#155dfc]">리포트 페이지 넘기기</p>
+            <p className="mt-1 text-[14px] font-bold text-[#334155]">
+              {reportPage} / 3 · {reportPageTitles[reportPage - 1]}
             </p>
-            <p className="text-[12px] text-[#99a1af]">생성일: 2026년 4월 23일</p>
           </div>
-
-          {/* 프로젝트 참여 현황 */}
-          <div
-            className="border-l-4 border-[#0046d9] rounded-[10px] p-8 mb-8"
-            style={{
-              backgroundImage:
-                "linear-gradient(172.304deg, rgb(239, 246, 255) 0%, rgb(238, 242, 255) 100%)",
-            }}
-          >
-            <div className="flex items-center gap-2 mb-6">
-              <span className="text-[20px] font-bold text-[#1c398e]">🎯</span>
-              <h3 className="text-[20px] font-bold text-black">프로젝트 참여 현황</h3>
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
-              <div className="bg-white rounded-[10px] shadow-[2px_2px_4px_1px_rgba(0,0,0,0.47)] p-6 text-center">
-                <p className="text-[30px] font-black text-[#1862ff] mb-2">30</p>
-                <p className="text-[12px] font-medium text-[#4a5565]">참여 프로젝트</p>
-              </div>
-              <div className="bg-white rounded-[10px] shadow-[2px_2px_4px_1px_rgba(0,0,0,0.47)] p-6 text-center">
-                <p className="text-[30px] font-black text-[#00277b] mb-2">50</p>
-                <p className="text-[12px] font-medium text-[#4a5565]">해결한 문제</p>
-              </div>
-              <div className="bg-white rounded-[10px] shadow-[2px_2px_4px_1px_rgba(0,0,0,0.47)] p-6 text-center">
-                <p className="text-[30px] font-black text-[#4b99ff] mb-2">개발</p>
-                <p className="text-[12px] font-medium text-[#4a5565]">가장 많이 담당한 역할</p>
-              </div>
-            </div>
-          </div>
-
-          {/* 프로젝트별 상세 경력 */}
-          <div className="mb-8">
-            <div className="flex items-center gap-2 mb-6">
-              <span className="text-[20px] font-bold text-[#101828]">📁</span>
-              <h3 className="text-[20px] font-bold text-[#101828]">프로젝트별 상세 경력</h3>
-            </div>
-
-            <div className="relative">
-              {/* 좌측 화살표 */}
-              <button
-                onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
-                className="absolute left-[-12px] top-1/2 -translate-y-1/2 z-10 w-[44px] h-[44px] flex items-center justify-center disabled:opacity-30 transition-opacity"
-                disabled={currentSlide === 0}
-              >
-                <div className="-rotate-90">
-                  <svg width="38" height="33" fill="none" viewBox="0 0 38.1051 33">
-                    <path d={svgPaths.p198f7770} fill={currentSlide === 0 ? "#ccc" : "#1862FF"} />
-                  </svg>
-                </div>
-              </button>
-
-              {/* 프로젝트 카드 그리드 */}
-              <div className="grid grid-cols-1 gap-5 px-0 md:grid-cols-2 md:gap-8 md:px-8">
-                {projects.slice(currentSlide * 2, currentSlide * 2 + 2).map((project, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setSelectedProject(project)}
-                    className="bg-[#eff6ff] rounded-[10px] shadow-[2px_4px_4px_4px_rgba(0,0,0,0.25)] p-10 text-left hover:shadow-[4px_6px_8px_4px_rgba(0,0,0,0.3)] hover:translate-y-[-2px] transition-all cursor-pointer"
-                  >
-                    <h4 className="text-[30px] font-bold text-black mb-1">{project.title}</h4>
-                    <p className="text-[22px] font-bold text-black mb-6">: {project.subtitle}</p>
-                    <div className="flex flex-wrap gap-3">
-                      {project.tags.map((tag, tagIndex) => (
-                        <span
-                          key={tagIndex}
-                          className="bg-white rounded-[20px] px-5 py-2 text-[18px] font-bold text-[#155dfc]"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {/* 우측 화살표 */}
-              <button
-                onClick={() => setCurrentSlide(Math.min(totalSlides - 1, currentSlide + 1))}
-                className="absolute right-[-12px] top-1/2 -translate-y-1/2 z-10 w-[44px] h-[44px] flex items-center justify-center disabled:opacity-30 transition-opacity"
-                disabled={currentSlide >= totalSlides - 1}
-              >
-                <div className="-rotate-90 -scale-y-100">
-                  <svg width="38" height="33" fill="none" viewBox="0 0 38.1051 33">
-                    <path
-                      d={svgPaths.p198f7770}
-                      fill={currentSlide >= totalSlides - 1 ? "#ccc" : "#1862FF"}
-                    />
-                  </svg>
-                </div>
-              </button>
-            </div>
-
-            {/* 페이지네이션 점 */}
-            <div className="flex justify-center gap-3 mt-6">
-              {Array.from({ length: totalSlides }).map((_, dot) => (
-                <button
-                  key={dot}
-                  onClick={() => setCurrentSlide(dot)}
-                  className={`rounded-full transition-all ${dot === currentSlide
-                    ? "w-[15px] h-[15px] bg-[#004AE6]"
-                    : "w-[12px] h-[12px] bg-[#9FC1FF]"
-                    }`}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* 핵심 역량 및 성과 */}
-          <div className="mb-8">
-            <div className="flex items-center gap-2 mb-6">
-              <span className="text-[20px] font-bold text-[#101828]">💪</span>
-              <h3 className="text-[20px] font-bold text-[#101828]">핵심 역량 및 성과</h3>
-            </div>
-
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
-              {/* 기술 역량 */}
-              <div className="bg-white border-2 border-[#e5e7eb] rounded-[10px] p-6 drop-shadow-[0px_4px_2px_rgba(0,0,0,0.25)]">
-                <h4 className="text-[16px] font-bold text-[#0052ff] mb-4">기술 역량</h4>
-                <ul className="space-y-2">
-                  {[
-                    "프론트엔드: React, TypeScript, Tailwind",
-                    "백엔드: Node.js, Express, REST API",
-                    "데이터베이스: PostgreSQL, MongoDB",
-                    "배포/인프라: Vercel, AWS EC2, Git",
-                  ].map((item, i) => (
-                    <li key={i} className="flex items-center gap-2 text-[14px] text-[#364153]">
-                      <span className="text-[#0f54e6]">✓</span>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* 협업 및 리더십 */}
-              <div className="bg-white border-2 border-[#e5e7eb] rounded-[10px] p-6 drop-shadow-[0px_4px_2px_rgba(0,0,0,0.25)]">
-                <h4 className="text-[16px] font-bold text-[#0052ff] mb-4">협업 및 리더십</h4>
-                <ul className="space-y-2">
-                  {[
-                    "3개 프로젝트 팀 리드 경험",
-                    "Git/GitHub 협업 워크플로우 구축",
-                    "코드 리뷰 및 품질 관리 담당",
-                    "트러블슈팅 문서화 및 지식 공유",
-                  ].map((item, i) => (
-                    <li key={i} className="flex items-center gap-2 text-[14px] text-[#364153]">
-                      <span className="text-[#0f54e6]">✓</span>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          {/* 성장 그래프 */}
-          <div className="mb-8 ml-0 max-w-full rounded-[14px] border-2 border-[#e5e7eb] bg-white p-5 drop-shadow-[0px_4px_2px_rgba(0,0,0,0.25)] sm:p-6 lg:ml-auto lg:max-w-[422px]">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-[16px]">📈</span>
-              <h4 className="text-[16px] font-bold text-[#101828]">성장 그래프</h4>
-            </div>
-            <div className="space-y-4">
-              {[
-                { label: "기술 역량", value: 85, color: "#2d3fff" },
-                { label: "협업 능력", value: 92, color: "#96c4f9" },
-                { label: "문제 해결", value: 78, color: "#bf00ff" },
-                { label: "리더십", value: 99, color: "#00e5ff" },
-              ].map((item) => (
-                <div key={item.label}>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-[12px] font-medium text-[#364153]">{item.label}</span>
-                    <span className="text-[12px] font-bold" style={{ color: item.color }}>
-                      {item.value}%
-                    </span>
-                  </div>
-                  <div className="bg-[#f3f4f6] rounded-full h-[8px] overflow-hidden">
-                    <div
-                      className="rounded-full h-full"
-                      style={{ width: `${item.value}%`, backgroundColor: item.color }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 향후 학습 및 성장 목표 */}
-          <div className="bg-white border-2 border-[rgba(229,231,235,0.95)] rounded-[10px] p-6 drop-shadow-[0px_4px_2px_rgba(0,0,0,0.25)] mb-8">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="text-[20px]">🎯</span>
-              <h3 className="text-[20px] font-bold text-[#1862ff]">향후 학습 및 성장 목표</h3>
-            </div>
-            <ul className="space-y-2">
-              {[
-                "풀스택 개발자로서 프론트엔드-백엔드 통합 역량 강화",
-                "클라우드 인프라 (AWS, Docker, Kubernetes) 실무 경험 확보",
-                "오픈소스 프로젝트 기여 및 개발자 커뮤니티 활동",
-              ].map((item, i) => (
-                <li key={i} className="flex items-start gap-2 text-[14px] text-[#364153]">
-                  <span className="text-[#1862ff] mt-1">→</span>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* 리포트 푸터 */}
-          <div className="border-t-2 border-[#c3c3c5] pt-6 text-center">
-            <p className="text-[12px] text-[#99a1af] mb-1">
-              본 리포트는 CampusConnect 시스템에서 자동으로 생성되었습니다.
-            </p>
-            <p className="text-[12px] text-[#99a1af]">
-              팀 프로젝트 경험을 체계적으로 정리하여 취업 포트폴리오로 활용하세요.
-            </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setReportPage((page) => Math.max(1, page - 1))}
+              disabled={reportPage === 1}
+              className="rounded-full border border-[#cbd5e1] bg-white px-4 py-2 text-[13px] font-bold text-[#334155] transition-colors hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              이전 페이지
+            </button>
+            <button
+              onClick={() => setReportPage((page) => Math.min(3, page + 1))}
+              disabled={reportPage === 3}
+              className="rounded-full bg-[#155dfc] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#0f4bd8] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              다음 페이지
+            </button>
           </div>
         </div>
+
+        {/* 포트폴리오 리포트 */}
+        <section className="mx-auto min-h-[1123px] w-full max-w-[794px] overflow-visible rounded-[10px] border border-[#d9e2f2] bg-white shadow-[0_28px_80px_rgba(15,23,42,0.18)]">
+          <div className="bg-[#0f172a] px-7 py-5 text-white sm:px-9">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="mb-2 inline-flex rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-bold tracking-wide text-blue-100">
+                  CampusConnect Student Performance Report
+                </p>
+                <h2 className="text-[24px] font-black leading-tight sm:text-[28px]">
+                  팀 프로젝트 종합 역량 리포트
+                </h2>
+                <p className="mt-2 max-w-xl text-[11px] leading-5 text-slate-300">
+                  수강 이력, 팀 배정, 프로젝트 산출물, 트러블슈팅 로그, 동료평가, 교수 피드백을 종합하여
+                  학생의 수행 역량과 성장 가능성을 정리한 요약 보고서입니다.
+                </p>
+              </div>
+              <div className="rounded-lg border border-white/15 bg-white/10 p-3 text-[10px] leading-5 text-slate-200">
+                <p>대상 학생: <span className="font-bold text-white">{profileName}</span></p>
+                <p>분석 기준일: <span className="font-bold text-white">2026.05.18</span></p>
+                <p>분석 범위: <span className="font-bold text-white">최근 팀 프로젝트 4건</span></p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4 px-7 py-5 text-[11px] leading-relaxed text-[#334155] sm:px-9">
+            {reportPage === 1 && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  {[
+                    { label: "참여 프로젝트", value: "4건", note: "기획·개발·디자인 역할 포함" },
+                    { label: "평균 완성도", value: "93.8%", note: "프로젝트 완료율 기준" },
+                    { label: "동료 긍정 평가", value: "24회", note: "재협업·책임감 키워드 중심" },
+                  ].map((item) => (
+                    <div key={item.label} className="rounded-xl border border-[#dbe7ff] bg-[#f8fbff] p-4">
+                      <p className="text-[9px] font-bold uppercase tracking-wide text-[#476582]">{item.label}</p>
+                      <p className="mt-1.5 text-[22px] font-black text-[#0f3ea8]">{item.value}</p>
+                      <p className="mt-1.5 text-[10px] leading-4 text-[#60748a]">{item.note}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="rounded-xl border-l-4 border-[#155dfc] bg-[#f7faff] p-4">
+                  <p className="text-[10px] font-black text-[#155dfc]">PAGE 01 SUMMARY</p>
+                  <h3 className="mt-1.5 text-[18px] font-black text-[#101828]">역량 및 주요 팀플 활동 요약</h3>
+                  <p className="mt-2 text-[11px] leading-5 text-[#334155]">
+                    {profileName} 학생은 여러 팀 프로젝트에서 사용자 관점의 기획, 화면 설계, 프론트엔드 구현,
+                    문제 상황 문서화까지 폭넓게 수행한 이력이 확인됩니다. 프로젝트 기록 전반에서
+                    기획 의도를 구현 가능한 화면으로 옮기는 능력, 팀 내 진행상황을 공유하는 습관,
+                    사용자 관점의 개선안을 제안하는 역량이 일관되게 확인됩니다.
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-[#dbe7ff] bg-white p-4">
+                  <p className="text-[10px] font-black text-[#155dfc]">CORE TECHNICAL SKILLS</p>
+                  <h3 className="mt-1.5 text-[17px] font-black text-[#101828]">보유 핵심 기술 역량</h3>
+                  <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {[
+                      {
+                        title: "프론트엔드 UI 구현",
+                        body: "React, TypeScript, Tailwind CSS 기반으로 사용자 화면을 컴포넌트 단위로 구현하고, 반응형 레이아웃과 상태 기반 UI를 구성한 경험이 있습니다.",
+                        chips: ["React", "TypeScript", "Tailwind CSS", "Responsive UI"],
+                      },
+                      {
+                        title: "서비스 기획 및 UX 설계",
+                        body: "사용자 인터뷰와 페르소나 정리를 통해 서비스 요구사항을 도출하고, Figma 프로토타입과 사용자 여정 맵으로 구체화한 경험이 있습니다.",
+                        chips: ["Figma", "User Journey", "UX Research", "Prototype"],
+                      },
+                      {
+                        title: "데이터 연동 이해",
+                        body: "REST API, Supabase, Firebase Auth처럼 프론트엔드와 데이터 계층을 연결하는 흐름을 이해하고 화면 요구사항에 맞춰 데이터를 사용하는 경험이 있습니다.",
+                        chips: ["REST API", "Supabase", "Firebase Auth", "PostgreSQL"],
+                      },
+                      {
+                        title: "협업 문서화",
+                        body: "트러블슈팅 로그, 역할 분담, 발표 자료, 프로젝트 회고를 문서화하여 팀 내 진행 상황을 공유하고 의사결정 근거를 남기는 역량이 확인됩니다.",
+                        chips: ["Troubleshooting", "Notion", "GitHub", "Review"],
+                      },
+                    ].map((skill) => (
+                      <div key={skill.title} className="rounded-lg border border-gray-200 bg-[#fbfdff] p-3">
+                        <h4 className="text-[13px] font-black text-[#0f172a]">{skill.title}</h4>
+                        <p className="mt-1.5 text-[10px] leading-4 text-[#475569]">{skill.body}</p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {skill.chips.map((chip) => (
+                            <span key={chip} className="rounded-full bg-[#eff6ff] px-2.5 py-0.5 text-[9px] font-bold text-[#155dfc]">
+                              {chip}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+                  <div className="rounded-xl border border-gray-200 p-4">
+                    <h3 className="text-[15px] font-black text-[#101828]">핵심 역량 진단</h3>
+                    <div className="mt-3 space-y-3">
+                      {[
+                        { label: "프로젝트 실행력", value: 92, desc: "기한 내 산출물 제출과 발표 준비가 안정적입니다." },
+                        { label: "협업 신뢰도", value: 90, desc: "동료평가에서 책임감과 시간 약속 관련 긍정 키워드가 반복됩니다." },
+                        { label: "프론트엔드 구현", value: 86, desc: "React 기반 UI 구현과 반응형 문제 해결 경험이 확인됩니다." },
+                        { label: "문제 해결/회고", value: 82, desc: "트러블슈팅 로그를 남기고 원인-계획-해결을 정리하는 습관이 있습니다." },
+                      ].map((item) => (
+                        <div key={item.label}>
+                          <div className="mb-2 flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-[11px] font-bold text-[#1e293b]">{item.label}</p>
+                              <p className="text-[10px] text-[#64748b]">{item.desc}</p>
+                            </div>
+                            <span className="text-[11px] font-black text-[#155dfc]">{item.value}</span>
+                          </div>
+                          <div className="h-2 overflow-hidden rounded-full bg-[#e8eef8]">
+                            <div className="h-full rounded-full bg-[#155dfc]" style={{ width: `${item.value}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 bg-[#fbfcff] p-4">
+                    <h3 className="text-[15px] font-black text-[#101828]">간략 활동 요약</h3>
+                    <div className="mt-3 space-y-2.5">
+                      {[
+                        ["기획", "사용자 인터뷰와 페르소나를 바탕으로 서비스 방향을 정리했습니다."],
+                        ["구현", "React 기반 화면 구현, 반응형 레이아웃, 데이터 연동 흐름을 담당했습니다."],
+                        ["협업", "역할 분담, 발표 자료, 트러블슈팅 기록을 문서화하며 팀 진행을 안정화했습니다."],
+                      ].map(([title, body]) => (
+                        <div key={title} className="rounded-lg bg-white p-2.5 shadow-sm">
+                          <p className="text-[10px] font-black text-[#155dfc]">{title}</p>
+                          <p className="mt-1.5 text-[10.5px] leading-5 text-[#475569]">{body}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {reportPage === 2 && (
+              <div>
+                <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-[10px] font-black text-[#155dfc]">PAGE 02 PROJECT DETAIL</p>
+                    <h3 className="text-[17px] font-black text-[#101828]">주요 팀플 상세 조회</h3>
+                  </div>
+                  <p className="text-[10px] text-[#64748b]">각 카드를 클릭하면 상세 리포트를 확인할 수 있습니다.</p>
+                </div>
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  {projects.map((project, index) => (
+                    <button
+                      key={project.title}
+                      onClick={() => setSelectedProject(project)}
+                      className="rounded-xl border border-[#dbe7ff] bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#155dfc] hover:shadow-md"
+                    >
+                      <div className="mb-3 flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[9px] font-bold text-[#64748b]">CASE {String(index + 1).padStart(2, "0")}</p>
+                          <h4 className="mt-1 text-[15px] font-black text-[#101828]">{project.title}</h4>
+                          <p className="mt-1 text-[10px] text-[#64748b]">{project.subtitle}</p>
+                        </div>
+                        <span className="rounded-full bg-[#eff6ff] px-2.5 py-0.5 text-[10px] font-black text-[#155dfc]">
+                          {project.completionRate}%
+                        </span>
+                      </div>
+                      <div className="space-y-1.5 text-[10.5px] leading-5 text-[#475569]">
+                        <p>기간/팀: <span className="font-bold text-[#1e293b]">{project.period}</span></p>
+                        <p>담당 역할: <span className="font-bold text-[#1e293b]">{project.role}</span></p>
+                        <p>핵심 성과: {project.problemCase.result}</p>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {project.techStack.slice(0, 5).map((tech) => (
+                          <span key={tech} className="rounded-full bg-[#eff6ff] px-2.5 py-0.5 text-[9px] font-bold text-[#155dfc]">
+                            {tech}
+                          </span>
+                        ))}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {reportPage === 3 && (
+              <div className="space-y-5">
+                <div className="rounded-xl border-l-4 border-[#155dfc] bg-[#f7faff] p-5">
+                  <p className="text-[10px] font-black text-[#155dfc]">PAGE 03 PROBLEM SOLVING</p>
+                  <h3 className="mt-1.5 text-[18px] font-black text-[#101828]">가장 주목해야 할 문제해결 경험</h3>
+                  <p className="mt-3 text-[12px] leading-6 text-[#334155]">
+                    {profileName} 학생의 문제해결 경험은 단순 오류 수정이 아니라, 원인 파악, 구조 재정리,
+                    재발 방지까지 이어지는 방식으로 기록되어 있습니다. 아래 사례들은 팀 프로젝트 안에서
+                    실제 서비스 구조와 사용자 경험을 개선한 근거로 볼 수 있습니다.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  {[
+                    {
+                      title: "모바일 레이아웃 깨짐 원인 분석",
+                      problem: "모바일 화면에서 카드와 폼 영역이 겹치고 일부 요소가 화면 밖으로 밀리는 현상이 발생했습니다.",
+                      action: "CSS 클래스 충돌과 고정 폭 사용을 원인으로 파악하고, grid/flex 기준의 반응형 레이아웃으로 재구성했습니다.",
+                      result: "모든 주요 화면에서 모바일, 태블릿, 데스크톱 순서로 자연스럽게 콘텐츠가 재배치되도록 개선했습니다.",
+                      impact: "사용자 기기 크기와 관계없이 동일한 기능 접근성을 확보했습니다.",
+                    },
+                    {
+                      title: "Firebase 로그인과 Supabase 유저 프로필 연결",
+                      problem: "로그인 계정과 서비스 내부 유저 정보가 분리되어 수업/팀 데이터 조회 기준이 불명확했습니다.",
+                      action: "Firebase uid를 `ai_users`의 단일 사용자 기준으로 연결하고, 수업 소속과 팀원 데이터를 user_id 기반으로 재정리했습니다.",
+                      result: "로그인 학생 계정 기준으로 수업, 수강자, 팀, 팀 워크스페이스 데이터를 일관되게 로드할 수 있게 되었습니다.",
+                      impact: "인증과 서비스 데이터의 기준을 통합해 향후 권한 관리와 개인화 조회의 기반을 마련했습니다.",
+                    },
+                    {
+                      title: "팀 워크스페이스 데이터 중복 참조 해결",
+                      problem: "여러 팀 상세 페이지가 같은 채팅, 피어리뷰, 트러블슈팅 로그를 참조하는 구조적 문제가 있었습니다.",
+                      action: "`ai_team_detail_*` 테이블에 team_id를 추가하고 각 팀별 상세 데이터를 분리했습니다.",
+                      result: "각 수업과 각 팀이 독립적인 내부 워크스페이스 데이터를 가지도록 정리되었습니다.",
+                      impact: "팀별 활동 기록의 신뢰성을 높이고, 프로젝트별 회고/평가 데이터가 섞이지 않도록 했습니다.",
+                    },
+                  ].map((caseItem, index) => (
+                    <div key={caseItem.title} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                      <p className="text-[9px] font-black text-[#64748b]">PROBLEM SOLVING CASE {index + 1}</p>
+                      <h4 className="mt-1.5 text-[15px] font-black text-[#155dfc]">{caseItem.title}</h4>
+                      <div className="mt-3 grid grid-cols-1 gap-3 text-[10.5px] leading-5 text-[#475569] md:grid-cols-2">
+                        <p><span className="font-bold text-[#0f172a]">문제:</span> {caseItem.problem}</p>
+                        <p><span className="font-bold text-[#0f172a]">조치:</span> {caseItem.action}</p>
+                        <p><span className="font-bold text-[#0f172a]">결과:</span> {caseItem.result}</p>
+                        <p><span className="font-bold text-[#0f172a]">의미:</span> {caseItem.impact}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="border-t border-gray-200 pt-4 text-center">
+              <p className="text-[9px] font-bold leading-4 text-[#64748b]">
+                본 화면은 현재 하드코딩된 예시 리포트입니다. 추후 ai_users, ai_courses, ai_teams, ai_team_detail_* 데이터를 집계하여 자동 생성하도록 확장할 수 있습니다.
+              </p>
+            </div>
+          </div>
+        </section>
         </main>
       </div>
 
