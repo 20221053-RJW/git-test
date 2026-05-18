@@ -30,6 +30,17 @@ export interface ProfessorProfile extends BaseProfile {
 }
 
 // 과목 관련 타입
+export type CourseStatus = "active" | "archived";
+
+export interface CourseStage {
+  id: string;
+  courseId: string;
+  name: string;
+  position: number;
+  description?: string;
+  isRequired: boolean;
+}
+
 export interface Course {
   id: string;
   name: string;
@@ -42,6 +53,22 @@ export interface Course {
   maxStudents?: number;
   description?: string;
   semester: string;
+  status: CourseStatus;
+  archivedAt?: Date;
+  archivedBy?: string;
+  stages?: CourseStage[];
+  stageCount?: number;
+}
+
+export interface CreateCourseInput {
+  name: string;
+  code: string;
+  semester: string;
+  schedule: string;
+  room?: string;
+  maxStudents?: number;
+  description?: string;
+  stages: string[];
 }
 
 // 팀원 한 명을 동그란 아바타로 보여주기 위해 필요한 정보입니다.

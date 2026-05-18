@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { api } from "../api/mock-data";
+import { useAuth } from "../contexts/AuthContext";
 import type { Course } from "../types";
 
 export default function CourseDetailPage() {
@@ -8,6 +9,10 @@ export default function CourseDetailPage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "students" | "teams">("overview");
+  const [archiving, setArchiving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const { isProfessor, isAdmin, user } = useAuth();
+  const canArchiveCourse = Boolean(course && course.status === "active" && (isAdmin || (isProfessor && course.professorId === user?.id)));
 
   useEffect(() => {
     if (!id) return;
@@ -17,6 +22,22 @@ export default function CourseDetailPage() {
       setLoading(false);
     });
   }, [id]);
+
+  const handleArchiveCourse = async () => {
+    if (!course || !window.confirm(`'${course.name}' 수업을 종료하고 아카이브로 전환할까요?`)) return;
+
+    setArchiving(true);
+    setErrorMessage("");
+
+    try {
+      const archivedCourse = await api.courses.archive(course.id);
+      setCourse(archivedCourse);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "수업을 종료하지 못했습니다.");
+    } finally {
+      setArchiving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -50,10 +71,34 @@ export default function CourseDetailPage() {
             </div>
             <p className="text-gray-600">{course.semester}</p>
           </div>
-          <Link to="/app/courses" className="text-blue-600 hover:underline text-sm">
-            {"\uBAA9\uB85D\uC73C\uB85C"}
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            {canArchiveCourse && (
+              <button
+                type="button"
+                disabled={archiving}
+                onClick={handleArchiveCourse}
+                className="rounded-lg border border-red-200 px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {archiving ? "종료 중..." : "수업 종료"}
+              </button>
+            )}
+            <Link to="/app/courses" className="px-3 py-2 text-sm text-blue-600 hover:underline">
+              {"\uBAA9\uB85D\uC73C\uB85C"}
+            </Link>
+          </div>
         </div>
+
+        {errorMessage && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            {errorMessage}
+          </div>
+        )}
+
+        {course.status === "archived" && (
+          <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold text-gray-600">
+            종료된 수업입니다. 교수자와 학생 모두 읽기 전용으로 조회할 수 있습니다.
+          </div>
+        )}
 
         {course.description && (
           <p className="text-gray-700 mb-4">{course.description}</p>
@@ -127,6 +172,18 @@ export default function CourseDetailPage() {
               <p className="text-gray-700">
                 {course.description || "\uAC15\uC758 \uAC1C\uC694\uAC00 \uC544\uC9C1 \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4."}
               </p>
+              {course.stages && course.stages.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="mb-3 font-bold text-gray-900">팀플 스테이지</h3>
+                  <ol className="space-y-2">
+                    {course.stages.map((stage) => (
+                      <li key={stage.id} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                        {stage.position}. {stage.name}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
             </div>
           )}
 

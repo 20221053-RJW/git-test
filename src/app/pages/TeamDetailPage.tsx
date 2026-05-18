@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../api/mock-data";
-import type { ChatMessage, PeerReviewStudent, PeerReviewTeammate, TroubleshootingLog } from "../types";
+import type { ChatMessage, Course, PeerReviewStudent, PeerReviewTeammate, TroubleshootingLog } from "../types";
 
 export default function TeamDetailPage() {
   const { id, teamId, courseId } = useParams<{ id?: string; teamId?: string; courseId?: string }>();
@@ -15,6 +15,7 @@ export default function TeamDetailPage() {
   const [showPeerReviewModal, setShowPeerReviewModal] = useState(false);
   const [problemInput, setProblemInput] = useState("");
   const [planInput, setPlanInput] = useState("");
+  const [course, setCourse] = useState<Course | null>(null);
 
   // 피드백 상태
   const [feedbackOptions, setFeedbackOptions] = useState<string[]>([]);
@@ -43,6 +44,7 @@ export default function TeamDetailPage() {
   }, [chatMessages, showChatModal]);
 
   const myName = isProfessor ? "성보경 교수님" : (user?.name ?? "류지원");
+  const isArchived = course?.status === "archived";
 
   const sendChat = () => {
     const text = chatInput.trim();
@@ -118,6 +120,14 @@ export default function TeamDetailPage() {
     });
   }, [selectedTeamId]);
 
+  useEffect(() => {
+    if (!courseId) return;
+
+    api.courses.getById(courseId).then((courseData) => {
+      setCourse(courseData ?? null);
+    });
+  }, [courseId]);
+
   return (
     <div className="min-h-screen bg-[#f0f0f0]">
       <div className="mx-auto w-full max-w-[1504px] px-4 py-6 sm:px-6 lg:px-8">
@@ -131,7 +141,11 @@ export default function TeamDetailPage() {
           </Link>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <h1 className="break-words text-2xl font-black text-[#155dfc] sm:text-[30px]">{selectedTeamId}</h1>
-            {isProfessor ? (
+            {isArchived ? (
+              <span className="rounded-[10px] border border-gray-200 bg-white px-6 py-2.5 text-base font-bold text-gray-500">
+                종료된 수업: 읽기 전용
+              </span>
+            ) : isProfessor ? (
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button
                   onClick={() => setShowStudentEvalModal(true)}
@@ -164,6 +178,12 @@ export default function TeamDetailPage() {
             )}
           </div>
         </div>
+
+        {isArchived && (
+          <div className="mb-6 rounded-[14px] border border-gray-200 bg-white px-5 py-4 text-sm font-bold text-gray-600 shadow-sm">
+            이 수업은 아카이브 상태입니다. 평가, 업로드, 문제 등록, 피드백 작성은 비활성화됩니다.
+          </div>
+        )}
 
         {/* AI 통합 진행상황 요약 */}
         <div className="bg-gradient-to-r from-[#bfd3ff] to-[#e8e9ff] border border-[#c6d2ff] rounded-[14px] p-6 mb-6 shadow-sm">
@@ -251,7 +271,7 @@ export default function TeamDetailPage() {
               </div>
 
               {/* 학생 전용: 파일 업로드 버튼 */}
-              {isStudent && (
+              {isStudent && !isArchived && (
                 <button className="w-full bg-[#f9fafb] border border-dashed border-[rgba(0,0,0,0.1)] rounded py-2.5 text-[#4a5565] font-medium hover:bg-gray-100 transition-colors">
                   + 링크 / 파일 업로드
                 </button>
@@ -270,7 +290,7 @@ export default function TeamDetailPage() {
 
             <div className="bg-[rgba(239,246,255,0.3)] border border-[#dbeafe] rounded-[10px] p-4 space-y-4 max-h-[565px] overflow-y-auto">
               {/* 문제 입력 폼 (교수만 표시) */}
-              {isProfessor && (
+              {isProfessor && !isArchived && (
                 <div className="bg-white border-2 border-[rgba(174,174,174,0.3)] rounded-[10px] shadow-md p-4 mb-4">
                   <p className="text-xs text-red-600 font-medium mb-2">
                     !!!문제 발견!!!
@@ -358,7 +378,7 @@ export default function TeamDetailPage() {
                       >
                         채팅방 이동
                       </button>
-                      {log.status === "in-progress" && isProfessor && (
+                      {log.status === "in-progress" && isProfessor && !isArchived && (
                         <>
                           <button className="bg-[#f3f4f6] text-[#364153] text-[11px] font-medium px-3 py-2 rounded hover:bg-gray-200 transition-colors">
                             💬 대댓글 달기
@@ -374,7 +394,7 @@ export default function TeamDetailPage() {
               </div>
 
               {/* 학생 전용: 문제 보고 폼 */}
-              {isStudent && (
+              {isStudent && !isArchived && (
                 <div className="bg-[rgba(239,246,255,0.3)] border border-[#bedbff] rounded-[10px] p-3 shadow-sm">
                   <input
                     type="text"
@@ -414,7 +434,11 @@ export default function TeamDetailPage() {
             배포된 링크를 확인해 보고, 피드백을 남겨주세요.
           </p>
 
-          {feedbackSubmitted ? (
+          {isArchived ? (
+            <div className="rounded-[14px] border border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm font-bold text-gray-500">
+              종료된 수업에서는 피드백을 새로 작성할 수 없습니다.
+            </div>
+          ) : feedbackSubmitted ? (
             /* ── 완료 상태 ── */
             <div className="flex flex-col items-center gap-5 py-4">
               <div className="flex flex-col items-center gap-2">
@@ -550,44 +574,48 @@ export default function TeamDetailPage() {
 
             {/* 입력 폼 */}
             <div className="px-5 py-4 border-t border-gray-200 bg-white rounded-b-[14px] flex-shrink-0">
-              <div className="flex items-center gap-2.5">
-                <label className="flex items-center gap-1.5 text-xs text-[#6a7282] flex-shrink-0 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    className="w-3.5 h-3.5 accent-[#155dfc]"
-                    checked={chatAnon}
-                    onChange={(e) => setChatAnon(e.target.checked)}
-                  />
-                  익명
-                </label>
-                <div className="flex-1 bg-[#f3f4f6] rounded-full px-4 py-2 flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); } }}
-                    placeholder="메시지를 입력하세요."
-                    className="flex-1 bg-transparent text-sm text-[#1e2939] placeholder:text-[#9d9d9d] outline-none"
-                  />
+              {isArchived ? (
+                <p className="text-center text-sm font-bold text-gray-500">종료된 수업에서는 채팅을 새로 작성할 수 없습니다.</p>
+              ) : (
+                <div className="flex items-center gap-2.5">
+                  <label className="flex items-center gap-1.5 text-xs text-[#6a7282] flex-shrink-0 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      className="w-3.5 h-3.5 accent-[#155dfc]"
+                      checked={chatAnon}
+                      onChange={(e) => setChatAnon(e.target.checked)}
+                    />
+                    익명
+                  </label>
+                  <div className="flex-1 bg-[#f3f4f6] rounded-full px-4 py-2 flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); } }}
+                      placeholder="메시지를 입력하세요."
+                      className="flex-1 bg-transparent text-sm text-[#1e2939] placeholder:text-[#9d9d9d] outline-none"
+                    />
+                  </div>
+                  <button
+                    onClick={sendChat}
+                    disabled={!chatInput.trim()}
+                    className="bg-[#155dfc] disabled:bg-[#c7d9f8] text-white w-9 h-9 rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors flex-shrink-0 shadow-sm"
+                    aria-label="전송"
+                  >
+                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 rotate-90">
+                      <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                    </svg>
+                  </button>
                 </div>
-                <button
-                  onClick={sendChat}
-                  disabled={!chatInput.trim()}
-                  className="bg-[#155dfc] disabled:bg-[#c7d9f8] text-white w-9 h-9 rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors flex-shrink-0 shadow-sm"
-                  aria-label="전송"
-                >
-                  <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 rotate-90">
-                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                  </svg>
-                </button>
-              </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
       {/* 평가 모달 (교수만) */}
-      {isProfessor && showEvalModal && (
+      {isProfessor && !isArchived && showEvalModal && (
         <div
           className="my-6 flex w-full items-center justify-center rounded-2xl bg-[rgba(79,79,79,0.81)] p-4"
           onClick={() => setShowEvalModal(false)}
@@ -686,7 +714,7 @@ export default function TeamDetailPage() {
       )}
 
       {/* 학생 평가 모달 (교수만) */}
-      {isProfessor && showStudentEvalModal && (
+      {isProfessor && !isArchived && showStudentEvalModal && (
         <div
           className="my-6 flex w-full items-center justify-center rounded-2xl bg-[rgba(79,79,79,0.81)] p-4"
           onClick={() => setShowStudentEvalModal(false)}
@@ -788,7 +816,7 @@ export default function TeamDetailPage() {
       )}
 
       {/* 회고록 모달 (학생만) */}
-      {isStudent && showRetrospectiveModal && (
+      {isStudent && !isArchived && showRetrospectiveModal && (
         <div
           className="my-6 flex w-full items-center justify-center rounded-2xl bg-[rgba(79,79,79,0.83)] p-4"
           onClick={() => setShowRetrospectiveModal(false)}
@@ -925,7 +953,7 @@ export default function TeamDetailPage() {
       )}
 
       {/* 조원 평가 모달 (학생만) */}
-      {isStudent && showPeerReviewModal && (
+      {isStudent && !isArchived && showPeerReviewModal && (
         <div
           className="my-6 flex w-full items-center justify-center rounded-2xl bg-[rgba(79,79,79,0.83)] p-4"
           onClick={() => setShowPeerReviewModal(false)}
@@ -1079,7 +1107,7 @@ export default function TeamDetailPage() {
       )}
 
       {/* 피드백 커스텀 모달 */}
-      {showFeedbackCustomModal && (
+      {!isArchived && showFeedbackCustomModal && (
         <div
           className="my-6 flex w-full items-center justify-center rounded-2xl bg-[rgba(79,79,79,0.83)] p-4"
           onClick={() => setShowFeedbackCustomModal(false)}

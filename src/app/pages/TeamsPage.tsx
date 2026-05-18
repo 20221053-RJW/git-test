@@ -196,7 +196,7 @@ export default function TeamsPage() {
     Promise.all([
       api.teamCards.getAll(courseId),
       api.announcements.getAll(courseId),
-      api.teamStages.getAll(),
+      api.teamStages.getAll(courseId),
       courseId ? api.courses.getById(courseId) : Promise.resolve(undefined),
     ]).then(([teamData, announcementData, stageData, courseData]) => {
       setTeams(teamData);
@@ -205,6 +205,8 @@ export default function TeamsPage() {
       setCourse(courseData ?? null);
     });
   }, [courseId]);
+
+  const isArchived = course?.status === "archived";
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
@@ -215,10 +217,22 @@ export default function TeamsPage() {
           <h1 className="text-2xl font-black tracking-tight text-[#155dfc] sm:text-3xl">
             {course ? `[${course.semester}] [${course.name}]` : "[2026-1] [팀 프로젝트]"}
           </h1>
-          <button className="w-full rounded-[10px] bg-[#1962ff] px-5 py-2.5 text-sm font-bold text-white shadow-md transition-colors hover:bg-[#1450e0] sm:w-auto">
-            + 새 팀 만들기
-          </button>
+          {isArchived ? (
+            <span className="rounded-[10px] border border-gray-200 bg-white px-5 py-2.5 text-sm font-bold text-gray-500 shadow-sm">
+              종료된 수업: 읽기 전용
+            </span>
+          ) : (
+            <button className="w-full rounded-[10px] bg-[#1962ff] px-5 py-2.5 text-sm font-bold text-white shadow-md transition-colors hover:bg-[#1450e0] sm:w-auto">
+              + 새 팀 만들기
+            </button>
+          )}
         </div>
+
+        {isArchived && (
+          <div className="mb-6 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-600">
+            종료된 수업입니다. 팀 정보와 활동 기록은 조회만 가능합니다.
+          </div>
+        )}
 
         {/* 팀 카드들을 반응형 그리드로 배치합니다. 화면이 넓어질수록 한 줄에 더 많이 보입니다. */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">

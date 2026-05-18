@@ -1,5 +1,8 @@
 import type {
   Course,
+  CourseStage,
+  CourseStatus,
+  CreateCourseInput,
   StudentProfile,
   ProfessorProfile,
   TeamCard,
@@ -53,6 +56,10 @@ type AiUser = {
   research_areas?: unknown;
 };
 
+type CourseQueryOptions = {
+  status?: CourseStatus | "all";
+};
+
 function toStudentProfile(user: AiUser): StudentProfile {
   return {
     id: user.id,
@@ -96,6 +103,22 @@ async function getCurrentAiUser(): Promise<AiUser | null> {
 async function getAccessibleCourseIds(): Promise<string[]> {
   const currentUser = await getCurrentAiUser();
   if (!currentUser) return [];
+
+  if (currentUser.role === "admin") {
+    const { data, error } = await supabase.from("ai_courses").select("id");
+    if (error) throw error;
+    return (data ?? []).map((course) => course.id);
+  }
+
+  if (currentUser.role === "professor") {
+    const { data, error } = await supabase
+      .from("ai_courses")
+      .select("id")
+      .eq("instructor_user_id", currentUser.id);
+
+    if (error) throw error;
+    return (data ?? []).map((course) => course.id);
+  }
 
   const [teachingResult, membershipResult] = await Promise.all([
     supabase
@@ -191,33 +214,99 @@ async function getProfessorByIdFromDb(id: string): Promise<ProfessorProfile | un
   return professors.find((professor) => professor.id === id);
 }
 
-async function getCoursesFromDb(): Promise<Course[]> {
+function createCourseId(code: string): string {
+  const normalizedCode = code
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return `course-${normalizedCode || Date.now()}-${Date.now()}`;
+}
+
+async function getCourseStagesFromDb(courseId?: string): Promise<CourseStage[]> {
+  if (!courseId) return [];
+
+  const { data, error } = await supabase
+    .from("ai_course_stages")
+    .select("id, course_id, name, position, description, is_required")
+    .eq("course_id", courseId)
+    .order("position", { ascending: true });
+
+  if (error) throw error;
+
+  return (data ?? []).map((stage) => ({
+    id: stage.id,
+    courseId: stage.course_id,
+    name: stage.name,
+    position: stage.position,
+    description: stage.description ?? undefined,
+    isRequired: stage.is_required,
+  }));
+}
+
+async function getCourseStageNamesFromDb(courseId?: string): Promise<string[]> {
+  const courseStages = await getCourseStagesFromDb(courseId);
+  if (courseStages.length > 0) return courseStages.map((stage) => stage.name);
+
+  const { data, error } = await supabase
+    .from("ai_team_stages")
+    .select("name, position")
+    .order("position", { ascending: true });
+
+  if (error) throw error;
+
+  return (data ?? []).map((stage) => stage.name);
+}
+
+async function getCoursesFromDb(options: CourseQueryOptions = { status: "active" }): Promise<Course[]> {
   const accessibleCourseIds = await getAccessibleCourseIds();
   if (accessibleCourseIds.length === 0) return [];
 
   let query = supabase
     .from("ai_courses")
-    .select("id, name, code, instructor_user_id, schedule, room, students_count, max_students, semester, description")
+    .select("id, name, code, instructor_user_id, schedule, room, students_count, max_students, semester, description, status, archived_at, archived_by")
     .order("id", { ascending: true });
 
   query = query.in("id", accessibleCourseIds);
+  if (options.status && options.status !== "all") query = query.eq("status", options.status);
 
-  const [coursesResult, professors, membershipsResult] = await Promise.all([
+  const [coursesResult, professors, membershipsResult, stagesResult] = await Promise.all([
     query,
     getProfessorsFromDb(),
     supabase.from("ai_course_memberships").select("course_id, role").eq("role", "student"),
+    supabase
+      .from("ai_course_stages")
+      .select("id, course_id, name, position, description, is_required")
+      .order("position", { ascending: true }),
   ]);
 
   if (coursesResult.error) throw coursesResult.error;
   if (membershipsResult.error) throw membershipsResult.error;
+  if (stagesResult.error) throw stagesResult.error;
 
   const studentCounts = (membershipsResult.data ?? []).reduce<Record<string, number>>((result, membership) => {
     result[membership.course_id] = (result[membership.course_id] ?? 0) + 1;
     return result;
   }, {});
 
+  const stagesByCourse = (stagesResult.data ?? []).reduce<Record<string, CourseStage[]>>((result, stage) => {
+    const courseStage = {
+      id: stage.id,
+      courseId: stage.course_id,
+      name: stage.name,
+      position: stage.position,
+      description: stage.description ?? undefined,
+      isRequired: stage.is_required,
+    };
+
+    result[stage.course_id] = [...(result[stage.course_id] ?? []), courseStage];
+    return result;
+  }, {});
+
   return (coursesResult.data ?? []).map((course) => {
     const professor = professors.find((item) => item.id === course.instructor_user_id);
+    const stages = stagesByCourse[course.id] ?? [];
 
     return {
       id: course.id,
@@ -231,13 +320,85 @@ async function getCoursesFromDb(): Promise<Course[]> {
       maxStudents: course.max_students ?? undefined,
       semester: course.semester,
       description: course.description ?? undefined,
+      status: course.status,
+      archivedAt: course.archived_at ? new Date(course.archived_at) : undefined,
+      archivedBy: course.archived_by ?? undefined,
+      stages,
+      stageCount: stages.length,
     };
   });
 }
 
 async function getCourseByIdFromDb(id: string): Promise<Course | undefined> {
-  const courses = await getCoursesFromDb();
+  const courses = await getCoursesFromDb({ status: "all" });
   return courses.find((course) => course.id === id);
+}
+
+async function createCourseInDb(input: CreateCourseInput): Promise<Course> {
+  const currentUser = await getCurrentAiUser();
+  if (!currentUser || !["professor", "admin"].includes(currentUser.role)) {
+    throw new Error("수업을 생성할 권한이 없습니다.");
+  }
+
+  const courseId = createCourseId(input.code);
+  const stageNames = input.stages.map((stage) => stage.trim()).filter(Boolean);
+
+  const { error: courseError } = await supabase.from("ai_courses").insert({
+    id: courseId,
+    name: input.name.trim(),
+    code: input.code.trim(),
+    instructor_user_id: currentUser.id,
+    schedule: input.schedule.trim(),
+    room: input.room?.trim() || null,
+    students_count: 0,
+    max_students: input.maxStudents ?? null,
+    semester: input.semester.trim(),
+    description: input.description?.trim() || null,
+    status: "active",
+  });
+
+  if (courseError) throw courseError;
+
+  if (stageNames.length > 0) {
+    const { error: stageError } = await supabase.from("ai_course_stages").insert(
+      stageNames.map((stage, index) => ({
+        course_id: courseId,
+        name: stage,
+        position: index + 1,
+      }))
+    );
+
+    if (stageError) throw stageError;
+  }
+
+  const createdCourse = await getCourseByIdFromDb(courseId);
+  if (!createdCourse) throw new Error("생성된 수업을 다시 불러오지 못했습니다.");
+  return createdCourse;
+}
+
+async function archiveCourseInDb(courseId: string): Promise<Course> {
+  const currentUser = await getCurrentAiUser();
+  const course = await getCourseByIdFromDb(courseId);
+
+  if (!currentUser || !course || (currentUser.role !== "admin" && course.professorId !== currentUser.id)) {
+    throw new Error("수업을 종료할 권한이 없습니다.");
+  }
+
+  const { error } = await supabase
+    .from("ai_courses")
+    .update({
+      status: "archived",
+      archived_at: new Date().toISOString(),
+      archived_by: currentUser.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", courseId);
+
+  if (error) throw error;
+
+  const archivedCourse = await getCourseByIdFromDb(courseId);
+  if (!archivedCourse) throw new Error("종료된 수업을 다시 불러오지 못했습니다.");
+  return archivedCourse;
 }
 
 async function getTeamCardsFromDb(courseId?: string): Promise<TeamCard[]> {
@@ -304,15 +465,8 @@ async function getTeamCardsFromDb(courseId?: string): Promise<TeamCard[]> {
   }));
 }
 
-async function getTeamStagesFromDb(): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("ai_team_stages")
-    .select("name, position")
-    .order("position", { ascending: true });
-
-  if (error) throw error;
-
-  return (data ?? []).map((stage) => stage.name);
+async function getTeamStagesFromDb(courseId?: string): Promise<string[]> {
+  return getCourseStageNamesFromDb(courseId);
 }
 
 async function getAnnouncementsFromDb(courseId?: string): Promise<Announcement[]> {
@@ -704,6 +858,8 @@ export const api = {
   courses: {
     getAll: getCoursesFromDb,
     getById: getCourseByIdFromDb,
+    create: createCourseInDb,
+    archive: archiveCourseInDb,
   },
   students: {
     getAll: getStudentsFromDb,
@@ -717,6 +873,7 @@ export const api = {
   },
   teamStages: {
     getAll: getTeamStagesFromDb,
+    getByCourse: getCourseStagesFromDb,
   },
   announcements: {
     getAll: getAnnouncementsFromDb,

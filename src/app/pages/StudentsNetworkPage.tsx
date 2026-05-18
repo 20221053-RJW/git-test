@@ -3,7 +3,7 @@ import { useParams } from "react-router";
 import { Search, BookOpen, Clock, MapPin, FlaskConical, User, Pencil, Shuffle } from "lucide-react";
 import { api } from "../api/mock-data";
 import { useAuth } from "../contexts/AuthContext";
-import type { ProfessorProfile } from "../types";
+import type { Course, ProfessorProfile } from "../types";
 
 interface Student {
   id: string;
@@ -753,6 +753,7 @@ export default function StudentsNetworkPage() {
   const [showRandomTeamModal, setShowRandomTeamModal] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
   const [studentExtras, setStudentExtras] = useState<Record<string, StudentExtra>>({});
+  const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
   const [editForm, setEditForm] = useState<EditForm>({
     major: "벤처중소기업학 / 글로벌미디어 복수전공",
@@ -774,10 +775,12 @@ export default function StudentsNetworkPage() {
       api.studentNetwork.getStudents(courseId),
       api.studentNetwork.getExtras(),
       api.studentNetwork.getEditForm(),
+      courseId ? api.courses.getById(courseId) : Promise.resolve(undefined),
     ])
-      .then(([studentData, extraData, formData]) => {
+      .then(([studentData, extraData, formData, courseData]) => {
         setStudents(studentData.length > 0 ? studentData : fallbackStudents);
         setStudentExtras(Object.keys(extraData).length > 0 ? extraData : fallbackStudentExtras);
+        setCourse(courseData ?? null);
         setEditForm({
           major: formData.major,
           mbti: formData.mbti,
@@ -818,12 +821,19 @@ export default function StudentsNetworkPage() {
   });
 
   const allDisplayStudents = isStudent ? [selfStudent, ...filteredOthers] : filteredOthers;
+  const isArchived = course?.status === "archived";
 
   return (
     // 전체 페이지 컨테이너
     <div className="flex min-h-screen flex-col bg-gray-50">
       <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
         <h2 className="mb-6 text-2xl font-black text-[#155dfc] sm:text-3xl">수강자들 네트워크</h2>
+
+        {isArchived && (
+          <div className="mb-6 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-600 shadow-sm">
+            종료된 수업입니다. 수강자 정보는 읽기 전용으로 조회됩니다.
+          </div>
+        )}
 
         {/* 교수 프로필 배너 */}
         {isProfessor && professor && (
@@ -889,26 +899,30 @@ export default function StudentsNetworkPage() {
                   ))}
                 </div>
               </div>
-              <button
-                onClick={() => setShowEditModal(true)}
-                className="bg-white border border-gray-300 text-gray-700 text-sm px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex-shrink-0 flex items-center gap-1.5"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                내 정보 수정
-              </button>
+              {!isArchived && (
+                <button
+                  onClick={() => setShowEditModal(true)}
+                  className="bg-white border border-gray-300 text-gray-700 text-sm px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors flex-shrink-0 flex items-center gap-1.5"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  내 정보 수정
+                </button>
+              )}
             </div>
           </div>
         )}
 
         {/* 검색 + 랜덤 팀 생성 */}
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <button
-            onClick={() => setShowRandomTeamModal(true)}
-            className="flex w-full items-center justify-center gap-2 rounded-[8px] bg-[#155dfc] px-5 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700 sm:w-auto"
-          >
-            <Shuffle className="w-4 h-4" />
-            랜덤 팀 생성 +
-          </button>
+          {!isArchived && (
+            <button
+              onClick={() => setShowRandomTeamModal(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-[8px] bg-[#155dfc] px-5 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700 sm:w-auto"
+            >
+              <Shuffle className="w-4 h-4" />
+              랜덤 팀 생성 +
+            </button>
+          )}
           <div className="flex w-full items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 focus-within:ring-2 focus-within:ring-blue-500 sm:w-72">
             <Search className="h-4 w-4 shrink-0 text-gray-400" />
             <input
@@ -956,11 +970,11 @@ export default function StudentsNetworkPage() {
           student={selfStudent}
           studentExtras={studentExtras}
           onClose={() => setShowMyProfileModal(false)}
-          onEditClick={() => setShowEditModal(true)}
+          onEditClick={isArchived ? undefined : () => setShowEditModal(true)}
         />
       )}
 
-      {showEditModal && (
+      {!isArchived && showEditModal && (
         <MyInfoEditModal
           initialForm={editForm}
           onClose={() => setShowEditModal(false)}
@@ -968,7 +982,7 @@ export default function StudentsNetworkPage() {
         />
       )}
 
-      {showRandomTeamModal && (
+      {!isArchived && showRandomTeamModal && (
         <RandomTeamModal
           allStudents={students}
           onClose={() => setShowRandomTeamModal(false)}
