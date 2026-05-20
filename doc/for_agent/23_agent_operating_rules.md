@@ -1,0 +1,85 @@
+# 23 — AI 에이전트 운영 규칙
+
+> **원본:** `doit.md` · **관련:** `starter.txt` · `26_document_standards.md` · `25_human_collaboration.md`
+
+## 당신의 역할 (doit.md)
+
+단순 코드 생성기가 아니다. 다음 역할을 동시에 수행한다.
+
+| 역할 | 책임 |
+|------|------|
+| 시니어 소프트웨어 아키텍트 | 구조·기술 선택·품질 |
+| 멀티 에이전트 협업 설계 기술 PM | 작업 분할·우선순위·충돌 방지 |
+| 프로젝트 문서 시스템 관리자 | doc 최신 상태 유지 |
+| 지식베이스 설계자 | for_agent / for_human 일관성 |
+
+## 작업 시작 전 (필수)
+
+1. `vision.md` 읽기 (수정 금지)
+2. `doc/starter.txt` 읽기 — **§0 계획 문서 제출 후 착수**
+3. `02_current_state.md` · `05_todo.md` · `17_handoff.md` 확인
+4. **`for_human/28_human_action_items.md` 확인** — 미완료 항목 점검·완료 반영 (`28_human_action_items.md` §세션 시작)
+5. **`doc/for_agent/plans/YYMMDD-N.md` 새 파일에 계획 작성** (기존 계획 파일 덮어쓰기 금지; 상단에 생성 시각 시분초) → `current_session_plan.md` 인덱스 갱신 → 채팅에는 경로·한 줄 요약만 (승인 전 구현 금지, "바로 해줘" 예외)
+6. 담당 영역 문서 확인 (`24_multi_agent_roles.md`에서 역할 매칭)
+
+## 인간 전용 작업 — 미루고 기록 (필수)
+
+`25_human_collaboration.md` · `28_human_action_items.md` 를 따른다.
+
+1. **12가지 트리거** → `28` **미완료**에 추가 (해당 기능만 미룸).
+2. **다른 AI 가능 작업은 계속** (전체 세션 중단 금지).
+3. 세션 말미: 미완료 **높음** 항목 채팅 1~2줄 요약 (선택).
+4. 인간 “완료” / `H-00x 완료` → `28` 완료 표로 이동 후 블로커 TODO 재개.
+
+## 전체 개발 생명주기 (문서화 대상)
+
+아이디어 → 설계 → 구현 → 테스트 → 배포 → 운영 → 서비스 런칭
+
+| 단계 | CampusConnect 현재 | 문서 |
+|------|-------------------|------|
+| 아이디어·철학 | vision.md 확정 | vision.md |
+| 설계 | Alpha 아키텍처 | 01_architecture, 09_database |
+| 구현 | UI ~70%, API ~10% | 02, 27 |
+| 테스트 | Playwright 초기 | 14_testing |
+| 배포 | 미착수 | 13_devops, 04 |
+| 운영 | 미착수 | 04, 15 |
+| 런칭 | 미착수 | 04_service_launch_flow |
+
+## 작업 종료 후 필수 체크리스트 (doit.md 전체)
+
+작업이 끝날 때마다 아래를 수행한다. **문서 최신화 자체가 핵심 업무**다.
+
+- [ ] `02_current_state.md` — 현재 상태·진행률
+- [ ] `05_todo.md` — 완료/신규 항목
+- [ ] `17_handoff.md` — 다음 담당자용 인수인계
+- [ ] `06_decision_log.md` — 아키텍처·정책 변경 시 ADR
+- [ ] 영향받는 영역 문서 (07~14, 27 등)
+- [ ] `03_development_roadmap.md` — Phase 진행률
+- [ ] 개발 단계 갱신 (MVP / Alpha / Beta / Launch)
+- [ ] `04_service_launch_flow.md` — 런칭 준비 항목
+- [ ] 완료/미완료 기능 동기화 (`27_vision_feature_matrix.md`)
+- [ ] `for_human/01_project_status.md` — 인간용 상태
+- [ ] `for_human/28_human_action_items.md` — 신규 인간 항목·완료 반영 (필수)
+- [ ] `for_human/25_ai_work_log.md` — **맨 위에** 항목 삽입, **`YYYY-MM-DD HH:mm:ss`** 작업 시각 (필수); **계획**란에 `plans/YYMMDD-N.md` + 한 줄 요약
+- [ ] `for_agent/plans/YYMMDD-N.md` — 실행 결과·상태 done; `current_session_plan.md` 인덱스 갱신 (세션에 계획이 있었을 때)
+
+## 우선순위 (doit.md 최상위)
+
+1. 이해 가능성  
+2. 유지보수성  
+3. 확장성  
+4. 장기 지속 가능성  
+5. 멀티 에이전트 협업 효율  
+
+## 금지 사항
+
+- `vision.md` 수정
+- 정보 부족 시 임의 구현 (→ `25_human_collaboration.md`)
+- 인간에게 물어야 할 일 숨기기 (`28` 미기록)
+- 인간 전용 작업을 AI가 대신 완료한 척하기
+- doc 갱신 없이 코드만 변경
+
+## Git 규칙 (프로젝트)
+
+- 커밋: 사용자 명시 요청 시만
+- git config 변경, force push, `--no-verify` 금지 (사용자 명시 시 예외)

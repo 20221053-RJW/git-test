@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import type { Team, TeamMember } from "../types";
-import { api } from "../api/mock-data";
+import { api } from "../api/supabase-api";
 
 export default function RandomTeamPage() {
   const [teams, setTeams] = useState<Team[]>([]);

@@ -1,5 +1,7 @@
 import { createBrowserRouter } from "react-router";
 import MainLayout from "./layouts/MainLayout";
+import ProtectedRoute from "./components/ProtectedRoute";
+import { CourseScopedRedirect } from "./components/CourseScopedRedirect";
 import LandingPage from "./pages/LandingPage";
 import CoursesPage from "./pages/CoursesPage";
 import CourseDetailPage from "./pages/CourseDetailPage";
@@ -9,6 +11,7 @@ import RandomTeamPage from "./pages/RandomTeamPage";
 import OtherStudentProfilePage from "./pages/OtherStudentProfilePage";
 import ProjectsPage from "./pages/ProjectsPage";
 import QnAPage from "./pages/QnAPage";
+import QnADetailPage from "./pages/QnADetailPage";
 import TeamsPage from "./pages/TeamsPage";
 import TeamDetailPage from "./pages/TeamDetailPage";
 import MyPage from "./pages/MyPage";
@@ -21,79 +24,85 @@ export const router = createBrowserRouter([
     path: "/",
     Component: LandingPage,
   },
-
   {
     path: "/signin",
     Component: SignInPage,
   },
-
   {
     path: "/app",
-    Component: MainLayout,
+    Component: ProtectedRoute,
     children: [
       {
-        path: "courses",
-        Component: CoursesPage,
-      },
-      {
-        path: "courses/:id",
-        Component: CourseDetailPage,
-      },
-      {
-        path: "courses/:courseId/students",
-        Component: StudentsNetworkPage,
-      },
-      {
-        path: "courses/:courseId/teams",
-        Component: TeamsPage,
-      },
-      {
-        path: "courses/:courseId/teams/:teamId",
-        Component: TeamDetailPage,
-      },
-      {
-        path: "profile",
-        Component: StudentProfilePage,
-      },
-      {
-        path: "profile/professor",
-        Component: ProfessorProfilePage,
-      },
-      {
-        path: "teams/random",
-        Component: RandomTeamPage,
-      },
-      {
-        path: "students/:id",
-        Component: OtherStudentProfilePage,
-      },
-      {
-        path: "projects",
-        Component: ProjectsPage,
-      },
-      {
-        path: "qna",
-        Component: QnAPage,
-      },
-      {
-        path: "teams",
-        Component: TeamsPage,
-      },
-      {
-        path: "teams/:id",
-        Component: TeamDetailPage,
-      },
-      {
-        path: "mypage",
-        Component: MyPage,
-      },
-      {
-        path: "students",
-        Component: StudentsNetworkPage,
+        Component: MainLayout,
+        children: [
+          {
+            path: "courses",
+            Component: CoursesPage,
+          },
+          {
+            path: "courses/:id",
+            Component: CourseDetailPage,
+          },
+          {
+            path: "courses/:courseId/students",
+            Component: StudentsNetworkPage,
+          },
+          {
+            path: "courses/:courseId/teams",
+            Component: TeamsPage,
+          },
+          {
+            path: "courses/:courseId/teams/:teamId",
+            Component: TeamDetailPage,
+          },
+          {
+            path: "profile",
+            Component: StudentProfilePage,
+          },
+          {
+            path: "profile/professor",
+            Component: ProfessorProfilePage,
+          },
+          {
+            path: "teams/random",
+            Component: RandomTeamPage,
+          },
+          {
+            path: "students/:id",
+            Component: OtherStudentProfilePage,
+          },
+          {
+            path: "projects",
+            Component: ProjectsPage,
+          },
+          {
+            path: "qna",
+            Component: QnAPage,
+          },
+          {
+            path: "qna/:questionId",
+            Component: QnADetailPage,
+          },
+          {
+            path: "teams",
+            element: <CourseScopedRedirect target="teams" />,
+          },
+          {
+            path: "teams/:id",
+            element: <CourseScopedRedirect target="team-detail" />,
+          },
+          {
+            path: "mypage",
+            Component: MyPage,
+          },
+          {
+            path: "students",
+            element: <CourseScopedRedirect target="students" />,
+          },
+        ],
       },
     ],
   },
-
   {
     path: "*",
     Component: NotFoundPage,

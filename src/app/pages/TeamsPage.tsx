@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { api } from "../api/mock-data";
+import { api } from "../api/supabase-api";
 
 import type { Activity, Announcement, Course, TeamCard } from "../types";
 

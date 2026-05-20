@@ -1,6 +1,6 @@
 import React, { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router";
-import { api } from "../api/mock-data";
+import { api } from "../api/supabase-api";
 import { useAuth } from "../contexts/AuthContext";
 import type { Course, CourseStatus, CreateCourseInput } from "../types";
 
@@ -25,7 +25,9 @@ export default function CoursesPage() {
   const [form, setForm] = useState<CreateCourseInput>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const { isAuthenticated, isProfessor, isAdmin, user } = useAuth();
+  const { isAuthenticated, isProfessor, isAdmin, isStudent, user } = useAuth();
+  const [joinCode, setJoinCode] = useState("");
+  const [joining, setJoining] = useState(false);
 
   const canManageCourses = isProfessor || isAdmin;
 
@@ -84,6 +86,32 @@ export default function CoursesPage() {
       setErrorMessage(error instanceof Error ? error.message : "수업을 생성하지 못했습니다.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const copyCourseCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      alert(`수업 코드 '${code}' 를 복사했습니다.`);
+    } catch {
+      alert(`수업 코드: ${code}`);
+    }
+  };
+
+  const handleJoinCourse = async (event: FormEvent) => {
+    event.preventDefault();
+    setJoining(true);
+    setErrorMessage("");
+
+    try {
+      const result = await api.memberships.joinByCode(joinCode);
+      setJoinCode("");
+      await loadCourses(statusFilter);
+      alert(`'${result.courseName}' 수업에 등록되었습니다.`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "수업 등록에 실패했습니다.");
+    } finally {
+      setJoining(false);
     }
   };
 
@@ -157,9 +185,56 @@ export default function CoursesPage() {
         </div>
       )}
 
+      {isStudent && statusFilter === "active" && (
+        <form
+          onSubmit={handleJoinCourse}
+          className="mb-6 flex flex-col gap-3 rounded-2xl border border-blue-100 bg-blue-50/50 p-4 sm:flex-row sm:items-end sm:gap-4 sm:p-5"
+        >
+          <div className="flex-1">
+            <p className="mb-1 text-sm font-bold text-gray-900">수업 코드로 등록</p>
+            <p className="mb-2 text-xs text-gray-600">교수에게 받은 코드를 입력하세요 (예: WEB-2026)</p>
+            <input
+              type="text"
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value)}
+              placeholder="수업 코드"
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={joining}
+            className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 sm:shrink-0"
+          >
+            {joining ? "등록 중..." : "수업 등록"}
+          </button>
+        </form>
+      )}
+
       {courses.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-500">
-          표시할 수업이 없습니다.
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center sm:p-10">
+          <p className="text-gray-600">등록된 수업이 없습니다.</p>
+          {isStudent && statusFilter === "active" && (
+            <form onSubmit={handleJoinCourse} className="mx-auto mt-6 max-w-sm space-y-3 text-left">
+              <p className="text-sm text-gray-500">수업 코드로 등록하세요 (예: WEB-2026, DB-2026)</p>
+              <input
+                type="text"
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value)}
+                placeholder="수업 코드"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+              <button
+                type="submit"
+                disabled={joining}
+                className="w-full rounded-lg bg-blue-600 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+              >
+                {joining ? "등록 중..." : "수업 등록"}
+              </button>
+            </form>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
@@ -176,9 +251,22 @@ export default function CoursesPage() {
               <h2 className="text-lg font-black text-gray-900 sm:text-xl">
                 {course.name}
               </h2>
-              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                {course.code}
-              </span>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-800">{course.code}</span>
+                {canManageCourses && course.status === "active" && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      copyCourseCode(course.code);
+                    }}
+                    className="text-xs font-medium text-blue-600 hover:underline"
+                  >
+                    코드 복사
+                  </button>
+                )}
+              </div>
             </div>
 
             {course.status === "archived" && (

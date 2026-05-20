@@ -1,13 +1,20 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
-import { api } from "../api/mock-data";
-import type { ChatMessage, Course, PeerReviewStudent, PeerReviewTeammate, TroubleshootingLog } from "../types";
+import { api } from "../api/supabase-api";
+import type {
+  ChatMessage,
+  Course,
+  PeerReviewStudent,
+  PeerReviewTeammate,
+  TeamDeliverable,
+  TroubleshootingLog,
+} from "../types";
 
 export default function TeamDetailPage() {
   const { id, teamId, courseId } = useParams<{ id?: string; teamId?: string; courseId?: string }>();
   const selectedTeamId = teamId ?? id ?? "";
-  const { isProfessor, isStudent, user } = useAuth();
+  const { isProfessor, isStudent, isAdmin, user } = useAuth();
   const [showEvalModal, setShowEvalModal] = useState(false);
   const [showStudentEvalModal, setShowStudentEvalModal] = useState(false);
   const [showChatModal, setShowChatModal] = useState(false);
@@ -43,8 +50,33 @@ export default function TeamDetailPage() {
     }
   }, [chatMessages, showChatModal]);
 
-  const myName = isProfessor ? "성보경 교수님" : (user?.name ?? "류지원");
+  const myName = user?.name ?? (isProfessor ? "교수" : "학생");
   const isArchived = course?.status === "archived";
+
+  const handleCreateTroubleshootingLog = async () => {
+    if (!selectedTeamId || !problemInput.trim()) {
+      alert("문제 내용을 입력해주세요.");
+      return;
+    }
+
+    setSubmittingLog(true);
+    try {
+      const created = await api.teamDetail.createTroubleshootingLog(selectedTeamId, {
+        problem: problemInput,
+        plan: planInput,
+        solution: solutionInput,
+      });
+      setTroubleshootingLogs((prev) => [...prev, created]);
+      setProblemInput("");
+      setPlanInput("");
+      setSolutionInput("");
+    } catch (error) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : "트러블슈팅 등록에 실패했습니다.");
+    } finally {
+      setSubmittingLog(false);
+    }
+  };
 
   const sendChat = () => {
     const text = chatInput.trim();
@@ -75,6 +107,122 @@ export default function TeamDetailPage() {
   const [badKeywords, setBadKeywords] = useState<string[]>([]);
   const [teammates, setTeammates] = useState<PeerReviewTeammate[]>([]);
   const [troubleshootingLogs, setTroubleshootingLogs] = useState<TroubleshootingLog[]>([]);
+  const [solutionInput, setSolutionInput] = useState("");
+  const [submittingLog, setSubmittingLog] = useState(false);
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [editLogForm, setEditLogForm] = useState({ problem: "", plan: "", solution: "" });
+  const [deliverables, setDeliverables] = useState<TeamDeliverable[]>([]);
+  const [uploadingDeliverable, setUploadingDeliverable] = useState(false);
+  const deliverableInputRef = useRef<HTMLInputElement>(null);
+
+  const canEditLog = (log: TroubleshootingLog) => log.author === myName;
+  const canResolveLog = (log: TroubleshootingLog) =>
+    log.status === "in-progress" &&
+    !isArchived &&
+    (log.author === myName || isProfessor || isAdmin);
+
+  const canUploadDeliverable = !isArchived && (isStudent || isProfessor || isAdmin);
+
+  const handleDeliverableUpload = async (fileList: FileList | null) => {
+    if (!selectedTeamId || !fileList?.[0]) return;
+
+    setUploadingDeliverable(true);
+    try {
+      const created = await api.teamDetail.uploadDeliverable(selectedTeamId, fileList[0]);
+      setDeliverables((prev) => [created, ...prev]);
+    } catch (error) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : "파일 업로드에 실패했습니다.");
+    } finally {
+      setUploadingDeliverable(false);
+      if (deliverableInputRef.current) deliverableInputRef.current.value = "";
+    }
+  };
+
+  const handleDeleteDeliverable = async (deliverable: TeamDeliverable) => {
+    if (!window.confirm(`"${deliverable.fileName}" 파일을 삭제할까요?`)) return;
+
+    setUploadingDeliverable(true);
+    try {
+      await api.teamDetail.deleteDeliverable(deliverable.id);
+      setDeliverables((prev) => prev.filter((item) => item.id !== deliverable.id));
+    } catch (error) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : "파일 삭제에 실패했습니다.");
+    } finally {
+      setUploadingDeliverable(false);
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const startEditLog = (log: TroubleshootingLog) => {
+    setEditingLogId(log.id);
+    setEditLogForm({
+      problem: log.problem,
+      plan: log.plan ?? "",
+      solution: log.solution ?? "",
+    });
+  };
+
+  const handleUpdateLog = async (e: React.FormEvent, logId: string) => {
+    e.preventDefault();
+    setSubmittingLog(true);
+    try {
+      const updated = await api.teamDetail.updateTroubleshootingLog(logId, {
+        problem: editLogForm.problem,
+        plan: editLogForm.plan,
+        solution: editLogForm.solution,
+      });
+      setTroubleshootingLogs((prev) => prev.map((log) => (log.id === logId ? updated : log)));
+      setEditingLogId(null);
+    } catch (error) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : "수정에 실패했습니다.");
+    } finally {
+      setSubmittingLog(false);
+    }
+  };
+
+  const handleDeleteLog = async (logId: string) => {
+    if (!window.confirm("이 트러블슈팅 기록을 삭제할까요?")) return;
+
+    setSubmittingLog(true);
+    try {
+      await api.teamDetail.deleteTroubleshootingLog(logId);
+      setTroubleshootingLogs((prev) => prev.filter((log) => log.id !== logId));
+      if (editingLogId === logId) setEditingLogId(null);
+    } catch (error) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : "삭제에 실패했습니다.");
+    } finally {
+      setSubmittingLog(false);
+    }
+  };
+
+  const handleResolveLog = async (log: TroubleshootingLog) => {
+    const solution = window.prompt("해결 방법을 입력하세요.", log.solution ?? "");
+    if (solution === null) return;
+    if (!solution.trim()) {
+      alert("해결 방법을 입력해주세요.");
+      return;
+    }
+
+    setSubmittingLog(true);
+    try {
+      const updated = await api.teamDetail.resolveTroubleshootingLog(log.id, solution);
+      setTroubleshootingLogs((prev) => prev.map((item) => (item.id === log.id ? updated : item)));
+    } catch (error) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : "해결 완료 처리에 실패했습니다.");
+    } finally {
+      setSubmittingLog(false);
+    }
+  };
 
   const [peerReviews, setPeerReviews] = useState<
     Record<string, { good: string[]; bad: string[]; comment: string; submitted: boolean }>
@@ -103,7 +251,8 @@ export default function TeamDetailPage() {
       api.teamDetail.getReviewKeywords(selectedTeamId),
       api.teamDetail.getTeammates(selectedTeamId),
       api.teamDetail.getTroubleshootingLogs(selectedTeamId),
-    ]).then(([feedbackData, chatData, reviewStudents, reviewKeywords, teammateData, logData]) => {
+      api.teamDetail.getDeliverables(selectedTeamId),
+    ]).then(([feedbackData, chatData, reviewStudents, reviewKeywords, teammateData, logData, deliverableData]) => {
       setFeedbackOptions(feedbackData);
       setSelectedFeedbacks(feedbackData.slice(0, 2));
       setChatMessages(chatData);
@@ -112,6 +261,7 @@ export default function TeamDetailPage() {
       setBadKeywords(reviewKeywords.bad);
       setTeammates(teammateData);
       setTroubleshootingLogs(logData);
+      setDeliverables(deliverableData);
       setPeerReviews(
         Object.fromEntries(
           teammateData.map((member) => [member.id, { good: [], bad: [], comment: "", submitted: false }])
@@ -252,29 +402,77 @@ export default function TeamDetailPage() {
               </div>
             </div>
 
-            {/* 파일 다운로드 */}
+            {/* 팀 산출물 파일 */}
             <div className="space-y-3">
-              <div className="bg-[#f9fafb] border border-[rgba(0,0,0,0.1)] rounded-[10px] p-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">💻</span>
-                  <span className="text-sm text-[#1e2939]">source_code_final.zip</span>
-                </div>
-                <button className="bg-[#e5e7eb] text-[#1e2939] text-xs font-medium px-3 py-2 rounded hover:bg-gray-300 transition-colors">
-                  ⬇️ 다운로드
-                </button>
-              </div>
-              <div className="bg-[#f9fafb] border border-[rgba(0,0,0,0.1)] rounded-[10px] p-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">📄</span>
-                  <span className="text-sm text-[#1e2939]">주제발표_초안.pdf</span>
-                </div>
-              </div>
+              {deliverables.length === 0 ? (
+                <p className="rounded-[10px] border border-dashed border-gray-300 bg-[#f9fafb] px-3 py-4 text-center text-sm text-[#6a7282]">
+                  업로드된 산출물이 없습니다.
+                </p>
+              ) : (
+                deliverables.map((item) => {
+                  const canDelete =
+                    !isArchived &&
+                    (user?.id === item.uploaderId || isProfessor || isAdmin);
 
-              {/* 학생 전용: 파일 업로드 버튼 */}
-              {isStudent && !isArchived && (
-                <button className="w-full bg-[#f9fafb] border border-dashed border-[rgba(0,0,0,0.1)] rounded py-2.5 text-[#4a5565] font-medium hover:bg-gray-100 transition-colors">
-                  + 링크 / 파일 업로드
-                </button>
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-[#f9fafb] border border-[rgba(0,0,0,0.1)] rounded-[10px] p-3 flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm shrink-0">📄</span>
+                          <span className="text-sm font-medium text-[#1e2939] truncate">{item.fileName}</span>
+                        </div>
+                        <p className="mt-1 text-xs text-[#6a7282]">
+                          {item.uploaderName} · {formatFileSize(item.fileSize)} ·{" "}
+                          {new Date(item.createdAt).toLocaleString("ko-KR")}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 gap-2">
+                        <a
+                          href={item.publicUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download={item.fileName}
+                          className="bg-[#e5e7eb] text-[#1e2939] text-xs font-medium px-3 py-2 rounded hover:bg-gray-300 transition-colors"
+                        >
+                          다운로드
+                        </a>
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDeliverable(item)}
+                            disabled={uploadingDeliverable}
+                            className="text-xs text-red-600 hover:underline disabled:opacity-60"
+                          >
+                            삭제
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+
+              {canUploadDeliverable && (
+                <>
+                  <input
+                    ref={deliverableInputRef}
+                    type="file"
+                    accept=".pdf,.zip,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.txt,.md,.json,.doc,.docx,.xlsx"
+                    className="hidden"
+                    onChange={(e) => handleDeliverableUpload(e.target.files)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => deliverableInputRef.current?.click()}
+                    disabled={uploadingDeliverable}
+                    className="w-full bg-[#f9fafb] border border-dashed border-[rgba(0,0,0,0.1)] rounded py-2.5 text-[#4a5565] font-medium hover:bg-gray-100 transition-colors disabled:opacity-60"
+                  >
+                    {uploadingDeliverable ? "업로드 중..." : "+ 파일 업로드 (최대 50MB)"}
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -289,36 +487,49 @@ export default function TeamDetailPage() {
             </div>
 
             <div className="bg-[rgba(239,246,255,0.3)] border border-[#dbeafe] rounded-[10px] p-4 space-y-4 max-h-[565px] overflow-y-auto">
-              {/* 문제 입력 폼 (교수만 표시) */}
-              {isProfessor && !isArchived && (
+              {/* 트러블슈팅 등록 폼 */}
+              {!isArchived && (
                 <div className="bg-white border-2 border-[rgba(174,174,174,0.3)] rounded-[10px] shadow-md p-4 mb-4">
                   <p className="text-xs text-red-600 font-medium mb-2">
-                    !!!문제 발견!!!
+                    새 트러블슈팅 기록
                   </p>
-                  <p className="text-xs text-red-600 mb-2">
-                    🚨 문제: 서버 코드에서 DB를 불러오는데 문제 발생.
-                  </p>
-                  <div className="bg-[#f0f0f0] rounded-[5px] p-2 mb-2">
-                    <input
-                      type="text"
-                      placeholder="해결을 원할 시 해결 계획을 입력하세요."
-                      className="w-full bg-transparent text-xs text-[#a8a8a8] outline-none"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <button className="flex-1 bg-[#155dfc] text-white text-xs font-semibold py-1.5 rounded-[5px] hover:bg-blue-700 transition-colors">
-                      문제 등록
-                    </button>
-                    <button className="flex-1 bg-[#b60000] text-white text-xs font-semibold py-1.5 rounded-[5px] hover:bg-red-700 transition-colors">
-                      문제 무시
-                    </button>
-                  </div>
+                  <textarea
+                    value={problemInput}
+                    onChange={(e) => setProblemInput(e.target.value)}
+                    placeholder="발견한 문제를 입력하세요."
+                    rows={2}
+                    className="mb-2 w-full rounded-[5px] border border-gray-200 p-2 text-xs outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                  <input
+                    type="text"
+                    value={planInput}
+                    onChange={(e) => setPlanInput(e.target.value)}
+                    placeholder="해결 계획 (선택)"
+                    className="mb-2 w-full rounded-[5px] border border-gray-200 p-2 text-xs outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                  <input
+                    type="text"
+                    value={solutionInput}
+                    onChange={(e) => setSolutionInput(e.target.value)}
+                    placeholder="해결 방법 (입력 시 해결 완료로 저장)"
+                    className="mb-2 w-full rounded-[5px] border border-gray-200 p-2 text-xs outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateTroubleshootingLog}
+                    disabled={submittingLog}
+                    className="w-full rounded-[5px] bg-[#155dfc] py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+                  >
+                    {submittingLog ? "등록 중..." : "기록 등록"}
+                  </button>
                 </div>
               )}
 
               {/* 트러블슈팅 로그 목록 */}
               <div className="space-y-4">
-                {troubleshootingLogs.map((log) => (
+                {troubleshootingLogs.map((log) => {
+                  const isEditing = editingLogId === log.id;
+                  return (
                   <div
                     key={log.id}
                     className={`bg-white rounded-[10px] shadow-sm p-4 ${
@@ -339,16 +550,71 @@ export default function TeamDetailPage() {
                             🟡 해결 중
                           </span>
                         )}
-                        <span className="text-xs font-bold text-[#1e2939]">
-                          {log.author}
-                        </span>
+                        <span className="text-xs font-bold text-[#1e2939]">{log.author}</span>
+                        {canEditLog(log) && !isArchived && !isEditing && (
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => startEditLog(log)}
+                              className="text-[10px] text-blue-600 hover:underline"
+                            >
+                              수정
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteLog(log.id)}
+                              disabled={submittingLog}
+                              className="text-[10px] text-red-600 hover:underline disabled:opacity-60"
+                            >
+                              삭제
+                            </button>
+                          </div>
+                        )}
                       </div>
-                      <span className="text-[10px] text-[#99a1af]">
-                        {log.timestamp}
-                      </span>
+                      <span className="text-[10px] text-[#99a1af]">{log.timestamp}</span>
                     </div>
 
-                    {/* 내용 */}
+                    {isEditing ? (
+                      <form onSubmit={(e) => handleUpdateLog(e, log.id)} className="space-y-2">
+                        <textarea
+                          value={editLogForm.problem}
+                          onChange={(e) => setEditLogForm((prev) => ({ ...prev, problem: e.target.value }))}
+                          rows={2}
+                          className="w-full rounded border border-gray-200 p-2 text-xs"
+                          required
+                        />
+                        <input
+                          type="text"
+                          value={editLogForm.plan}
+                          onChange={(e) => setEditLogForm((prev) => ({ ...prev, plan: e.target.value }))}
+                          placeholder="해결 계획"
+                          className="w-full rounded border border-gray-200 p-2 text-xs"
+                        />
+                        <input
+                          type="text"
+                          value={editLogForm.solution}
+                          onChange={(e) => setEditLogForm((prev) => ({ ...prev, solution: e.target.value }))}
+                          placeholder="해결 방법"
+                          className="w-full rounded border border-gray-200 p-2 text-xs"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="submit"
+                            disabled={submittingLog}
+                            className="rounded bg-[#155dfc] px-3 py-1.5 text-xs text-white disabled:opacity-60"
+                          >
+                            저장
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingLogId(null)}
+                            className="rounded bg-gray-200 px-3 py-1.5 text-xs text-gray-700"
+                          >
+                            취소
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
                     <div className="space-y-2">
                       <p className="text-xs">
                         <span className="font-bold text-[#fb2c36]">🚨 문제:</span>
@@ -369,58 +635,32 @@ export default function TeamDetailPage() {
                         </div>
                       )}
                     </div>
+                    )}
 
-                    {/* 액션 버튼 */}
-                    <div className="mt-3 flex flex-col gap-2 border-t border-[#f3f4f6] pt-3 sm:flex-row sm:items-center">
+                    <div className="mt-3 flex flex-col gap-2 border-t border-[#f3f4f6] pt-3 sm:flex-row sm:items-center sm:flex-wrap">
                       <button
+                        type="button"
                         onClick={() => setShowChatModal(true)}
-                        className="bg-[#155dfc] text-white text-xs font-bold px-4 py-2 rounded-[20px] hover:bg-blue-700 transition-colors"
+                        className="rounded-[20px] bg-[#155dfc] px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"
                       >
                         채팅방 이동
                       </button>
-                      {log.status === "in-progress" && isProfessor && !isArchived && (
-                        <>
-                          <button className="bg-[#f3f4f6] text-[#364153] text-[11px] font-medium px-3 py-2 rounded hover:bg-gray-200 transition-colors">
-                            💬 대댓글 달기
-                          </button>
-                          <button className="bg-[#f0fdf4] border border-[#b9f8cf] text-[#008236] text-[11px] font-medium px-3 py-2 rounded hover:bg-green-100 transition-colors">
-                            ✅ 해결 완료 처리
-                          </button>
-                        </>
+                      {canResolveLog(log) && (
+                        <button
+                          type="button"
+                          onClick={() => handleResolveLog(log)}
+                          disabled={submittingLog}
+                          className="rounded border border-[#b9f8cf] bg-[#f0fdf4] px-3 py-2 text-[11px] font-medium text-[#008236] hover:bg-green-100 disabled:opacity-60"
+                        >
+                          ✅ 해결 완료 처리
+                        </button>
                       )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
-              {/* 학생 전용: 문제 보고 폼 */}
-              {isStudent && !isArchived && (
-                <div className="bg-[rgba(239,246,255,0.3)] border border-[#bedbff] rounded-[10px] p-3 shadow-sm">
-                  <input
-                    type="text"
-                    value={problemInput}
-                    onChange={(e) => setProblemInput(e.target.value)}
-                    placeholder="🚨 어떤 문제(에러)를 겪고 있나요?"
-                    className="w-full bg-white border border-[#e5e7eb] rounded p-2 text-xs text-[#1e2939] placeholder:text-[rgba(30,41,57,0.5)] mb-3"
-                  />
-                  <input
-                    type="text"
-                    value={planInput}
-                    onChange={(e) => setPlanInput(e.target.value)}
-                    placeholder="🏃 원인을 어떻게 파악하고, 어떻게 해결할 계획인가요?"
-                    className="w-full bg-white border border-[#e5e7eb] rounded p-2 text-xs text-[#1e2939] placeholder:text-[rgba(30,41,57,0.5)] mb-3"
-                  />
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <label className="flex items-center gap-2 text-xs text-[#6a7282]">
-                      <input type="checkbox" className="w-3.5 h-3.5" />
-                      <span>익명</span>
-                    </label>
-                    <button className="bg-[#0f172a] text-white px-4 py-2 rounded text-xs font-bold hover:bg-gray-800 transition-colors shadow-sm">
-                      기록 남기기
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>

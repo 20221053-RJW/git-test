@@ -231,6 +231,19 @@ export interface TroubleshootingLog {
   solution?: string;
 }
 
+export interface TeamDeliverable {
+  id: string;
+  teamId: string;
+  courseId: string;
+  uploaderId: string;
+  uploaderName: string;
+  fileName: string;
+  fileSize: number;
+  mimeType?: string;
+  publicUrl: string;
+  createdAt: Date;
+}
+
 // 프로젝트 관련 타입
 export interface Project {
   id: string;

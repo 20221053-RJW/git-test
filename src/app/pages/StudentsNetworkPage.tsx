@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useParams } from "react-router";
 import { Search, BookOpen, Clock, MapPin, FlaskConical, User, Pencil, Shuffle } from "lucide-react";
-import { api } from "../api/mock-data";
+import { api } from "../api/supabase-api";
 import { useAuth } from "../contexts/AuthContext";
 import type { Course, ProfessorProfile } from "../types";
 
@@ -419,12 +419,23 @@ function MyInfoEditModal({
 }: {
   initialForm: EditForm;
   onClose: () => void;
-  onSave: (form: EditForm) => void;
+  onSave: (form: EditForm) => void | Promise<void>;
 }) {
   const [form, setForm] = useState<EditForm>(initialForm);
+  const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const update = (key: keyof EditForm, value: string) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onSave(form);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div
@@ -495,8 +506,13 @@ function MyInfoEditModal({
             <button onClick={onClose} className="px-8 py-2.5 rounded-[8px] border border-gray-300 text-sm font-medium text-[#364153] hover:bg-gray-50 transition-colors">
               취소
             </button>
-            <button onClick={() => { onSave(form); onClose(); }} className="px-8 py-2.5 rounded-[8px] bg-[#155dfc] text-white text-sm font-bold hover:bg-blue-700 transition-colors">
-              저장하기
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="px-8 py-2.5 rounded-[8px] bg-[#155dfc] text-white text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-60"
+            >
+              {saving ? "저장 중..." : "저장하기"}
             </button>
           </div>
         </div>
@@ -545,12 +561,23 @@ function TeamBox({ teamNumber, members }: { teamNumber: number; members: Student
   );
 }
 
-function RandomTeamModal({ allStudents, onClose }: { allStudents: Student[]; onClose: () => void }) {
+function RandomTeamModal({
+  courseId,
+  allStudents,
+  canSave,
+  onClose,
+}: {
+  courseId: string;
+  allStudents: Student[];
+  canSave: boolean;
+  onClose: () => void;
+}) {
   const [activeKeywords, setActiveKeywords] = useState<string[]>(["size4", "even", "career", "mbti"]);
   const [teams, setTeams] = useState<Student[][]>([]);
   const [customInput, setCustomInput] = useState("");
   const [customKeywords, setCustomKeywords] = useState<string[]>([]);
   const [showCustomInput, setShowCustomInput] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const generate = (kws: string[]) => {
     const size = kws.includes("size3") ? 3 : 4;
@@ -691,15 +718,42 @@ function RandomTeamModal({ allStudents, onClose }: { allStudents: Student[]; onC
           )}
         </div>
 
-        {/* 생성 버튼 */}
-        <div className="flex-shrink-0 px-7 py-5 border-t border-gray-100 flex justify-center">
+        {/* 생성·저장 */}
+        <div className="flex-shrink-0 px-7 py-5 border-t border-gray-100 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <button
+            type="button"
             onClick={() => generate(activeKeywords)}
-            className="bg-[#155dfc] text-white px-20 py-3 rounded-[10px] font-bold text-base hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
+            className="bg-[#155dfc] text-white px-12 py-3 rounded-[10px] font-bold text-base hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm"
           >
             <Shuffle className="w-4 h-4" />
-            생성
+            다시 생성
           </button>
+          {canSave && (
+            <button
+              type="button"
+              disabled={saving || teams.length === 0}
+              onClick={async () => {
+                if (!courseId || teams.length === 0) return;
+                setSaving(true);
+                try {
+                  const result = await api.teams.saveRandomAssignment(
+                    courseId,
+                    teams.map((group) => group.map((student) => student.id))
+                  );
+                  alert(`${result.teamCount}개 팀, ${result.memberCount}명 배정을 저장했습니다.`);
+                  onClose();
+                } catch (error) {
+                  console.error(error);
+                  alert(error instanceof Error ? error.message : "팀 배정 저장에 실패했습니다.");
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              className="rounded-[10px] border border-[#155dfc] bg-white px-12 py-3 text-base font-bold text-[#155dfc] transition-colors hover:bg-blue-50 disabled:opacity-60"
+            >
+              {saving ? "저장 중..." : "Supabase에 저장"}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -978,13 +1032,26 @@ export default function StudentsNetworkPage() {
         <MyInfoEditModal
           initialForm={editForm}
           onClose={() => setShowEditModal(false)}
-          onSave={(form) => setEditForm(form)}
+          onSave={async (form) => {
+            try {
+              const saved = await api.studentNetwork.saveProfile(form);
+              setEditForm(saved);
+              const refreshed = await api.studentNetwork.getStudents(courseId);
+              setStudents(refreshed.length > 0 ? refreshed : fallbackStudents);
+            } catch (error) {
+              console.error(error);
+              alert(error instanceof Error ? error.message : "프로필 저장에 실패했습니다.");
+              throw error;
+            }
+          }}
         />
       )}
 
-      {!isArchived && showRandomTeamModal && (
+      {!isArchived && showRandomTeamModal && courseId && (
         <RandomTeamModal
+          courseId={courseId}
           allStudents={students}
+          canSave={Boolean(isProfessor || isAdmin)}
           onClose={() => setShowRandomTeamModal(false)}
         />
       )}

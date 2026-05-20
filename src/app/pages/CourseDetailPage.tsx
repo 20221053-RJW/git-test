@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
-import { api } from "../api/mock-data";
+import { api } from "../api/supabase-api";
 import { useAuth } from "../contexts/AuthContext";
 import type { Course } from "../types";
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router";
 import type { Project } from "../types";
-import { api } from "../api/mock-data";
+import { api } from "../api/supabase-api";
 
 const statusColors = {
   planning: "bg-gray-100 text-gray-800",

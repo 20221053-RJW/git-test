@@ -1,6 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import svgPaths from "../../imports/Group43/svg-bqpgzlg1zb";
 import { useAuth } from "../contexts/AuthContext";
+import { api } from "../api/supabase-api";
+import AiReportPrintView from "../components/AiReportPrintView";
+import type { AiReportContext, AiReportGenerateResponse } from "../types/ai-report";
 
 interface PeerReview {
   text: string;
@@ -31,9 +34,65 @@ interface Project {
 export default function MyPage() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [reportPage, setReportPage] = useState(1);
+  const [aiReportLoading, setAiReportLoading] = useState(false);
+  const [aiReportMessage, setAiReportMessage] = useState<string | null>(null);
+  const [reportPreview, setReportPreview] = useState<{
+    context: AiReportContext;
+    report: AiReportGenerateResponse;
+  } | null>(null);
   const { user } = useAuth();
 
-  const projects: Project[] = [
+  async function openDbReportPreview() {
+    if (!user?.id) {
+      setAiReportMessage("로그인 후 이용할 수 있습니다.");
+      return;
+    }
+    setAiReportLoading(true);
+    setAiReportMessage(null);
+    try {
+      const context = await api.aiReport.gatherContext(user.id);
+      const report = api.aiReport.buildDraftFromContext(context);
+      setReportPreview({ context, report });
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "리포트 데이터를 불러오지 못했습니다.";
+      setAiReportMessage(msg);
+    } finally {
+      setAiReportLoading(false);
+    }
+  }
+
+  async function handleGenerateAiReport() {
+    if (!user?.id) {
+      setAiReportMessage("로그인 후 이용할 수 있습니다.");
+      return;
+    }
+    setAiReportLoading(true);
+    setAiReportMessage(null);
+    try {
+      const result = await api.aiReport.generateReport({ userId: user.id, locale: "ko" });
+      setAiReportMessage("AI 리포트가 생성되었습니다.");
+      const context = await api.aiReport.gatherContext(user.id);
+      setReportPreview({ context, report: result });
+    } catch (err) {
+      if (err instanceof Error && err.name === "AiReportNotReady") {
+        setAiReportMessage(`${err.message} DB 미리보기를 엽니다.`);
+        await openDbReportPreview();
+        return;
+      }
+      const msg =
+        err instanceof Error ? err.message : "AI 리포트 생성에 실패했습니다.";
+      setAiReportMessage(msg);
+    } finally {
+      setAiReportLoading(false);
+    }
+  }
+
+  function handlePrintReport() {
+    window.print();
+  }
+
+  const DEMO_PROJECTS: Project[] = [
     {
       title: "헬리버리 서비스",
       subtitle: "10-20대의 건강한 식사 분석 서비스",
@@ -152,6 +211,45 @@ export default function MyPage() {
     },
   ];
 
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
+  const [reportContext, setReportContext] = useState<AiReportContext | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const loaded = await api.myPage.getProjectsForUser();
+        if (!cancelled) {
+          setProjects(loaded.length > 0 ? loaded : DEMO_PROJECTS);
+        }
+      } catch {
+        if (!cancelled) setProjects(DEMO_PROJECTS);
+      } finally {
+        if (!cancelled) setProjectsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    api.aiReport
+      .gatherContext(user.id)
+      .then((ctx) => {
+        if (!cancelled) setReportContext(ctx);
+      })
+      .catch(() => {
+        if (!cancelled) setReportContext(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
   const sideNavItems = ["요약 리포트", "상세 리포트", "내 정보 조회", "내 정보 수정"];
   const reportPageTitles = ["역량 및 활동 요약", "주요 팀플 상세", "문제해결 경험"];
   const profileName = user?.name ?? "로그인 사용자";
@@ -163,6 +261,96 @@ export default function MyPage() {
       : user?.role === "professor"
         ? `숭실대학교 ${user.department || "소속 미입력"} 교수`
         : "로그인 사용자";
+
+  const activitySummary = reportContext
+    ? {
+        teamCount: reportContext.teams.length,
+        troubleshootingCount: reportContext.totalTroubleshootingLogs,
+        deliverableCount: reportContext.totalDeliverables,
+        avgProgress:
+          reportContext.teams.length > 0
+            ? Math.round(
+                reportContext.teams.reduce((sum, team) => sum + team.progress, 0) /
+                  reportContext.teams.length
+              )
+            : 0,
+      }
+    : null;
+
+  const analysisDateLabel = new Date().toLocaleDateString("ko-KR");
+  const projectCountLabel = activitySummary?.teamCount ?? projects.length;
+  const summaryCards = activitySummary
+    ? [
+        {
+          label: "참여 팀 프로젝트",
+          value: `${activitySummary.teamCount}건`,
+          note: "Supabase 팀 멤버십 기준",
+        },
+        {
+          label: "평균 진행률",
+          value: `${activitySummary.avgProgress}%`,
+          note: "팀 progress 평균",
+        },
+        {
+          label: "트러블슈팅",
+          value: `${activitySummary.troubleshootingCount}건`,
+          note: `산출물 ${activitySummary.deliverableCount}건`,
+        },
+      ]
+    : [
+        {
+          label: "참여 프로젝트",
+          value: `${projects.length}건`,
+          note: "표시 중인 카드 수 (데모 포함 가능)",
+        },
+        { label: "평균 완성도", value: "—", note: "팀 데이터 로드 후 표시" },
+        { label: "활동 로그", value: "—", note: "DB 집계 대기" },
+      ];
+
+  const summaryParagraph = activitySummary
+    ? activitySummary.teamCount > 0
+      ? `${profileName} 학생은 ${activitySummary.teamCount}개 팀 프로젝트에 참여했으며, 트러블슈팅 ${activitySummary.troubleshootingCount}건·산출물 ${activitySummary.deliverableCount}건이 기록되어 있습니다. 평균 진행률은 ${activitySummary.avgProgress}%입니다.`
+      : `${profileName} 학생의 팀 활동 기록이 아직 없습니다. 수업에 등록하고 팀에 배정되면 여기에 집계됩니다.`
+    : `${profileName} 학생의 활동 데이터를 불러오는 중이거나, 아래 데모 프로젝트 카드를 참고하세요.`;
+
+  const DEMO_TROUBLESHOOTING_CASES = [
+    {
+      title: "모바일 레이아웃 깨짐 원인 분석",
+      problem:
+        "모바일 화면에서 카드와 폼 영역이 겹치고 일부 요소가 화면 밖으로 밀리는 현상이 발생했습니다.",
+      action:
+        "CSS 클래스 충돌과 고정 폭 사용을 원인으로 파악하고, grid/flex 기준의 반응형 레이아웃으로 재구성했습니다.",
+      result: "모든 주요 화면에서 모바일, 태블릿, 데스크톱 순서로 자연스럽게 콘텐츠가 재배치되도록 개선했습니다.",
+      impact: "사용자 기기 크기와 관계없이 동일한 기능 접근성을 확보했습니다.",
+      courseName: "",
+      projectTitle: "",
+    },
+    {
+      title: "Firebase 로그인과 Supabase 유저 프로필 연결",
+      problem:
+        "로그인 계정과 서비스 내부 유저 정보가 분리되어 수업/팀 데이터 조회 기준이 불명확했습니다.",
+      action:
+        "Firebase uid를 `ai_users`의 단일 사용자 기준으로 연결하고, 수업 소속과 팀원 데이터를 user_id 기반으로 재정리했습니다.",
+      result:
+        "로그인 학생 계정 기준으로 수업, 수강자, 팀, 팀 워크스페이스 데이터를 일관되게 로드할 수 있게 되었습니다.",
+      impact: "인증과 서비스 데이터의 기준을 통합해 향후 권한 관리와 개인화 조회의 기반을 마련했습니다.",
+      courseName: "",
+      projectTitle: "",
+    },
+  ];
+
+  const troubleshootingCases =
+    reportContext && reportContext.troubleshootingCases.length > 0
+      ? reportContext.troubleshootingCases
+      : DEMO_TROUBLESHOOTING_CASES;
+
+  const page3UsesDb = Boolean(
+    reportContext && reportContext.troubleshootingCases.length > 0
+  );
+
+  const page3Intro = page3UsesDb
+    ? `${profileName} 학생의 트러블슈팅 ${reportContext!.troubleshootingCases.length}건이 Supabase 팀 워크스페이스에 기록되어 있습니다. 아래는 실제 problem · plan · solution 필드입니다.`
+    : `${profileName} 학생의 문제해결 경험은 단순 오류 수정이 아니라, 원인 파악, 구조 재정리, 재발 방지까지 이어지는 방식으로 기록되어 있습니다. (DB 로그가 없어 예시 사례를 표시합니다.)`;
 
   return (
     <div className="min-h-screen bg-[#f0f0f0]">
@@ -309,8 +497,12 @@ export default function MyPage() {
               </div>
               <div className="rounded-lg border border-white/15 bg-white/10 p-3 text-[10px] leading-5 text-slate-200">
                 <p>대상 학생: <span className="font-bold text-white">{profileName}</span></p>
-                <p>분석 기준일: <span className="font-bold text-white">2026.05.18</span></p>
-                <p>분석 범위: <span className="font-bold text-white">최근 팀 프로젝트 4건</span></p>
+                <p>분석 기준일: <span className="font-bold text-white">{analysisDateLabel}</span></p>
+                <p>
+                  분석 범위:{" "}
+                  <span className="font-bold text-white">팀 프로젝트 {projectCountLabel}건</span>
+                  {activitySummary ? " (DB)" : ""}
+                </p>
               </div>
             </div>
           </div>
@@ -319,11 +511,7 @@ export default function MyPage() {
             {reportPage === 1 && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                  {[
-                    { label: "참여 프로젝트", value: "4건", note: "기획·개발·디자인 역할 포함" },
-                    { label: "평균 완성도", value: "93.8%", note: "프로젝트 완료율 기준" },
-                    { label: "동료 긍정 평가", value: "24회", note: "재협업·책임감 키워드 중심" },
-                  ].map((item) => (
+                  {summaryCards.map((item) => (
                     <div key={item.label} className="rounded-xl border border-[#dbe7ff] bg-[#f8fbff] p-4">
                       <p className="text-[9px] font-bold uppercase tracking-wide text-[#476582]">{item.label}</p>
                       <p className="mt-1.5 text-[22px] font-black text-[#0f3ea8]">{item.value}</p>
@@ -335,12 +523,7 @@ export default function MyPage() {
                 <div className="rounded-xl border-l-4 border-[#155dfc] bg-[#f7faff] p-4">
                   <p className="text-[10px] font-black text-[#155dfc]">PAGE 01 SUMMARY</p>
                   <h3 className="mt-1.5 text-[18px] font-black text-[#101828]">역량 및 주요 팀플 활동 요약</h3>
-                  <p className="mt-2 text-[11px] leading-5 text-[#334155]">
-                    {profileName} 학생은 여러 팀 프로젝트에서 사용자 관점의 기획, 화면 설계, 프론트엔드 구현,
-                    문제 상황 문서화까지 폭넓게 수행한 이력이 확인됩니다. 프로젝트 기록 전반에서
-                    기획 의도를 구현 가능한 화면으로 옮기는 능력, 팀 내 진행상황을 공유하는 습관,
-                    사용자 관점의 개선안을 제안하는 역량이 일관되게 확인됩니다.
-                  </p>
+                  <p className="mt-2 text-[11px] leading-5 text-[#334155]">{summaryParagraph}</p>
                 </div>
 
                 <div className="rounded-xl border border-[#dbe7ff] bg-white p-4">
@@ -436,39 +619,101 @@ export default function MyPage() {
                     <p className="text-[10px] font-black text-[#155dfc]">PAGE 02 PROJECT DETAIL</p>
                     <h3 className="text-[17px] font-black text-[#101828]">주요 팀플 상세 조회</h3>
                   </div>
-                  <p className="text-[10px] text-[#64748b]">각 카드를 클릭하면 상세 리포트를 확인할 수 있습니다.</p>
+                  <p className="text-[10px] text-[#64748b]">
+                    {reportContext && reportContext.teams.length > 0
+                      ? "Supabase 팀 멤버십 기준 카드입니다."
+                      : projectsLoading
+                        ? "프로젝트 불러오는 중…"
+                        : "각 카드를 클릭하면 상세 리포트를 확인할 수 있습니다."}
+                  </p>
                 </div>
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                  {projects.map((project, index) => (
-                    <button
-                      key={project.title}
-                      onClick={() => setSelectedProject(project)}
-                      className="rounded-xl border border-[#dbe7ff] bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#155dfc] hover:shadow-md"
-                    >
-                      <div className="mb-3 flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-[9px] font-bold text-[#64748b]">CASE {String(index + 1).padStart(2, "0")}</p>
-                          <h4 className="mt-1 text-[15px] font-black text-[#101828]">{project.title}</h4>
-                          <p className="mt-1 text-[10px] text-[#64748b]">{project.subtitle}</p>
+                                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  {reportContext && reportContext.teams.length > 0
+                    ? reportContext.teams.map((team, index) => (
+                        <div
+                          key={team.teamId}
+                          className="rounded-xl border border-[#dbe7ff] bg-white p-4 text-left shadow-sm"
+                        >
+                          <div className="mb-3 flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-[9px] font-bold text-[#64748b]">
+                                TEAM {String(index + 1).padStart(2, "0")} · DB
+                              </p>
+                              <h4 className="mt-1 text-[15px] font-black text-[#101828]">
+                                {team.projectTitle}
+                              </h4>
+                              <p className="mt-1 text-[10px] text-[#64748b]">
+                                {team.courseName} · {team.memberRole}
+                              </p>
+                            </div>
+                            <span className="rounded-full bg-[#eff6ff] px-2.5 py-0.5 text-[10px] font-black text-[#155dfc]">
+                              {team.progress}%
+                            </span>
+                          </div>
+                          <div className="space-y-1.5 text-[10.5px] leading-5 text-[#475569]">
+                            <p>
+                              팀명: <span className="font-bold text-[#1e293b]">{team.teamName}</span>
+                            </p>
+                            <p>
+                              트러블슈팅{" "}
+                              <span className="font-bold text-[#1e293b]">
+                                {team.troubleshootingCount}건
+                              </span>
+                              {" · "}
+                              산출물{" "}
+                              <span className="font-bold text-[#1e293b]">
+                                {team.deliverableCount}건
+                              </span>
+                            </p>
+                            {team.sampleProblems.length > 0 && (
+                              <p>주요 이슈: {team.sampleProblems.join(" / ")}</p>
+                            )}
+                          </div>
                         </div>
-                        <span className="rounded-full bg-[#eff6ff] px-2.5 py-0.5 text-[10px] font-black text-[#155dfc]">
-                          {project.completionRate}%
-                        </span>
-                      </div>
-                      <div className="space-y-1.5 text-[10.5px] leading-5 text-[#475569]">
-                        <p>기간/팀: <span className="font-bold text-[#1e293b]">{project.period}</span></p>
-                        <p>담당 역할: <span className="font-bold text-[#1e293b]">{project.role}</span></p>
-                        <p>핵심 성과: {project.problemCase.result}</p>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {project.techStack.slice(0, 5).map((tech) => (
-                          <span key={tech} className="rounded-full bg-[#eff6ff] px-2.5 py-0.5 text-[9px] font-bold text-[#155dfc]">
-                            {tech}
-                          </span>
-                        ))}
-                      </div>
-                    </button>
-                  ))}
+                      ))
+                    : projects.map((project, index) => (
+                        <button
+                          key={`${project.title}-${index}`}
+                          onClick={() => setSelectedProject(project)}
+                          className="rounded-xl border border-[#dbe7ff] bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#155dfc] hover:shadow-md"
+                        >
+                          <div className="mb-3 flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-[9px] font-bold text-[#64748b]">
+                                CASE {String(index + 1).padStart(2, "0")}
+                              </p>
+                              <h4 className="mt-1 text-[15px] font-black text-[#101828]">
+                                {project.title}
+                              </h4>
+                              <p className="mt-1 text-[10px] text-[#64748b]">{project.subtitle}</p>
+                            </div>
+                            <span className="rounded-full bg-[#eff6ff] px-2.5 py-0.5 text-[10px] font-black text-[#155dfc]">
+                              {project.completionRate}%
+                            </span>
+                          </div>
+                          <div className="space-y-1.5 text-[10.5px] leading-5 text-[#475569]">
+                            <p>
+                              기간/팀:{" "}
+                              <span className="font-bold text-[#1e293b]">{project.period}</span>
+                            </p>
+                            <p>
+                              담당 역할:{" "}
+                              <span className="font-bold text-[#1e293b]">{project.role}</span>
+                            </p>
+                            <p>핵심 성과: {project.problemCase.result}</p>
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-1.5">
+                            {project.techStack.slice(0, 5).map((tech) => (
+                              <span
+                                key={tech}
+                                className="rounded-full bg-[#eff6ff] px-2.5 py-0.5 text-[9px] font-bold text-[#155dfc]"
+                              >
+                                {tech}
+                              </span>
+                            ))}
+                          </div>
+                        </button>
+                      ))}
                 </div>
               </div>
             )}
@@ -478,45 +723,39 @@ export default function MyPage() {
                 <div className="rounded-xl border-l-4 border-[#155dfc] bg-[#f7faff] p-5">
                   <p className="text-[10px] font-black text-[#155dfc]">PAGE 03 PROBLEM SOLVING</p>
                   <h3 className="mt-1.5 text-[18px] font-black text-[#101828]">가장 주목해야 할 문제해결 경험</h3>
-                  <p className="mt-3 text-[12px] leading-6 text-[#334155]">
-                    {profileName} 학생의 문제해결 경험은 단순 오류 수정이 아니라, 원인 파악, 구조 재정리,
-                    재발 방지까지 이어지는 방식으로 기록되어 있습니다. 아래 사례들은 팀 프로젝트 안에서
-                    실제 서비스 구조와 사용자 경험을 개선한 근거로 볼 수 있습니다.
-                  </p>
+                  <p className="mt-3 text-[12px] leading-6 text-[#334155]">{page3Intro}</p>
                 </div>
 
                 <div className="space-y-4">
-                  {[
-                    {
-                      title: "모바일 레이아웃 깨짐 원인 분석",
-                      problem: "모바일 화면에서 카드와 폼 영역이 겹치고 일부 요소가 화면 밖으로 밀리는 현상이 발생했습니다.",
-                      action: "CSS 클래스 충돌과 고정 폭 사용을 원인으로 파악하고, grid/flex 기준의 반응형 레이아웃으로 재구성했습니다.",
-                      result: "모든 주요 화면에서 모바일, 태블릿, 데스크톱 순서로 자연스럽게 콘텐츠가 재배치되도록 개선했습니다.",
-                      impact: "사용자 기기 크기와 관계없이 동일한 기능 접근성을 확보했습니다.",
-                    },
-                    {
-                      title: "Firebase 로그인과 Supabase 유저 프로필 연결",
-                      problem: "로그인 계정과 서비스 내부 유저 정보가 분리되어 수업/팀 데이터 조회 기준이 불명확했습니다.",
-                      action: "Firebase uid를 `ai_users`의 단일 사용자 기준으로 연결하고, 수업 소속과 팀원 데이터를 user_id 기반으로 재정리했습니다.",
-                      result: "로그인 학생 계정 기준으로 수업, 수강자, 팀, 팀 워크스페이스 데이터를 일관되게 로드할 수 있게 되었습니다.",
-                      impact: "인증과 서비스 데이터의 기준을 통합해 향후 권한 관리와 개인화 조회의 기반을 마련했습니다.",
-                    },
-                    {
-                      title: "팀 워크스페이스 데이터 중복 참조 해결",
-                      problem: "여러 팀 상세 페이지가 같은 채팅, 피어리뷰, 트러블슈팅 로그를 참조하는 구조적 문제가 있었습니다.",
-                      action: "`ai_team_detail_*` 테이블에 team_id를 추가하고 각 팀별 상세 데이터를 분리했습니다.",
-                      result: "각 수업과 각 팀이 독립적인 내부 워크스페이스 데이터를 가지도록 정리되었습니다.",
-                      impact: "팀별 활동 기록의 신뢰성을 높이고, 프로젝트별 회고/평가 데이터가 섞이지 않도록 했습니다.",
-                    },
-                  ].map((caseItem, index) => (
-                    <div key={caseItem.title} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                      <p className="text-[9px] font-black text-[#64748b]">PROBLEM SOLVING CASE {index + 1}</p>
+                  {troubleshootingCases.map((caseItem, index) => (
+                    <div
+                      key={"logId" in caseItem ? caseItem.logId : `${caseItem.title}-${index}`}
+                      className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
+                    >
+                      <p className="text-[9px] font-black text-[#64748b]">
+                        PROBLEM SOLVING CASE {index + 1}
+                        {page3UsesDb ? " · DB" : ""}
+                      </p>
                       <h4 className="mt-1.5 text-[15px] font-black text-[#155dfc]">{caseItem.title}</h4>
+                      {"courseName" in caseItem && caseItem.courseName ? (
+                        <p className="mt-1 text-[10px] text-[#64748b]">
+                          {caseItem.courseName}
+                          {caseItem.projectTitle ? ` · ${caseItem.projectTitle}` : ""}
+                        </p>
+                      ) : null}
                       <div className="mt-3 grid grid-cols-1 gap-3 text-[10.5px] leading-5 text-[#475569] md:grid-cols-2">
-                        <p><span className="font-bold text-[#0f172a]">문제:</span> {caseItem.problem}</p>
-                        <p><span className="font-bold text-[#0f172a]">조치:</span> {caseItem.action}</p>
-                        <p><span className="font-bold text-[#0f172a]">결과:</span> {caseItem.result}</p>
-                        <p><span className="font-bold text-[#0f172a]">의미:</span> {caseItem.impact}</p>
+                        <p>
+                          <span className="font-bold text-[#0f172a]">문제:</span> {caseItem.problem}
+                        </p>
+                        <p>
+                          <span className="font-bold text-[#0f172a]">조치:</span> {caseItem.action}
+                        </p>
+                        <p>
+                          <span className="font-bold text-[#0f172a]">결과:</span> {caseItem.result}
+                        </p>
+                        <p>
+                          <span className="font-bold text-[#0f172a]">의미:</span> {caseItem.impact}
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -524,10 +763,31 @@ export default function MyPage() {
               </div>
             )}
 
-            <div className="border-t border-gray-200 pt-4 text-center">
+            <div className="border-t border-gray-200 pt-4 text-center space-y-3">
               <p className="text-[9px] font-bold leading-4 text-[#64748b]">
-                본 화면은 현재 하드코딩된 예시 리포트입니다. 추후 ai_users, ai_courses, ai_teams, ai_team_detail_* 데이터를 집계하여 자동 생성하도록 확장할 수 있습니다.
+                1·2·3페이지 요약은 Supabase 집계를 반영합니다. AI 문단 생성은 Edge Function 배포(H-002) 후 이용할 수 있습니다.
               </p>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={openDbReportPreview}
+                  disabled={aiReportLoading}
+                  className="rounded-lg border border-[#155dfc] bg-white px-4 py-2 text-[11px] font-bold text-[#155dfc] disabled:opacity-50"
+                >
+                  {aiReportLoading ? "불러오는 중…" : "DB 활동 미리보기 (A4)"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGenerateAiReport}
+                  disabled={aiReportLoading}
+                  className="rounded-lg bg-[#155dfc] px-4 py-2 text-[11px] font-bold text-white disabled:opacity-50"
+                >
+                  {aiReportLoading ? "생성 중…" : "AI 리포트 생성 (베타)"}
+                </button>
+              </div>
+              {aiReportMessage && (
+                <p className="text-[10px] font-medium text-[#475569]">{aiReportMessage}</p>
+              )}
             </div>
           </div>
         </section>
@@ -662,6 +922,38 @@ export default function MyPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {reportPreview && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 print:p-0 print:bg-white"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setReportPreview(null);
+          }}
+        >
+          <div className="my-4 w-full max-w-[220mm] print:my-0 print:max-w-none">
+            <div className="mb-3 flex justify-end gap-2 print:hidden">
+              <button
+                type="button"
+                onClick={handlePrintReport}
+                className="rounded-lg bg-[#155dfc] px-4 py-2 text-[11px] font-bold text-white"
+              >
+                인쇄 / PDF 저장
+              </button>
+              <button
+                type="button"
+                onClick={() => setReportPreview(null)}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-[11px] font-bold"
+              >
+                닫기
+              </button>
+            </div>
+            <AiReportPrintView
+              context={reportPreview.context}
+              report={reportPreview.report}
+            />
           </div>
         </div>
       )}

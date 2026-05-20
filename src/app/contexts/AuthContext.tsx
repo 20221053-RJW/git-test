@@ -3,12 +3,14 @@ import type { AdminProfile, StudentProfile, ProfessorProfile, UserRole } from ".
 import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth } from "../firebase";
 import { supabase } from "../supabase";
+import { api } from "../api/supabase-api";
 
 export type Signupinput = {
   name: string;
   email: string;
   password: string;
   role: UserRole;
+  courseCode?: string;
 }
 
 interface AuthContextType {
@@ -85,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AdminProfile | StudentProfile | ProfessorProfile | null>(null);
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const role = user?.role || null;
   const isStudent = role === "student";
@@ -97,14 +99,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         // Firebase로 로그인된 사용자라면 Supabase ai_users에서 서비스 프로필을 가져옵니다.
-        const { data: userData } = await supabase
+        const { data: userData, error } = await supabase
           .from("ai_users")
           .select("*")
           .eq("firebase_uid", firebaseUser.uid)
-          .single();
+          .maybeSingle();
 
-        if (userData) setUser(toProfile(userData as AiUserRow));
-        setIsAuthenticated(true);
+        if (error) {
+          console.error("프로필 조회 실패:", error);
+          setUser(null);
+          setIsAuthenticated(false);
+        } else if (userData) {
+          setUser(toProfile(userData as AiUserRow));
+          setIsAuthenticated(true);
+        } else {
+          setUser(null);
+          setIsAuthenticated(false);
+        }
       } else {
         setUser(null);
         setIsAuthenticated(false);
@@ -124,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // input은 회원가입할 때 필요한 정보 묶음입니다.
       // 예: { name: "...", email: "...", password: "...", role: "student" }
       // 이렇게 객체 하나로 받으면 나중에 name, major 같은 값이 추가돼도 함수 인자를 계속 늘리지 않아도 됩니다.
-      const { name, email, password, role } = input;
+      const { name, email, password, role, courseCode } = input;
 
       // Firebase Auth에 계정을 만들고, Firebase uid를 Supabase에 저장합니다.
       const firebaseUid = (await createUserWithEmailAndPassword(auth, email, password)).user.uid;
@@ -144,8 +155,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // 위에서 만든 userData를 Supabase의 ai_users 테이블에 한 줄 추가합니다.
       // 나중에 name, major, studentId 같은 값도 여기에 같이 넣으면 됩니다.
-      await supabase.from("ai_users").upsert([userData], { onConflict: "firebase_uid" });
-      alert("회원가입이 완료되었습니다. 로그인 페이지로 이동합니다.");
+      const { data: savedUser, error: saveError } = await supabase
+        .from("ai_users")
+        .upsert([userData], { onConflict: "firebase_uid" })
+        .select()
+        .single();
+
+      if (saveError) throw saveError;
+      if (savedUser) {
+        setUser(toProfile(savedUser as AiUserRow));
+        setIsAuthenticated(true);
+
+        if (role === "student" && courseCode?.trim()) {
+          await api.memberships.joinByCode(courseCode);
+        }
+      }
 
     } catch (error) {
       // 회원가입 중 에러가 나면 이 함수를 호출한 쪽으로 에러를 다시 던집니다.
@@ -164,17 +188,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
 
       // Supabase ai_users 테이블에서 해당 uid의 사용자 정보 가져오기
-      const { data: userData } = await supabase
+      const { data: userData, error: profileError } = await supabase
         .from("ai_users")
         .select("*")
         .eq("firebase_uid", userCredential.user.uid)
-        .single();
+        .maybeSingle();
 
-      if (userData) {
-        // AuthContext의 user 업데이트
-        setUser(toProfile(userData as AiUserRow));
-        setIsAuthenticated(true);
+      if (profileError) throw profileError;
+      if (!userData) {
+        await signOut(auth);
+        throw new Error("서비스 프로필이 없습니다. 회원가입을 먼저 완료해주세요.");
       }
+
+      setUser(toProfile(userData as AiUserRow));
+      setIsAuthenticated(true);
     } catch (error) {
       throw error;
     } finally {

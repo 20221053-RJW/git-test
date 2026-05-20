@@ -19,7 +19,8 @@ export default function SignInPage() {
     name: "",
     email: "",
     password: "",
-    role: "student" as UserRole
+    role: "student" as UserRole,
+    courseCode: "",
   });
 
   // 이메일/비밀번호 input이나 역할 select 값이 바뀔 때 실행됩니다.
@@ -53,10 +54,10 @@ export default function SignInPage() {
         email: form.email as string,
         password: form.password as string,
         role: form.role as UserRole,
+        courseCode: form.role === "student" ? form.courseCode : undefined,
       });
 
-      // 회원가입이 성공하면 과목 목록 페이지로 이동합니다.
-      navigate("/");
+      navigate("/app/courses");
     } catch (error) {
       // Firebase/Supabase가 돌려준 실제 에러를 콘솔에 남겨야 400 원인을 확인하기 쉽습니다.
       console.error("회원가입 실패:", error);
@@ -187,6 +188,25 @@ export default function SignInPage() {
                   <option value="professor">교수</option>
                 </select>
               </div>
+
+              {form.role === "student" && (
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                    수업 코드 (선택)
+                  </label>
+                  <input
+                    type="text"
+                    name="courseCode"
+                    value={form.courseCode ?? ""}
+                    onChange={handlechange}
+                    placeholder="예: WEB-2026"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    가입 후 해당 수업에 자동 등록됩니다. 수업 목록에서도 등록할 수 있습니다.
+                  </p>
+                </div>
+              )}
 
               <button
                 // submit 버튼이라서 클릭하면 form의 onSubmit이 실행됩니다.

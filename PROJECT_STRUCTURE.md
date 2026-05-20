@@ -84,13 +84,12 @@ src/
 ## 데이터 관리
 
 ### 현재 상태
-- 모든 데이터는 Mock 데이터로 구현됨
-- 각 페이지 컴포넌트 내부에서 useState로 관리
+- 읽기: `src/app/api/supabase-api.ts` facade → Supabase `ai_*` 테이블
+- 쓰기 CRUD·Storage·실시간 채팅은 대부분 미완
 
 ### 향후 확장 계획
-1. **API 통합**
-   - `src/api/` 디렉토리 생성
-   - API 클라이언트 및 엔드포인트 정의
+1. **API 확장**
+   - `supabase-api.ts`에 CREATE/UPDATE/DELETE 메서드 추가
    
 2. **상태 관리**
    - React Context API 또는 Zustand/Redux 도입

@@ -1,4 +1,4 @@
-# 기여 가이드
+﻿# 기여 가이드
 
 CampusConnect 프로젝트에 기여해주셔서 감사합니다!
 
@@ -173,8 +173,8 @@ src/app/components/Navigation.tsx
 ### 2. 새로운 API
 
 ```bash
-# Mock 데이터 추가
-src/app/api/mock-data.ts
+# Supabase API facade에 메서드 추가
+src/app/api/supabase-api.ts
 ```
 
 ### 3. 새로운 커스텀 Hook

@@ -1,4 +1,4 @@
-# CampusConnect
+﻿# CampusConnect
 
 웹개발 수업 협업을 위한 올인원 플랫폼
 
@@ -57,7 +57,7 @@ src/
 │   │   └── useAuth.ts
 │   │
 │   └── api/                    # API 및 데이터
-│       └── mock-data.ts        # Mock 데이터
+│       └── supabase-api.ts        # Supabase API facade
 │
 ├── imports/                    # Figma 가져온 컴포넌트
 └── styles/                     # 전역 스타일
@@ -160,7 +160,7 @@ const navItems: NavItem[] = [
 ### 새로운 API 엔드포인트 추가
 
 ```tsx
-// src/app/api/mock-data.ts
+// src/app/api/supabase-api.ts
 export const api = {
   // 기존 API...
   newResource: {
