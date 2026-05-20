@@ -54,6 +54,10 @@ export const router = createBrowserRouter([
             Component: TeamsPage,
           },
           {
+            path: "courses/:courseId/teams/random",
+            Component: RandomTeamPage,
+          },
+          {
             path: "courses/:courseId/teams/:teamId",
             Component: TeamDetailPage,
           },
@@ -75,7 +79,7 @@ export const router = createBrowserRouter([
           },
           {
             path: "teams/random",
-            Component: RandomTeamPage,
+            element: <CourseScopedRedirect target="random-teams" />,
           },
           {
             path: "students/:id",

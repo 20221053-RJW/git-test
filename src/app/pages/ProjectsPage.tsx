@@ -59,7 +59,7 @@ export default function ProjectsPage() {
           {projects.map((project) => (
             <Link
               key={project.id}
-              to={`/app/projects/${project.id}`}
+              to={`/app/courses/${project.courseId}/teams/${project.teamId}`}
               className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg sm:p-6"
             >
               <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">

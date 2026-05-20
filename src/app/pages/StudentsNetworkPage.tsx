@@ -823,7 +823,7 @@ export default function StudentsNetworkPage() {
     portfolioFileName: "류지원_포트폴리오_2026.pdf",
   });
 
-  const { isProfessor, isStudent, user } = useAuth();
+  const { isProfessor, isStudent, isAdmin, user } = useAuth();
   const professor = isProfessor ? (user as ProfessorProfile) : null;
   const selfStudent = students.find((s) => s.isSelf) ?? students[0];
   const otherStudents = students.filter((s) => !s.isSelf);
@@ -837,8 +837,16 @@ export default function StudentsNetworkPage() {
       courseId ? api.courses.getById(courseId) : Promise.resolve(undefined),
     ])
       .then(([studentData, extraData, formData, courseData]) => {
-        setStudents(studentData.length > 0 ? studentData : fallbackStudents);
-        setStudentExtras(Object.keys(extraData).length > 0 ? extraData : fallbackStudentExtras);
+        // vision 추가요청 #13: /courses/:courseId/students 에서는 DB가 비어 있어도 데모 목록으로 대체하지 않음
+        const useCourseScope = Boolean(courseId);
+        setStudents(
+          useCourseScope || studentData.length > 0 ? studentData : fallbackStudents,
+        );
+        setStudentExtras(
+          useCourseScope || Object.keys(extraData).length > 0
+            ? extraData
+            : fallbackStudentExtras,
+        );
         setCourse(courseData ?? null);
         setEditForm({
           major: formData.major,
@@ -1042,7 +1050,9 @@ export default function StudentsNetworkPage() {
               const saved = await api.studentNetwork.saveProfile(form);
               setEditForm(saved);
               const refreshed = await api.studentNetwork.getStudents(courseId);
-              setStudents(refreshed.length > 0 ? refreshed : fallbackStudents);
+              setStudents(
+                courseId || refreshed.length > 0 ? refreshed : fallbackStudents,
+              );
             } catch (error) {
               console.error(error);
               alert(error instanceof Error ? error.message : "프로필 저장에 실패했습니다.");

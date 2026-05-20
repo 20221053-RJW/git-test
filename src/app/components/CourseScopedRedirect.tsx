@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate, useParams } from "react-router";
 import { api } from "../api/supabase-api";
 
-type Target = "teams" | "students" | "team-detail";
+type Target = "teams" | "students" | "team-detail" | "random-teams";
 
 export function CourseScopedRedirect({ target }: { target: Target }) {
   const { id: teamId } = useParams();
@@ -29,11 +29,13 @@ export function CourseScopedRedirect({ target }: { target: Target }) {
             setFailed(true);
             return;
           }
-          setTo(
+          const path =
             target === "students"
               ? `/app/courses/${courseId}/students`
-              : `/app/courses/${courseId}/teams`
-          );
+              : target === "random-teams"
+                ? `/app/courses/${courseId}/teams/random`
+                : `/app/courses/${courseId}/teams`;
+          setTo(path);
         }
       } catch {
         if (!cancelled) setFailed(true);

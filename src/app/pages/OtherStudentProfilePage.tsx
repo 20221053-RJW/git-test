@@ -9,12 +9,17 @@ export default function OtherStudentProfilePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!id) return;
-
-    api.students.getById(id).then((data) => {
-      setProfile(data || null);
+    if (!id) {
       setLoading(false);
-    });
+      return;
+    }
+
+    setLoading(true);
+    api.students
+      .getById(id)
+      .then((data) => setProfile(data ?? null))
+      .catch(() => setProfile(null))
+      .finally(() => setLoading(false));
   }, [id]);
 
   if (loading) {

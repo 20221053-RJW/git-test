@@ -40,10 +40,13 @@
 | T-055 | 마이페이지 리포트 팀플 정보 실데이터 검증 | done |
 | T-056 | 수업 상세 내부 네비 제거 + 메인 사이드바 이관 | done |
 | T-058 | human_action_items 체크칸 + AI 체크기반 검증 규칙 | done |
+| T-081 | vision #13 수강자 목록 데모 폴백 제거 | done |
+| T-082 | 랜덤 팀 레거시 라우트 수업 스코프 + Projects 카드 링크 | done |
+| T-083 | 타 학생 프로필 단건 조회 접근 가능 수업 멤버십 기준 | done |
 
 ### vision 점검 후 우선순위 (신규)
 
-1. vision 추가요청 1~11 회귀 안정화
+1. vision 추가요청 1~11·13 회귀 안정화(T-081 이후 스모크 재확인)
 2. vision 추가요청 12 운영 검증(체크 `[o]` 동작 루프)
 
 ## P3 — AI·마이페이지
@@ -83,10 +86,14 @@
 | T-078 | 통합 검증 리포트 preflight strict 모드 | done | `--preflight --strict`, `verify:bundle:preflight:strict` |
 | T-079 | 통합 검증 리포트 preflight strict self-test | done | `preflight-strict-selftest.mjs`, `verify:bundle:preflight:selftest` |
 | T-080 | 통합 검증 리포트 실행 파이프라인 자동화 | done | `run-verify-bundle-pipeline.mjs`, `verify:bundle:pipeline` |
+| T-081 | 수강자 네트워크 빈 수업 데모 폴백 제거(vision #13) | done | `StudentsNetworkPage` `courseId` 스코프 시 API 결과 그대로 사용 |
+| T-082 | 랜덤 팀 `courseId` 라우트·Projects 카드 링크 | done | `/courses/:courseId/teams/random`, `ProjectsPage`→팀 상세 |
+| T-083 | `getStudentByIdFromDb` 접근 가능 수업 멤버십 기준 | done | primary 수업에만 속하지 않아도 같은 네트워크면 조회 가능 |
 
 ## 완료됨 (최근)
 
-- [o] T-056 수업 상세 내부 네비 제거 + 메인 사이드바 이관 (2026-05-20)
+- [o] T-083 타 학생 프로필 단건 조회 멤버십 범위 확장 (`getStudentByIdFromDb`) (2026-05-20)
+- [o] T-082 랜덤 팀 페이지 수업 스코프 라우트 + `ProjectsPage` 팀 링크 (2026-05-20)
 - [o] T-054 팀 리스트 내 내가 속한 팀 강조 UI + E2E #29 (2026-05-20)
 - [o] T-055 MyPage 리포트 실데이터 기준 보정(종료 팀플 필터 + 더미 폴백 제거) (2026-05-20)
 - [o] T-057 Playwright 스모크 회귀 커맨드 + MyPage 실데이터 회귀 E2E #31 (2026-05-20)

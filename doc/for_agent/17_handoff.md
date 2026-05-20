@@ -42,6 +42,9 @@
 - **추가 반영:** T-062(`human:verify:json` + `human:verify:ci` 자동화/CI 모드) 완료
 - **추가 반영:** T-063(`human:sync` 반자동 동기화: 완료 이동/체크 복귀) 완료
 - **추가 반영:** T-064(`human:sync` 자동 검증 메모 로그 누적) 완료
+- **추가 반영:** T-081(vision #13 수강자 네트워크에서 빈 수업일 때 데모 학생 목록 미사용) 완료
+- **추가 반영:** T-082(`/teams/random`→수업 스코프 `courses/:courseId/teams/random` 리다이렉트·`ProjectsPage` 팀 상세 링크) 완료
+- **추가 반영:** T-083(`getStudentByIdFromDb`를 접근 가능 수업(student 멤버십) 전체에서 해석·`OtherStudentProfilePage` 로딩 에러 처리) 완료
 
 ## 바로 이어서 (인간 우선)
 

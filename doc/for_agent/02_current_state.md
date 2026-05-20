@@ -33,6 +33,7 @@
 | 추가요청 10: MyPage 리포트 팀플 정보 실데이터 검증 | 구현 | 종료 수업(`archived`) 참여 팀플만 집계 + 더미 폴백 제거(T-055) |
 | 추가요청 11: CourseDetail 내부 네비 제거·메인 네비 이관 | 구현 | `MainLayout` 좌측 네비 확장 + `CourseDetailPage` 내부 네비 제거(T-056) |
 | 추가요청 12: human_action_items 완료 체크칸 + AI 체크 기반 검증 | 구현 | `28_human_action_items` 체크 열 추가 + `[o]` 우선 검증 규칙 반영(T-058) |
+| 추가요청 13: 수강자 목록은 해당 수업 멤버만(빈 수업 데모 목록 금지) | 구현 | `StudentsNetworkPage`에서 `courseId`가 있으면 API 빈 배열 유지, 데모 폴백 제외(T-081) |
 
 ## 구현 완료 (기능)
 
@@ -59,7 +60,7 @@
 - [ ] Edge `generate-report` **배포**·OPENAI Secret (T-030, H-002) — 코드는 `supabase/functions/`
 - [ ] 프로덕션 배포 실행 (T-042, H-005)
 - [ ] E2E 전체 green (H-003, H-004 시크릿)
-- [o] vision 추가요청 구현 완료 (T-024~T-027·T-050~T-056 완료)
+- [o] vision 추가요청 구현 완료 (T-024~T-027·T-050~T-056·T-081~T-083 완료)
 
 ## 최근 검증 (2026-05-20)
 
@@ -126,8 +127,11 @@
 - T-079 검증: `verify:bundle:preflight:selftest` 실행 결과 pass/fail 케이스 각각 기대 종료코드(0/1) 확인
 - T-080 개선: `run-verify-bundle-pipeline.mjs` 추가로 preflight self-test 통과 후 리포트 저장을 단일 파이프라인으로 실행
 - T-080 검증: `verify:bundle:pipeline` 실행 시 self-test 통과 → `verify:bundle:save:archive:env` 순차 완료 확인
-- T-058 구현: `for_human/28_human_action_items.md` 미완료 표 체크 칸(`[ ]/[o]`) 추가
+- T-081 문서·스냅샷: vision #13 수강자 네트워크 데모 폴백 제거 정리 + `StudentsNetworkPage` 주석 보강 (2026-05-20)
 - T-058 구현: `23_agent_operating_rules.md`, `for_agent/28_human_action_items.md`에 `[o]` 항목 검증 절차 반영
+- T-081 구현: `StudentsNetworkPage` 수업 스코프(`courseId`)일 때 학생 목록 빈 결과를 데모 목록으로 바꾸지 않음(vision 추가요청 #13)
+- T-082 구현: `routes`에 `courses/:courseId/teams/random` 우선 매칭, `/teams/random`은 `CourseScopedRedirect`로 primary 수업으로 이동, `RandomTeamPage`가 `api.students.getAll(courseId)` 사용, `ProjectsPage` 카드가 팀 상세 URL로 연결됨
+- T-083 구현: `getStudentByIdFromDb`가 primary 수업이 아니라 접근 가능 수업 중 student 멤버십이 있는 경우 `ai_users`에서 프로필 반환 (`OtherStudentProfilePage` 포함)
 - T-059 구현: `scripts/check-human-actions.mjs` 추가, `[o]` H-항목 자동 추출 커맨드(`npm run human:checked`) 제공
 - T-059 검증: `npm run human:checked` 실행 결과 현재 체크된 항목 없음 확인
 - T-060 구현: `scripts/verify-human-actions.mjs` 추가, `[o]` H-항목 자동 검증(`pass/fail/manual`) 커맨드 제공

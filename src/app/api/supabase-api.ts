@@ -255,8 +255,25 @@ async function getStudentsFromDb(courseId?: string): Promise<StudentProfile[]> {
 }
 
 async function getStudentByIdFromDb(id: string): Promise<StudentProfile | undefined> {
-  const students = await getStudentsFromDb();
-  return students.find((student) => student.id === id);
+  const accessibleCourseIds = await getAccessibleCourseIds();
+  if (accessibleCourseIds.length === 0) return undefined;
+
+  const { data: membershipRows, error } = await supabase
+    .from("ai_course_memberships")
+    .select("course_id")
+    .eq("user_id", id)
+    .eq("role", "student")
+    .in("course_id", accessibleCourseIds)
+    .limit(1);
+
+  if (error) throw error;
+  if (!membershipRows?.length) return undefined;
+
+  const { data: userRow, error: userError } = await supabase.from("ai_users").select("*").eq("id", id).maybeSingle();
+  if (userError) throw userError;
+  if (!userRow || userRow.role !== "student") return undefined;
+
+  return toStudentProfile(userRow as AiUser);
 }
 
 async function getProfessorsFromDb(): Promise<ProfessorProfile[]> {

@@ -40,6 +40,36 @@
 
 ## 최근 작업 로그 (최신 → 과거)
 
+### 2026-05-20 18:17:45 — 타 학생 프로필 단건 조회 멤버십 범위 확장
+
+| 항목 | 내용 |
+|------|------|
+| **계획** | [`260520-84.md`](../for_agent/plans/260520-84.md) — primary 수업이 아니어도 접근 가능한 수업 네트워크면 `/app/students/:id` 프로필 조회 허용 |
+| **한 일** | `getStudentByIdFromDb`: `ai_course_memberships`(student)×접근 가능 `course_id` 확인 후 사용자 로드. `OtherStudentProfilePage` 로딩/에러 `finally`. `npm run build` 확인. |
+| **당신이 할 일** | — |
+
+---
+
+### 2026-05-20 18:15:00 — 랜덤 팀 페이지 수업 스코프 라우트 + Projects 카드 링크
+
+| 항목 | 내용 |
+|------|------|
+| **계획** | [`260520-83.md`](../for_agent/plans/260520-83.md) — 레거시 랜덤 팀을 `courses/:courseId/teams/random`로 통합하고 프로젝트 카드 링크 404 교정 |
+| **한 일** | `courses/:courseId/teams/random`를 `:teamId`보다 위에 두어 예약 경로 처리, `/app/teams/random`은 `CourseScopedRedirect` `random-teams`로 primary 수업 URL로 안내. `RandomTeamPage`는 라우트 `courseId`(또는 폴백 primary)로 `api.students.getAll(courseId)`. `ProjectsPage` 카드를 `/app/courses/{courseId}/teams/{teamId}`로 연결. `npm run build` 통과. |
+| **당신이 할 일** | — |
+
+---
+
+### 2026-05-20 18:10:30 — vision #13 수강자 네트워크 빈 수업 데모 폴백 제거
+
+| 항목 | 내용 |
+|------|------|
+| **계획** | [`260520-82.md`](../for_agent/plans/260520-82.md) — vision 추가요청 #13: 해당 수업 학생만 표시, 빈 수업은 데모 목록 금지 |
+| **한 일** | `StudentsNetworkPage`에서 `courseId`(수업 스코프)가 있을 때 API가 빈 배열을 반환해도 `fallbackStudents`/데모 extras로 바꾸지 않도록 명시·주석 보강. `vision_snapshot` #13·#14 동기화, `27`·`02`·`05`·`17`·`for_human/01`·`26`에 T-081 반영. |
+| **당신이 할 일** | 새로 만든 빈 수업에서 수강자 메뉴를 열었을 때 가짜 카드가 없는지 한 번 확인하면 됨 |
+
+---
+
 ### 2026-05-20 16:10:02 — 통합 검증 리포트 실행 파이프라인 추가
 
 | 항목 | 내용 |
