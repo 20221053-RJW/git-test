@@ -42,20 +42,35 @@ export default function MyPage() {
     report: AiReportGenerateResponse;
   } | null>(null);
   const { user } = useAuth();
+  const canViewStudentReport = user?.role === "student";
+
+  async function resolveReportContext(forceRefresh = false): Promise<AiReportContext> {
+    if (!user?.id) {
+      throw new Error("로그인 후 이용할 수 있습니다.");
+    }
+    if (!forceRefresh && reportContext) {
+      return reportContext;
+    }
+    const context = await api.aiReport.gatherContext(user.id);
+    setReportContext(context);
+    return context;
+  }
 
   async function openDbReportPreview() {
     if (!user?.id) {
       setAiReportMessage("로그인 후 이용할 수 있습니다.");
       return;
     }
+    if (!canViewStudentReport) {
+      setAiReportMessage("학생 계정에서만 리포트 기능을 사용할 수 있습니다.");
+      return;
+    }
     setAiReportLoading(true);
     setAiReportMessage(null);
     try {
-      const context = await api.aiReport.gatherContext(user.id);
+      const context = await resolveReportContext();
       const report = api.aiReport.buildDraftFromContext(context);
-      setReportActivitySummary(
-        `집계: 트러블슈팅 ${context.totalTroubleshootingLogs}건 · 산출물 ${context.totalDeliverables}건 · 피드백 ${context.totalFeedbacksSubmitted} · 회고 ${context.totalRetrospectivesSubmitted} · 동료평가 ${context.totalPeerReviewsSubmitted} · 교수평가 ${context.totalProfessorStudentEvalsReceived}/${context.totalProfessorProjectEvalsReceived}팀`
-      );
+      setReportActivitySummary(api.aiReport.formatActivitySummary(context));
       setReportPreview({ context, report });
     } catch (err) {
       const msg =
@@ -71,13 +86,22 @@ export default function MyPage() {
       setAiReportMessage("로그인 후 이용할 수 있습니다.");
       return;
     }
+    if (!canViewStudentReport) {
+      setAiReportMessage("학생 계정에서만 리포트 기능을 사용할 수 있습니다.");
+      return;
+    }
     setAiReportLoading(true);
     setAiReportMessage(null);
     try {
       const result = await api.aiReport.generateReport({ userId: user.id, locale: "ko" });
-      setAiReportMessage("AI 리포트가 생성되었습니다.");
-      const context = await api.aiReport.gatherContext(user.id);
+      const context = await resolveReportContext();
+      setReportActivitySummary(api.aiReport.formatActivitySummary(context));
       setReportPreview({ context, report: result });
+      setAiReportMessage(
+        result.model === "draft-db-only"
+          ? "DB 집계 초안이 생성되었습니다. OPENAI 연동(H-002) 후 AI 문단을 받을 수 있습니다."
+          : "AI 리포트가 생성되었습니다."
+      );
     } catch (err) {
       if (err instanceof Error && err.name === "AiReportNotReady") {
         setAiReportMessage(
@@ -96,6 +120,36 @@ export default function MyPage() {
 
   function handlePrintReport() {
     window.print();
+  }
+
+  async function refreshReportData() {
+    if (!user?.id) {
+      setAiReportMessage("로그인 후 이용할 수 있습니다.");
+      return;
+    }
+    if (!canViewStudentReport) {
+      setAiReportMessage("학생 계정에서만 리포트 기능을 사용할 수 있습니다.");
+      return;
+    }
+    setAiReportLoading(true);
+    setAiReportMessage(null);
+    try {
+      const context = await resolveReportContext(true);
+      setReportActivitySummary(api.aiReport.formatActivitySummary(context));
+      if (reportPreview) {
+        setReportPreview({
+          context,
+          report: api.aiReport.buildDraftFromContext(context),
+        });
+      }
+      setAiReportMessage("활동 집계를 새로고침했습니다.");
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "집계를 새로고침하지 못했습니다.";
+      setAiReportMessage(msg);
+    } finally {
+      setAiReportLoading(false);
+    }
   }
 
   const DEMO_PROJECTS: Project[] = [
@@ -220,17 +274,18 @@ export default function MyPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [reportContext, setReportContext] = useState<AiReportContext | null>(null);
+  const [reportContextReady, setReportContextReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const loaded = await api.myPage.getProjectsForUser();
-        if (!cancelled) {
-          setProjects(loaded.length > 0 ? loaded : DEMO_PROJECTS);
+        if (!cancelled && loaded.length > 0) {
+          setProjects(loaded);
         }
       } catch {
-        if (!cancelled) setProjects(DEMO_PROJECTS);
+        // reportContext 준비 후 데모 폴백 effect에서 처리
       } finally {
         if (!cancelled) setProjectsLoading(false);
       }
@@ -241,8 +296,13 @@ export default function MyPage() {
   }, []);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setReportContext(null);
+      setReportContextReady(true);
+      return;
+    }
     let cancelled = false;
+    setReportContextReady(false);
     api.aiReport
       .gatherContext(user.id)
       .then((ctx) => {
@@ -250,11 +310,27 @@ export default function MyPage() {
       })
       .catch(() => {
         if (!cancelled) setReportContext(null);
+      })
+      .finally(() => {
+        if (!cancelled) setReportContextReady(true);
       });
     return () => {
       cancelled = true;
     };
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!reportContextReady || projectsLoading) return;
+
+    if (reportContext && reportContext.teams.length > 0) {
+      setProjects(api.aiReport.mapToMyPageProjects(reportContext));
+      return;
+    }
+
+    if (projects.length === 0) {
+      setProjects(DEMO_PROJECTS);
+    }
+  }, [reportContext, reportContextReady, projectsLoading, projects.length]);
 
   const sideNavItems = ["요약 리포트", "상세 리포트", "내 정보 조회", "내 정보 수정"];
   const reportPageTitles = ["역량 및 활동 요약", "주요 팀플 상세", "문제해결 경험"];
@@ -285,7 +361,9 @@ export default function MyPage() {
 
   const analysisDateLabel = new Date().toLocaleDateString("ko-KR");
   const projectCountLabel = activitySummary?.teamCount ?? projects.length;
-  const summaryCards = activitySummary
+  const summaryCards = reportContext
+    ? api.aiReport.buildSummaryCards(reportContext)
+    : activitySummary
     ? [
         {
           label: "참여 팀 프로젝트",
@@ -313,11 +391,44 @@ export default function MyPage() {
         { label: "활동 로그", value: "—", note: "DB 집계 대기" },
       ];
 
-  const summaryParagraph = activitySummary
-    ? activitySummary.teamCount > 0
-      ? `${profileName} 학생은 ${activitySummary.teamCount}개 팀 프로젝트에 참여했으며, 트러블슈팅 ${activitySummary.troubleshootingCount}건·산출물 ${activitySummary.deliverableCount}건이 기록되어 있습니다. 평균 진행률은 ${activitySummary.avgProgress}%입니다.`
-      : `${profileName} 학생의 팀 활동 기록이 아직 없습니다. 수업에 등록하고 팀에 배정되면 여기에 집계됩니다.`
-    : `${profileName} 학생의 활동 데이터를 불러오는 중이거나, 아래 데모 프로젝트 카드를 참고하세요.`;
+  const summaryParagraph = reportContext
+    ? api.aiReport.buildSummaryParagraph(reportContext)
+    : activitySummary
+      ? activitySummary.teamCount > 0
+        ? `${profileName} 학생은 ${activitySummary.teamCount}개 팀 프로젝트에 참여했으며, 트러블슈팅 ${activitySummary.troubleshootingCount}건·산출물 ${activitySummary.deliverableCount}건이 기록되어 있습니다. 평균 진행률은 ${activitySummary.avgProgress}%입니다.`
+        : `${profileName} 학생의 팀 활동 기록이 아직 없습니다. 수업에 등록하고 팀에 배정되면 여기에 집계됩니다.`
+      : `${profileName} 학생의 활동 데이터를 불러오는 중이거나, 아래 데모 프로젝트 카드를 참고하세요.`;
+
+  const dbTechnologyChips = reportContext
+    ? api.aiReport.buildTechnologies(reportContext)
+    : [];
+  const showDbSkills =
+    reportContext &&
+    (reportContext.skills.length > 0 ||
+      reportContext.totalDeliverables > 0 ||
+      dbTechnologyChips.some((chip) => !chip.startsWith("(")));
+
+  const DEMO_COMPETENCY_ITEMS = [
+    { label: "프로젝트 실행력", value: 92, desc: "기한 내 산출물 제출과 발표 준비가 안정적입니다." },
+    { label: "협업 신뢰도", value: 90, desc: "동료평가에서 책임감과 시간 약속 관련 긍정 키워드가 반복됩니다." },
+    { label: "프론트엔드 구현", value: 86, desc: "React 기반 UI 구현과 반응형 문제 해결 경험이 확인됩니다." },
+    { label: "문제 해결/회고", value: 82, desc: "트러블슈팅 로그를 남기고 원인-계획-해결을 정리하는 습관이 있습니다." },
+  ];
+
+  const competencyItems = reportContext
+    ? api.aiReport.buildCompetencyItems(reportContext)
+    : DEMO_COMPETENCY_ITEMS;
+
+  const activityBullets = reportContext
+    ? api.aiReport.buildActivityBullets(reportContext)
+    : [
+        { title: "기획", body: "사용자 인터뷰와 페르소나를 바탕으로 서비스 방향을 정리했습니다." },
+        { title: "구현", body: "React 기반 화면 구현, 반응형 레이아웃, 데이터 연동 흐름을 담당했습니다." },
+        {
+          title: "협업",
+          body: "역할 분담, 발표 자료, 트러블슈팅 기록을 문서화하며 팀 진행을 안정화했습니다.",
+        },
+      ];
 
   const DEMO_TROUBLESHOOTING_CASES = [
     {
@@ -354,8 +465,8 @@ export default function MyPage() {
     reportContext && reportContext.troubleshootingCases.length > 0
   );
 
-  const page3Intro = page3UsesDb
-    ? `${profileName} 학생의 트러블슈팅 ${reportContext!.troubleshootingCases.length}건이 Supabase 팀 워크스페이스에 기록되어 있습니다. 아래는 실제 problem · plan · solution 필드입니다.`
+  const page3Intro = reportContext
+    ? api.aiReport.buildPage3Intro(reportContext)
     : `${profileName} 학생의 문제해결 경험은 단순 오류 수정이 아니라, 원인 파악, 구조 재정리, 재발 방지까지 이어지는 방식으로 기록되어 있습니다. (DB 로그가 없어 예시 사례를 표시합니다.)`;
 
   return (
@@ -460,33 +571,35 @@ export default function MyPage() {
           </div>
         </div>
 
-        <div className="mx-auto flex w-full max-w-[794px] flex-col gap-3 rounded-2xl border border-[#dbe7ff] bg-white px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-5">
-          <div>
-            <p className="text-[12px] font-black text-[#155dfc]">리포트 페이지 넘기기</p>
-            <p className="mt-1 text-[14px] font-bold text-[#334155]">
-              {reportPage} / 3 · {reportPageTitles[reportPage - 1]}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setReportPage((page) => Math.max(1, page - 1))}
-              disabled={reportPage === 1}
-              className="rounded-full border border-[#cbd5e1] bg-white px-4 py-2 text-[13px] font-bold text-[#334155] transition-colors hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              이전 페이지
-            </button>
-            <button
-              onClick={() => setReportPage((page) => Math.min(3, page + 1))}
-              disabled={reportPage === 3}
-              className="rounded-full bg-[#155dfc] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#0f4bd8] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              다음 페이지
-            </button>
-          </div>
-        </div>
+        {canViewStudentReport ? (
+          <>
+            <div className="mx-auto flex w-full max-w-[794px] flex-col gap-3 rounded-2xl border border-[#dbe7ff] bg-white px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <div>
+                <p className="text-[12px] font-black text-[#155dfc]">리포트 페이지 넘기기</p>
+                <p className="mt-1 text-[14px] font-bold text-[#334155]">
+                  {reportPage} / 3 · {reportPageTitles[reportPage - 1]}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setReportPage((page) => Math.max(1, page - 1))}
+                  disabled={reportPage === 1}
+                  className="rounded-full border border-[#cbd5e1] bg-white px-4 py-2 text-[13px] font-bold text-[#334155] transition-colors hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  이전 페이지
+                </button>
+                <button
+                  onClick={() => setReportPage((page) => Math.min(3, page + 1))}
+                  disabled={reportPage === 3}
+                  className="rounded-full bg-[#155dfc] px-4 py-2 text-[13px] font-bold text-white transition-colors hover:bg-[#0f4bd8] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  다음 페이지
+                </button>
+              </div>
+            </div>
 
-        {/* 포트폴리오 리포트 */}
-        <section className="mx-auto min-h-[1123px] w-full max-w-[794px] overflow-visible rounded-[10px] border border-[#d9e2f2] bg-white shadow-[0_28px_80px_rgba(15,23,42,0.18)]">
+            {/* 포트폴리오 리포트 */}
+            <section className="mx-auto min-h-[1123px] w-full max-w-[794px] overflow-visible rounded-[10px] border border-[#d9e2f2] bg-white shadow-[0_28px_80px_rgba(15,23,42,0.18)]">
           <div className="bg-[#0f172a] px-7 py-5 text-white sm:px-9">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
@@ -516,7 +629,10 @@ export default function MyPage() {
           <div className="space-y-4 px-7 py-5 text-[11px] leading-relaxed text-[#334155] sm:px-9">
             {reportPage === 1 && (
               <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div
+                  className={`grid grid-cols-1 gap-3 ${reportContext ? "md:grid-cols-2 lg:grid-cols-4" : "md:grid-cols-3"}`}
+                  data-testid={reportContext ? "mypage-summary-cards" : undefined}
+                >
                   {summaryCards.map((item) => (
                     <div key={item.label} className="rounded-xl border border-[#dbe7ff] bg-[#f8fbff] p-4">
                       <p className="text-[9px] font-bold uppercase tracking-wide text-[#476582]">{item.label}</p>
@@ -529,12 +645,32 @@ export default function MyPage() {
                 <div className="rounded-xl border-l-4 border-[#155dfc] bg-[#f7faff] p-4">
                   <p className="text-[10px] font-black text-[#155dfc]">PAGE 01 SUMMARY</p>
                   <h3 className="mt-1.5 text-[18px] font-black text-[#101828]">역량 및 주요 팀플 활동 요약</h3>
-                  <p className="mt-2 text-[11px] leading-5 text-[#334155]">{summaryParagraph}</p>
+                  <p
+                    className="mt-2 text-[11px] leading-5 text-[#334155]"
+                    data-testid={reportContext ? "mypage-summary-paragraph" : undefined}
+                  >
+                    {summaryParagraph}
+                  </p>
                 </div>
 
                 <div className="rounded-xl border border-[#dbe7ff] bg-white p-4">
                   <p className="text-[10px] font-black text-[#155dfc]">CORE TECHNICAL SKILLS</p>
                   <h3 className="mt-1.5 text-[17px] font-black text-[#101828]">보유 핵심 기술 역량</h3>
+                  {showDbSkills ? (
+                    <div className="mt-3" data-testid="mypage-db-skills">
+                      <p className="mb-2 text-[10px] text-[#64748b]">Supabase 프로필·산출물 기준</p>
+                      <div className="flex flex-wrap gap-2">
+                        {dbTechnologyChips.map((chip) => (
+                          <span
+                            key={chip}
+                            className="rounded-full bg-[#eff6ff] px-3 py-1 text-[10px] font-bold text-[#155dfc]"
+                          >
+                            {chip}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
                   <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                     {[
                       {
@@ -571,18 +707,19 @@ export default function MyPage() {
                       </div>
                     ))}
                   </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_0.9fr]">
-                  <div className="rounded-xl border border-gray-200 p-4">
-                    <h3 className="text-[15px] font-black text-[#101828]">핵심 역량 진단</h3>
+                  <div
+                    className="rounded-xl border border-gray-200 p-4"
+                    data-testid={reportContext ? "mypage-competency-db" : undefined}
+                  >
+                    <h3 className="text-[15px] font-black text-[#101828]">
+                      핵심 역량 진단{reportContext ? " (DB)" : ""}
+                    </h3>
                     <div className="mt-3 space-y-3">
-                      {[
-                        { label: "프로젝트 실행력", value: 92, desc: "기한 내 산출물 제출과 발표 준비가 안정적입니다." },
-                        { label: "협업 신뢰도", value: 90, desc: "동료평가에서 책임감과 시간 약속 관련 긍정 키워드가 반복됩니다." },
-                        { label: "프론트엔드 구현", value: 86, desc: "React 기반 UI 구현과 반응형 문제 해결 경험이 확인됩니다." },
-                        { label: "문제 해결/회고", value: 82, desc: "트러블슈팅 로그를 남기고 원인-계획-해결을 정리하는 습관이 있습니다." },
-                      ].map((item) => (
+                      {competencyItems.map((item) => (
                         <div key={item.label}>
                           <div className="mb-2 flex items-center justify-between gap-3">
                             <div>
@@ -599,17 +736,16 @@ export default function MyPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-gray-200 bg-[#fbfcff] p-4">
+                  <div
+                    className="rounded-xl border border-gray-200 bg-[#fbfcff] p-4"
+                    data-testid={reportContext ? "mypage-activity-bullets" : undefined}
+                  >
                     <h3 className="text-[15px] font-black text-[#101828]">간략 활동 요약</h3>
                     <div className="mt-3 space-y-2.5">
-                      {[
-                        ["기획", "사용자 인터뷰와 페르소나를 바탕으로 서비스 방향을 정리했습니다."],
-                        ["구현", "React 기반 화면 구현, 반응형 레이아웃, 데이터 연동 흐름을 담당했습니다."],
-                        ["협업", "역할 분담, 발표 자료, 트러블슈팅 기록을 문서화하며 팀 진행을 안정화했습니다."],
-                      ].map(([title, body]) => (
-                        <div key={title} className="rounded-lg bg-white p-2.5 shadow-sm">
-                          <p className="text-[10px] font-black text-[#155dfc]">{title}</p>
-                          <p className="mt-1.5 text-[10.5px] leading-5 text-[#475569]">{body}</p>
+                      {activityBullets.map((item) => (
+                        <div key={item.title} className="rounded-lg bg-white p-2.5 shadow-sm">
+                          <p className="text-[10px] font-black text-[#155dfc]">{item.title}</p>
+                          <p className="mt-1.5 text-[10.5px] leading-5 text-[#475569]">{item.body}</p>
                         </div>
                       ))}
                     </div>
@@ -639,6 +775,7 @@ export default function MyPage() {
                         <div
                           key={team.teamId}
                           className="rounded-xl border border-[#dbe7ff] bg-white p-4 text-left shadow-sm"
+                          data-testid={index === 0 ? "mypage-team-card-db" : undefined}
                         >
                           <div className="mb-3 flex items-start justify-between gap-3">
                             <div>
@@ -671,9 +808,40 @@ export default function MyPage() {
                                 {team.deliverableCount}건
                               </span>
                             </p>
+                            {team.deliverableFileNames.length > 0 && (
+                              <p>
+                                산출물:{" "}
+                                <span className="font-bold text-[#1e293b]">
+                                  {team.deliverableFileNames.join(", ")}
+                                </span>
+                              </p>
+                            )}
                             {team.sampleProblems.length > 0 && (
                               <p>주요 이슈: {team.sampleProblems.join(" / ")}</p>
                             )}
+                            <p className="flex flex-wrap gap-1.5 pt-1">
+                              {team.feedbackSubmitted && (
+                                <span className="rounded-full bg-[#ecfdf5] px-2 py-0.5 text-[9px] font-bold text-[#047857]">
+                                  피드백 ✓
+                                </span>
+                              )}
+                              {team.retrospectiveSubmitted && (
+                                <span className="rounded-full bg-[#eff6ff] px-2 py-0.5 text-[9px] font-bold text-[#155dfc]">
+                                  회고 ✓
+                                </span>
+                              )}
+                              {team.peerReviewsSubmitted > 0 && (
+                                <span className="rounded-full bg-[#f5f3ff] px-2 py-0.5 text-[9px] font-bold text-[#6d28d9]">
+                                  동료평가 {team.peerReviewsSubmitted}
+                                </span>
+                              )}
+                              {(team.professorStudentEvalReceived ||
+                                team.professorProjectEvalReceived) && (
+                                <span className="rounded-full bg-[#fff7ed] px-2 py-0.5 text-[9px] font-bold text-[#c2410c]">
+                                  교수평가 ✓
+                                </span>
+                              )}
+                            </p>
                           </div>
                         </div>
                       ))
@@ -729,14 +897,20 @@ export default function MyPage() {
                 <div className="rounded-xl border-l-4 border-[#155dfc] bg-[#f7faff] p-5">
                   <p className="text-[10px] font-black text-[#155dfc]">PAGE 03 PROBLEM SOLVING</p>
                   <h3 className="mt-1.5 text-[18px] font-black text-[#101828]">가장 주목해야 할 문제해결 경험</h3>
-                  <p className="mt-3 text-[12px] leading-6 text-[#334155]">{page3Intro}</p>
+                  <p
+                    className="mt-3 text-[12px] leading-6 text-[#334155]"
+                    data-testid={page3UsesDb ? "mypage-page3-intro" : undefined}
+                  >
+                    {page3Intro}
+                  </p>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-4" data-testid="mypage-troubleshooting-list">
                   {troubleshootingCases.map((caseItem, index) => (
                     <div
                       key={"logId" in caseItem ? caseItem.logId : `${caseItem.title}-${index}`}
                       className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
+                      data-testid={index === 0 && page3UsesDb ? "mypage-troubleshooting-case" : undefined}
                     >
                       <p className="text-[9px] font-black text-[#64748b]">
                         PROBLEM SOLVING CASE {index + 1}
@@ -771,8 +945,8 @@ export default function MyPage() {
 
             <div className="border-t border-gray-200 pt-4 text-center space-y-3">
               <p className="text-[9px] font-bold leading-4 text-[#64748b]">
-                1·2·3페이지 요약은 Supabase 집계(트러블슈팅·산출물·피드백·회고·동료평가·교수평가)를 반영합니다.
-                AI 문단은 Edge 배포(H-002) 후 생성됩니다.
+                1·2·3페이지·A4는 Supabase 집계를 반영합니다. Edge 배포 후 「AI 리포트 생성」은 OPENAI 없어도 DB
+                초안(200)이며, 키 등록 시 LLM 문단(H-002)이 적용됩니다.
               </p>
               {reportActivitySummary && (
                 <p className="text-[9px] text-[#155dfc]" data-testid="report-activity-summary">
@@ -780,6 +954,15 @@ export default function MyPage() {
                 </p>
               )}
               <div className="flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={refreshReportData}
+                  disabled={aiReportLoading || !reportContextReady}
+                  data-testid="mypage-refresh-report"
+                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-[11px] font-bold text-[#475569] disabled:opacity-50"
+                >
+                  {aiReportLoading ? "불러오는 중…" : "집계 새로고침"}
+                </button>
                 <button
                   type="button"
                   onClick={openDbReportPreview}
@@ -792,17 +975,34 @@ export default function MyPage() {
                   type="button"
                   onClick={handleGenerateAiReport}
                   disabled={aiReportLoading}
+                  data-testid="ai-report-generate-button"
                   className="rounded-lg bg-[#155dfc] px-4 py-2 text-[11px] font-bold text-white disabled:opacity-50"
                 >
                   {aiReportLoading ? "생성 중…" : "AI 리포트 생성 (베타)"}
                 </button>
               </div>
               {aiReportMessage && (
-                <p className="text-[10px] font-medium text-[#475569]">{aiReportMessage}</p>
+                <p className="text-[10px] font-medium text-[#475569]" data-testid="ai-report-message">
+                  {aiReportMessage}
+                </p>
               )}
             </div>
           </div>
-        </section>
+            </section>
+          </>
+        ) : (
+          <section
+            className="mx-auto w-full max-w-[794px] rounded-[10px] border border-[#d9e2f2] bg-white p-8 text-center shadow-[0_28px_80px_rgba(15,23,42,0.18)]"
+            data-testid="mypage-professor-report-block"
+          >
+            <p className="text-[11px] font-black text-[#155dfc]">REPORT ACCESS</p>
+            <h2 className="mt-2 text-[22px] font-black text-[#0f172a]">학생용 팀플 리포트</h2>
+            <p className="mt-3 text-[13px] leading-6 text-[#475569]">
+              이 리포트는 학생의 협업·성장 기록을 위한 전용 화면입니다. 교수 계정에서는 팀 상세의 제출 현황과
+              평가 패널을 이용해 주세요.
+            </p>
+          </section>
+        )}
         </main>
       </div>
 
@@ -941,6 +1141,7 @@ export default function MyPage() {
       {reportPreview && (
         <div
           className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 print:p-0 print:bg-white"
+          data-testid="report-preview-overlay"
           onClick={(e) => {
             if (e.target === e.currentTarget) setReportPreview(null);
           }}
@@ -957,6 +1158,7 @@ export default function MyPage() {
               <button
                 type="button"
                 onClick={() => setReportPreview(null)}
+                data-testid="report-preview-close"
                 className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-[11px] font-bold"
               >
                 닫기

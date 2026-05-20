@@ -57,6 +57,10 @@
 
 `ai_user_learning_profiles`: **SELECT만** — `saveProfile`은 `ai_users` UPDATE 사용.
 
+## 스테이징 검증 (승인 전)
+
+→ [`rls_staging_verification.md`](./rls_staging_verification.md) — 번들 v2 · JWT · E2E 순서
+
 ## 인간 리뷰 체크리스트
 
 - [ ] Firebase ↔ Supabase JWT 전략 결정 ([Supabase Third-Party Auth](https://supabase.com/docs/guides/auth/third-party/firebase-auth) 또는 Custom Claims)

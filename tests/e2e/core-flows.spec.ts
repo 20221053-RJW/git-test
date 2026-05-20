@@ -54,6 +54,14 @@ test.describe("CampusConnect — 핵심 E2E (T-040)", () => {
     });
     await expect(page.getByTestId("report-activity-summary")).toContainText("트러블슈팅");
     await expect(page.getByTestId("report-activity-summary")).toContainText("교수평가");
+    await expect(page.getByTestId("report-problems-solved")).toBeVisible();
+    await expect(page.getByTestId("report-technologies")).toBeVisible();
+    await expect(page.getByTestId("report-growth-reflection")).toBeVisible();
+    await expect(page.getByTestId("report-team-sections")).toBeVisible();
+    await expect(page.getByTestId("report-preview-overlay")).toBeVisible();
+    await expect(page.getByTestId("report-print-view")).toBeVisible();
+    await page.getByTestId("report-preview-close").click();
+    await expect(page.getByTestId("report-preview-overlay")).toBeHidden();
   });
 
   test("12. 교수 팀 제출 현황·프로젝트 평가", async ({ page }) => {
@@ -153,14 +161,186 @@ test.describe("CampusConnect — 핵심 E2E (T-040)", () => {
     await expect(page.getByText(unique)).toBeVisible({ timeout: 15_000 });
   });
 
+  test("15. 팀 상세 배포 링크 등록", async ({ page }) => {
+    await loginViaLanding(page);
+    await openFirstCourse(page);
+    await page.getByRole("link", { name: "팀", exact: true }).click();
+    await page.getByRole("button", { name: "입장하기" }).first().click();
+
+    const uniqueUrl = `https://example.com/e2e-${Date.now()}`;
+    await page.getByPlaceholder("배포 링크 URL (예: https://example.com)").fill(uniqueUrl);
+    await page.getByRole("button", { name: "링크 등록" }).click();
+    await expect(page.getByRole("link", { name: "열기" }).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator(`a[href="${uniqueUrl}"]`).first()).toBeVisible();
+  });
+
+  test("16. 팀 상세 파일 업로드", async ({ page }) => {
+    await loginViaLanding(page);
+    await openFirstCourse(page);
+    await page.getByRole("link", { name: "팀", exact: true }).click();
+    await page.getByRole("button", { name: "입장하기" }).first().click();
+
+    const uniqueName = `e2e-upload-${Date.now()}.txt`;
+    await page.getByTestId("team-deliverable-file-input").setInputFiles({
+      name: uniqueName,
+      mimeType: "text/plain",
+      buffer: Buffer.from("campusconnect e2e upload"),
+    });
+
+    await expect(page.getByText(uniqueName)).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("17. 팀 상세 배포 링크 삭제", async ({ page }) => {
+    page.on("dialog", (dialog) => dialog.accept());
+
+    await loginViaLanding(page);
+    await openFirstCourse(page);
+    await page.getByRole("link", { name: "팀", exact: true }).click();
+    await page.getByRole("button", { name: "입장하기" }).first().click();
+
+    const uniqueUrl = `https://example.com/e2e-delete-${Date.now()}`;
+    await page.getByPlaceholder("배포 링크 URL (예: https://example.com)").fill(uniqueUrl);
+    await page.getByPlaceholder("링크 제목 (선택)").fill("e2e-link-delete");
+    await page.getByRole("button", { name: "링크 등록" }).click();
+
+    const row = page.locator('[data-testid^="team-deliverable-item-"]', {
+      has: page.getByText("e2e-link-delete"),
+    }).first();
+    await expect(row).toBeVisible({ timeout: 15_000 });
+    await row.locator('[data-testid^="team-deliverable-delete-"]').click();
+    await expect(row).toHaveCount(0);
+  });
+
+  test("18. 팀 상세 잘못된 링크 입력 검증", async ({ page }) => {
+    await loginViaLanding(page);
+    await openFirstCourse(page);
+    await page.getByRole("link", { name: "팀", exact: true }).click();
+    await page.getByRole("button", { name: "입장하기" }).first().click();
+
+    await page.getByTestId("team-deliverable-link-url-input").fill("not valid url ###");
+    const dialogPromise = page.waitForEvent("dialog");
+    await page.getByTestId("team-deliverable-link-submit").click();
+    const dialog = await dialogPromise;
+    await expect(dialog.message()).toContain("올바른 링크 형식");
+    await dialog.accept();
+  });
+
+  test("19. 팀 상세 링크 프로토콜 자동보정", async ({ page }) => {
+    await loginViaLanding(page);
+    await openFirstCourse(page);
+    await page.getByRole("link", { name: "팀", exact: true }).click();
+    await page.getByRole("button", { name: "입장하기" }).first().click();
+
+    const rawUrl = `example.com/e2e-protocol-${Date.now()}`;
+    const expectedUrl = `https://${rawUrl}`;
+    await page.getByTestId("team-deliverable-link-url-input").fill(rawUrl);
+    await page.getByTestId("team-deliverable-link-title-input").fill("e2e-link-protocol");
+    await page.getByTestId("team-deliverable-link-submit").click();
+    await expect(page.locator(`a[href="${expectedUrl}"]`).first()).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("20. 팀 상세 소스코드 파일 업로드", async ({ page }) => {
+    await loginViaLanding(page);
+    await openFirstCourse(page);
+    await page.getByRole("link", { name: "팀", exact: true }).click();
+    await page.getByRole("button", { name: "입장하기" }).first().click();
+
+    const uniqueName = `e2e-source-${Date.now()}.ts`;
+    await page.getByTestId("team-deliverable-file-input").setInputFiles({
+      name: uniqueName,
+      mimeType: "text/plain",
+      buffer: Buffer.from("export const e2e = true;"),
+    });
+
+    await expect(page.getByText(uniqueName)).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("21. 팀 상세 금지 확장자 업로드 차단", async ({ page }) => {
+    await loginViaLanding(page);
+    await openFirstCourse(page);
+    await page.getByRole("link", { name: "팀", exact: true }).click();
+    await page.getByRole("button", { name: "입장하기" }).first().click();
+
+    const dialogPromise = page.waitForEvent("dialog");
+    await page.getByTestId("team-deliverable-file-input").setInputFiles({
+      name: `e2e-blocked-${Date.now()}.exe`,
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from("blocked"),
+    });
+
+    const dialog = await dialogPromise;
+    await expect(dialog.message()).toContain("지원하지 않는 파일 형식");
+    await dialog.accept();
+  });
+
+  test("22. 팀 상세 업로드 가이드 노출", async ({ page }) => {
+    await loginViaLanding(page);
+    await openFirstCourse(page);
+    await page.getByRole("link", { name: "팀", exact: true }).click();
+    await page.getByRole("button", { name: "입장하기" }).first().click();
+    await expect(page.getByTestId("team-deliverable-upload-guide")).toContainText("허용 형식");
+    await expect(page.getByTestId("team-deliverable-upload-button")).toContainText("500MB");
+  });
+
+  test("23. 팀 상세 링크 제목 fallback", async ({ page }) => {
+    await loginViaLanding(page);
+    await openFirstCourse(page);
+    await page.getByRole("link", { name: "팀", exact: true }).click();
+    await page.getByRole("button", { name: "입장하기" }).first().click();
+
+    const rawUrl = `example.com/e2e-fallback-${Date.now()}/path`;
+    const expectedUrl = `https://${rawUrl}`;
+    await page.getByTestId("team-deliverable-link-url-input").fill(rawUrl);
+    await page.getByTestId("team-deliverable-link-submit").click();
+
+    const row = page.locator('[data-testid^="team-deliverable-item-"]', {
+      has: page.locator(`a[href="${expectedUrl}"]`),
+    }).first();
+    await expect(row).toBeVisible({ timeout: 15_000 });
+    await expect(row).toContainText("example.com/path");
+  });
+
   test("7. 마이페이지 리포트 페이지 전환", async ({ page }) => {
     await loginViaLanding(page);
     await page.locator('a[href="/app/mypage"]').click();
     await expect(page).toHaveURL("/app/mypage");
+    await expect(page.getByTestId("mypage-summary-paragraph")).toContainText("트러블슈팅", {
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId("mypage-summary-cards")).toBeVisible();
+    await expect(page.getByTestId("mypage-competency-db")).toBeVisible();
+    await expect(page.getByTestId("mypage-competency-db")).toContainText("DB 추정");
+    await expect(page.getByTestId("mypage-activity-bullets")).toContainText("협업");
     await page.getByRole("button", { name: "다음 페이지" }).click();
     await expect(page.getByText("PAGE 02 PROJECT DETAIL")).toBeVisible();
+    await expect(page.getByTestId("mypage-team-card-db")).toBeVisible({ timeout: 15_000 });
     await page.getByRole("button", { name: "다음 페이지" }).click();
     await expect(page.getByText("PAGE 03 PROBLEM SOLVING")).toBeVisible();
+    await expect(page.getByTestId("mypage-page3-intro")).toContainText("트러블슈팅", {
+      timeout: 15_000,
+    });
+  });
+
+  test("13. 마이페이지 AI 리포트 생성 버튼", async ({ page }) => {
+    await loginViaLanding(page);
+    await page.locator('a[href="/app/mypage"]').click();
+    await expect(page).toHaveURL("/app/mypage");
+    await page.getByTestId("ai-report-generate-button").click();
+    const message = page.getByTestId("ai-report-message");
+    await expect(message).toBeVisible({ timeout: 25_000 });
+    await expect(message).toHaveText(
+      /DB 집계 초안|AI 리포트가 생성|DB 미리보기|Edge/
+    );
+  });
+
+  test("14. 교수 마이페이지 학생 리포트 비노출", async ({ page }) => {
+    test.skip(!hasProfessorE2ECredentials, "E2E_PROFESSOR_EMAIL · E2E_PROFESSOR_PASSWORD 를 .env 에 설정하세요.");
+
+    await loginProfessorViaLanding(page);
+    await page.locator('a[href="/app/mypage"]').click();
+    await expect(page).toHaveURL("/app/mypage");
+    await expect(page.getByTestId("mypage-professor-report-block")).toBeVisible();
+    await expect(page.getByTestId("ai-report-generate-button")).toHaveCount(0);
   });
 
   test("5. 로그아웃 → 랜딩", async ({ page }) => {

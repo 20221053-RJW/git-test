@@ -9,7 +9,7 @@ export default function AiReportPrintView({ context, report }: Props) {
   const generatedLabel = new Date(report.generated_at).toLocaleString("ko-KR");
 
   return (
-    <article className="ai-report-print mx-auto bg-white text-black">
+    <article className="ai-report-print mx-auto bg-white text-black" data-testid="report-print-view">
       <header className="border-b-2 border-[#155dfc] pb-4 mb-6">
         <p className="text-[10px] font-bold uppercase tracking-widest text-[#64748b]">
           CampusConnect · 팀 프로젝트 역량 리포트
@@ -34,7 +34,10 @@ export default function AiReportPrintView({ context, report }: Props) {
 
       <section className="mb-5">
         <h2 className="text-[13px] font-black text-[#155dfc] mb-2">해결한 문제</h2>
-        <ul className="list-disc pl-5 text-[11px] leading-relaxed space-y-1">
+        <ul
+          className="list-disc pl-5 text-[11px] leading-relaxed space-y-1"
+          data-testid="report-problems-solved"
+        >
           {report.problems_solved.map((item) => (
             <li key={item}>{item}</li>
           ))}
@@ -43,11 +46,13 @@ export default function AiReportPrintView({ context, report }: Props) {
 
       <section className="mb-5">
         <h2 className="text-[13px] font-black text-[#155dfc] mb-2">기술·역량</h2>
-        <p className="text-[11px]">{report.technologies.join(" · ")}</p>
+        <p className="text-[11px]" data-testid="report-technologies">
+          {report.technologies.join(" · ")}
+        </p>
       </section>
 
       {report.sections && report.sections.length > 0 && (
-        <section className="mb-5">
+        <section className="mb-5" data-testid="report-team-sections">
           <h2 className="text-[13px] font-black text-[#155dfc] mb-2">팀별 상세</h2>
           <div className="space-y-3">
             {report.sections.map((section) => (

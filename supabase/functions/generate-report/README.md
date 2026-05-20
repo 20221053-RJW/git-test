@@ -21,8 +21,9 @@ supabase functions deploy generate-report
 
 | `OPENAI_API_KEY` | HTTP | 응답 |
 |------------------|------|------|
-| 없음 | 501 | `{ code: "NOT_IMPLEMENTED", message }` |
-| 있음 | 200 | `AiReportGenerateResponse` JSON |
+| 없음 | **200** | `AiReportGenerateResponse` · `model: "draft-db-only"` (클라이언트 A4 초안과 동일 목적) |
+| 있음 | 200 | LLM 요약 · `model: "gpt-4o-mini"` |
+| 함수 미배포 | (클라이언트) 404 | 「DB 활동 미리보기」 안내 |
 
 집계 데이터: 팀·트러블슈팅·산출물·**피드백·회고·동료평가·교수 평가** (클라이언트 `ai-report.ts`와 동일). 번들 v2 SQL 미실행 시 해당 건수는 0.
 

@@ -84,7 +84,8 @@ export const api = {
 ## `aiReport.gatherContext` · `buildDraftFromContext`
 
 - **gatherContext(userId)** — `AiReportContext`: 팀 스냅샷, `troubleshootingCases`, 산출물·피드백·회고·동료평가·교수 평가 **팀별 스니펫**. 테이블 없으면 0.
-- **buildDraftFromContext(context)** — LLM 없이 A4용 `AiReportGenerateResponse` 초안 (`model: draft-db-only`)
+- **buildDraftFromContext(context)** — LLM 없이 A4용 `AiReportGenerateResponse` 초안 (`model: draft-db-only`); `problems_solved`는 트러블슈팅 problem·plan·solution, `technologies`는 skills + 산출물 확장자
+- **formatActivitySummary** · **buildSummaryParagraph** · **buildSummaryCards** · **buildPage3Intro** · **buildCompetencyItems** · **buildActivityBullets** · **buildTechnologies** · **mapToMyPageProjects** — 마이페이지·A4 공통 집계
 - UI: `MyPage` 「DB 활동 미리보기 (A4)」·`data-testid=report-activity-summary` · `AiReportPrintView`
 - 인간 확인: [37_verify_ai_report.md](../for_human/37_verify_ai_report.md)
 

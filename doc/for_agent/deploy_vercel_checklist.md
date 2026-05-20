@@ -10,7 +10,7 @@
 | 1 | 프로덕션 Supabase 프로젝트 URL·anon key 확보 | [ ] |
 | 2 | RLS 리뷰 (`rls_review_packet.md`, H-001) | [ ] |
 | 3 | **`migrations/20260520102000_team_detail_writes_bundle_v2.sql`** (H-007~010 일괄) · [29](../for_human/29_supabase_bundle_sql.md) | [ ] |
-| 4 | Edge `generate-report` deploy + `OPENAI_API_KEY` (H-002, 선택) | [ ] |
+| 4 | Edge `generate-report` deploy (+ `OPENAI_API_KEY` 선택 — 없어도 DB 초안 200) | [ ] |
 | 5 | Storage bucket `ai_team_deliverables` 정책 확인 | [ ] |
 
 ## 배포 전 — Firebase

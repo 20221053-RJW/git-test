@@ -181,6 +181,8 @@ export default function TeamDetailPage() {
   const [deliverables, setDeliverables] = useState<TeamDeliverable[]>([]);
   const [uploadingDeliverable, setUploadingDeliverable] = useState(false);
   const deliverableInputRef = useRef<HTMLInputElement>(null);
+  const [deliverableLinkUrl, setDeliverableLinkUrl] = useState("");
+  const [deliverableLinkTitle, setDeliverableLinkTitle] = useState("");
 
   const canEditLog = (log: TroubleshootingLog) => log.author === myName;
   const canResolveLog = (log: TroubleshootingLog) =>
@@ -267,6 +269,25 @@ export default function TeamDetailPage() {
     } catch (error) {
       console.error(error);
       alert(error instanceof Error ? error.message : "파일 삭제에 실패했습니다.");
+    } finally {
+      setUploadingDeliverable(false);
+    }
+  };
+
+  const handleAddDeliverableLink = async () => {
+    if (!selectedTeamId || !deliverableLinkUrl.trim()) return;
+    setUploadingDeliverable(true);
+    try {
+      const created = await api.teamDetail.addDeliverableLink(selectedTeamId, {
+        url: deliverableLinkUrl,
+        title: deliverableLinkTitle,
+      });
+      setDeliverables((prev) => [created, ...prev]);
+      setDeliverableLinkUrl("");
+      setDeliverableLinkTitle("");
+    } catch (error) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : "링크 등록에 실패했습니다.");
     } finally {
       setUploadingDeliverable(false);
     }
@@ -740,15 +761,16 @@ export default function TeamDetailPage() {
                   return (
                     <div
                       key={item.id}
+                      data-testid={`team-deliverable-item-${item.id}`}
                       className="bg-[#f9fafb] border border-[rgba(0,0,0,0.1)] rounded-[10px] p-3 flex items-center justify-between gap-3"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm shrink-0">📄</span>
+                          <span className="text-sm shrink-0">{item.kind === "link" ? "🔗" : "📄"}</span>
                           <span className="text-sm font-medium text-[#1e2939] truncate">{item.fileName}</span>
                         </div>
                         <p className="mt-1 text-xs text-[#6a7282]">
-                          {item.uploaderName} · {formatFileSize(item.fileSize)} ·{" "}
+                          {item.uploaderName} · {item.kind === "link" ? "링크" : formatFileSize(item.fileSize)} ·{" "}
                           {new Date(item.createdAt).toLocaleString("ko-KR")}
                         </p>
                       </div>
@@ -757,16 +779,17 @@ export default function TeamDetailPage() {
                           href={item.publicUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          download={item.fileName}
+                          download={item.kind === "link" ? undefined : item.fileName}
                           className="bg-[#e5e7eb] text-[#1e2939] text-xs font-medium px-3 py-2 rounded hover:bg-gray-300 transition-colors"
                         >
-                          다운로드
+                          {item.kind === "link" ? "열기" : "다운로드"}
                         </a>
                         {canDelete && (
                           <button
                             type="button"
                             onClick={() => handleDeleteDeliverable(item)}
                             disabled={uploadingDeliverable}
+                            data-testid={`team-deliverable-delete-${item.id}`}
                             className="text-xs text-red-600 hover:underline disabled:opacity-60"
                           >
                             삭제
@@ -780,10 +803,40 @@ export default function TeamDetailPage() {
 
               {canUploadDeliverable && (
                 <>
+                  <div className="grid grid-cols-1 gap-2 rounded-[10px] border border-[#dbeafe] bg-[#f8fbff] p-3">
+                    <input
+                      type="text"
+                      value={deliverableLinkUrl}
+                      onChange={(e) => setDeliverableLinkUrl(e.target.value)}
+                      data-testid="team-deliverable-link-url-input"
+                      placeholder="배포 링크 URL (예: https://example.com)"
+                      className="w-full rounded-[8px] border border-[#bfdbfe] bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-300"
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={deliverableLinkTitle}
+                        onChange={(e) => setDeliverableLinkTitle(e.target.value)}
+                        data-testid="team-deliverable-link-title-input"
+                        placeholder="링크 제목 (선택)"
+                        className="w-full rounded-[8px] border border-[#bfdbfe] bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-blue-300"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void handleAddDeliverableLink()}
+                        disabled={uploadingDeliverable || !deliverableLinkUrl.trim()}
+                        data-testid="team-deliverable-link-submit"
+                        className="shrink-0 rounded-[8px] bg-[#155dfc] px-3 py-2 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-60"
+                      >
+                        링크 등록
+                      </button>
+                    </div>
+                  </div>
                   <input
                     ref={deliverableInputRef}
                     type="file"
-                    accept=".pdf,.zip,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.txt,.md,.json,.doc,.docx,.xlsx"
+                    data-testid="team-deliverable-file-input"
+                    accept=".pdf,.zip,.7z,.rar,.tar,.gz,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.gif,.svg,.txt,.md,.json,.csv,.ts,.tsx,.js,.jsx,.py,.java,.c,.cpp,.go,.rs,.sql,.yaml,.yml,.doc,.docx,.xls,.xlsx"
                     className="hidden"
                     onChange={(e) => handleDeliverableUpload(e.target.files)}
                   />
@@ -791,10 +844,14 @@ export default function TeamDetailPage() {
                     type="button"
                     onClick={() => deliverableInputRef.current?.click()}
                     disabled={uploadingDeliverable}
+                    data-testid="team-deliverable-upload-button"
                     className="w-full bg-[#f9fafb] border border-dashed border-[rgba(0,0,0,0.1)] rounded py-2.5 text-[#4a5565] font-medium hover:bg-gray-100 transition-colors disabled:opacity-60"
                   >
-                    {uploadingDeliverable ? "업로드 중..." : "+ 파일 업로드 (최대 50MB)"}
+                    {uploadingDeliverable ? "업로드 중..." : "+ 파일 업로드 (최대 500MB)"}
                   </button>
+                  <p className="text-[11px] text-[#64748b]" data-testid="team-deliverable-upload-guide">
+                    허용 형식: 압축(zip/7z/rar), 코드(ts/js/py/java/cpp/go/rs/sql), 문서(pdf/doc/xlsx), 이미지(png/jpg/svg)
+                  </p>
                 </>
               )}
             </div>

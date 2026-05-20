@@ -27,6 +27,9 @@ doc/ 구조:
 
 [1단계 — 파악]
 - vision.md, 02_current_state.md, 05_todo.md, 17_handoff.md 를 읽는다.
+- vision.md와 `doc/for_agent/vision_snapshot.md`를 대조해 "추가요청사항" 신규/변경 여부를 확인한다.
+  · 신규 요청이 있으면 `27_vision_feature_matrix.md`와 `05_todo.md`에 즉시 반영
+  · 반영 후 `vision_snapshot.md`를 최신 원본으로 동기화
 - for_human/28_human_action_items.md 를 연다.
   · 미완료: 인간이 아직 안 한 일 (키, 승인, 법무 등)
   · 완료 확인: .env 키, 사용자 "H-00x 완료", CI green 등으로 점검 후 완료한 일 표로 이동

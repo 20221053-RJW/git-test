@@ -40,6 +40,8 @@ export interface AiReportTeamSnapshot {
   progress: number;
   troubleshootingCount: number;
   deliverableCount: number;
+  /** 팀 산출물 파일명 (A4 팀 섹션용, 최대 5건) */
+  deliverableFileNames: string[];
   sampleProblems: string[];
   /** 팀 피드백 제출 여부 (H-007 테이블) */
   feedbackSubmitted: boolean;
@@ -94,4 +96,6 @@ export interface AiReportContext {
   totalProfessorStudentEvalsReceived: number;
   /** 교수 프로젝트 평가가 있는 팀 수 */
   totalProfessorProjectEvalsReceived: number;
+  /** 팀 산출물 파일명 (기술·역량 초안용) */
+  deliverableFileNames: string[];
 }

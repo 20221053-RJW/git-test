@@ -5,14 +5,15 @@
 
 ## 지금 여기까지
 
-- **단계:** Alpha → Beta 진입 (~58%)
+- **단계:** Alpha → Beta 진입 (~63%)
 - **API:** `supabase-api.ts` — 과목·팀·Q&A·네트워크·Storage·팀 상세 쓰기 전반
 - **인증:** Firebase + `ai_users` + ProtectedRoute + JWT 스캐폴드 (`VITE_ENABLE_SUPABASE_FIREBASE_JWT`, **기본 off**)
 - **팀 상세:** 채팅·Realtime, 피드백·동료평가·회고록 DB, 교수 평가·제출 현황 패널, AI 진행 요약(실데이터)
-- **마이페이지:** 리포트 3페이지 + A4(전 활동 스니펫·성장 회고 초안) + Edge `generate-report` (deploy H-002)
-- **E2E:** 12플로우 + 인증 가드 · CI `build.yml` + `e2e.yml`
+- **마이페이지:** 리포트 3페이지 DB 집계 + A4 + Edge `generate-report` (배포 후 OPENAI 없으면도 DB 초안 200)
+- **E2E:** 23플로우 + 인증 가드 · CI `build.yml` + `e2e.yml`
 - **RLS:** `rls_review_packet.md` + `20260519000000_rls_beta_draft.sql` — **미적용** (H-001)
 - **DB 마이그레이션(로컬 DRAFT):** 번들 v2 `20260520102000_team_detail_writes_bundle_v2.sql` — **인간 실행 필요**
+- **스캔 확인:** `CoursesPage` 수업코드 자동생성(T-026)·일정 캘린더(T-027) 완료, `TeamDetailPage` 업로드 500MB·링크 게시물(T-024) 완료 + 코드/압축 확장자 확대, `MyPage` 교수 비노출(T-025) 완료
 
 ## 바로 이어서 (인간 우선)
 
@@ -26,13 +27,19 @@
 
 ## AI가 다음에 할 수 있는 것 (H-001 승인 후)
 
-- RLS Beta SQL 스테이징 검증
+- RLS Beta SQL 스테이징 검증 → `rls_staging_verification.md`
 - `VITE_ENABLE_SUPABASE_FIREBASE_JWT=true` 회귀 테스트
 - [o] `gatherAiReportContext` 교수 평가 집계 (2026-05-20, 260520-23)
+- [o] vision 추가요청 4건 완료 (T-024~T-027) — `27_vision_feature_matrix.md`
+
+## AI가 다음에 할 수 있는 것 (인간 승인 없이 가능)
+
+1. T-024 대용량 업로드·링크 게시물 회귀 테스트
 
 ## 건드리지 말 것
 
 - `vision.md`, `doit.md`
+- `vision_snapshot.md`는 원본 대조용으로만 갱신 (원본 대체 금지)
 - `src/imports/` 대량 삭제
 - RLS SQL **무승인** 원격 적용
 

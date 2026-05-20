@@ -306,6 +306,7 @@ export interface TeamDeliverable {
   fileSize: number;
   mimeType?: string;
   publicUrl: string;
+  kind?: "file" | "link";
   createdAt: Date;
 }
 

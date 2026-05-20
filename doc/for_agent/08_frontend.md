@@ -22,7 +22,7 @@ React 18.3 · TypeScript · Vite 6 · React Router 7 · Tailwind 4 · Radix/Shad
 | `/app/courses/:courseId/students` | StudentsNetworkPage | Supabase |
 | `/app/courses/:courseId/teams` | TeamsPage | Supabase |
 | `/app/courses/:courseId/teams/:teamId` | TeamDetailPage | Supabase CRUD |
-| `/app/mypage` | MyPage | `gatherContext`, 리포트 3페이지 |
+| `/app/mypage` | MyPage | `resolveReportContext`(캐시), 리포트 3페이지, A4·집계 새로고침 |
 | `/app/qna` | QnAPage | Supabase |
 | `/app/qna/:questionId` | QnADetailPage | 답변 CRUD |
 | `/app/teams`, `/app/students` | `CourseScopedRedirect` | |

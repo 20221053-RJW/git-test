@@ -6,6 +6,13 @@ import type { Course, CourseStatus, CreateCourseInput } from "../types";
 
 const defaultStageNames = ["아이디어 기획", "서비스 디자인", "프론트 개발", "백엔드 개발", "발표 및 배포"];
 
+function generateAutoCourseCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const pick = (size: number) =>
+    Array.from({ length: size }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  return `CC-${pick(4)}-${pick(4)}`;
+}
+
 const emptyForm: CreateCourseInput = {
   name: "",
   code: "",
@@ -30,6 +37,10 @@ export default function CoursesPage() {
   const [joining, setJoining] = useState(false);
 
   const canManageCourses = isProfessor || isAdmin;
+  const openCreateModal = () => {
+    setForm({ ...emptyForm, code: generateAutoCourseCode() });
+    setShowCreateModal(true);
+  };
 
   const loadCourses = async (status: CourseStatus) => {
     setLoading(true);
@@ -76,6 +87,7 @@ export default function CoursesPage() {
     try {
       await api.courses.create({
         ...form,
+        code: form.code.trim(),
         stages: form.stages.filter((stage) => stage.trim()),
       });
       setForm(emptyForm);
@@ -170,7 +182,7 @@ export default function CoursesPage() {
           {canManageCourses && (
             <button
               type="button"
-              onClick={() => setShowCreateModal(true)}
+              onClick={openCreateModal}
               className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
             >
               + 수업 생성
@@ -350,12 +362,21 @@ export default function CoursesPage() {
               </label>
               <label className="text-sm font-bold text-gray-700">
                 수업 코드
-                <input
-                  required
-                  value={form.code}
-                  onChange={(event) => updateForm("code", event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-normal outline-none focus:border-blue-500"
-                />
+                <div className="mt-1 flex gap-2">
+                  <input
+                    required
+                    value={form.code}
+                    readOnly
+                    className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 font-normal outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => updateForm("code", generateAutoCourseCode())}
+                    className="shrink-0 rounded-lg border border-blue-200 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-50"
+                  >
+                    재생성
+                  </button>
+                </div>
               </label>
               <label className="text-sm font-bold text-gray-700">
                 학기
@@ -369,6 +390,7 @@ export default function CoursesPage() {
               <label className="text-sm font-bold text-gray-700">
                 일정
                 <input
+                  type="date"
                   required
                   value={form.schedule}
                   onChange={(event) => updateForm("schedule", event.target.value)}

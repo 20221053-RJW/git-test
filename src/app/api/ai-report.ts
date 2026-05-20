@@ -1,5 +1,6 @@
 import { auth } from "../firebase";
 import { supabase } from "../supabase";
+import type { MyPageProject } from "../types";
 import type {
   AiReportContext,
   AiReportGenerateRequest,
@@ -138,6 +139,7 @@ export async function gatherAiReportContext(userId: string): Promise<AiReportCon
       totalPeerReviewsSubmitted: 0,
       totalProfessorStudentEvalsReceived: 0,
       totalProfessorProjectEvalsReceived: 0,
+      deliverableFileNames: [],
     };
   }
 
@@ -162,7 +164,7 @@ export async function gatherAiReportContext(userId: string): Promise<AiReportCon
       .order("sort_order", { ascending: true }),
     supabase
       .from("ai_team_deliverables")
-      .select("team_id")
+      .select("team_id, file_name")
       .in("team_id", teamIds),
     supabase
       .from("ai_team_detail_feedbacks")
@@ -344,6 +346,11 @@ export async function gatherAiReportContext(userId: string): Promise<AiReportCon
       progress: team.progress ?? 0,
       troubleshootingCount: teamLogs.length,
       deliverableCount: deliverables.filter((d) => d.team_id === team.id).length,
+      deliverableFileNames: deliverables
+        .filter((d) => d.team_id === team.id)
+        .map((d) => d.file_name)
+        .filter((name): name is string => Boolean(name?.trim()))
+        .slice(0, 5),
       sampleProblems: problems,
       feedbackSubmitted: feedbackTeamIds.has(team.id),
       feedbackSnippet: feedbackSnippetByTeam.get(team.id),
@@ -373,7 +380,87 @@ export async function gatherAiReportContext(userId: string): Promise<AiReportCon
     totalPeerReviewsSubmitted: peerRows.length,
     totalProfessorStudentEvalsReceived: profStudentCommentByTeam.size,
     totalProfessorProjectEvalsReceived: profProjectByTeam.size,
+    deliverableFileNames: deliverables
+      .map((d) => d.file_name)
+      .filter((name): name is string => Boolean(name?.trim())),
   };
+}
+
+function formatProblemSolvedLine(caseItem: AiReportTroubleshootingCase): string {
+  const segments: string[] = [caseItem.problem.trim()];
+  const action = caseItem.action.trim();
+  const result = caseItem.result.trim();
+  if (action && action !== "(대응 계획 미기록)") {
+    segments.push(`대응: ${truncateSnippet(action, 80)}`);
+  }
+  if (result && !result.startsWith("진행 중")) {
+    segments.push(`결과: ${truncateSnippet(result, 80)}`);
+  }
+  return `[${caseItem.projectTitle}] ${segments.join(" — ")}`;
+}
+
+function buildProblemsSolvedDraft(context: AiReportContext): string[] {
+  if (context.troubleshootingCases.length > 0) {
+    return context.troubleshootingCases.map(formatProblemSolvedLine);
+  }
+  const sampleProblems = context.teams.flatMap((t) => t.sampleProblems).slice(0, 8);
+  if (sampleProblems.length > 0) {
+    return sampleProblems.map((p) => truncateSnippet(p, 160));
+  }
+  return ["등록된 트러블슈팅 로그가 없습니다."];
+}
+
+function extractDeliverableExtensions(fileNames: string[]): string[] {
+  const extensions = new Set<string>();
+  for (const name of fileNames) {
+    const match = name.trim().match(/\.([a-z0-9]{1,8})$/i);
+    if (match) extensions.add(match[1].toLowerCase());
+  }
+  return Array.from(extensions).sort();
+}
+
+export function buildTechnologiesDraft(context: AiReportContext): string[] {
+  const fromSkills = context.skills.map((s) => s.trim()).filter(Boolean);
+  const fromFiles = extractDeliverableExtensions(context.deliverableFileNames).map(
+    (ext) => `산출물 .${ext}`
+  );
+  const merged = Array.from(new Set([...fromSkills, ...fromFiles]));
+  if (merged.length > 0) return merged;
+  if (context.totalDeliverables > 0) {
+    return [`팀 산출물 ${context.totalDeliverables}건 (프로필 기술 스택·파일명을 추가하면 더 풍부해집니다)`];
+  }
+  return ["(프로필에 기술 스택을 추가해 주세요)"];
+}
+
+function buildTeamSectionBody(
+  team: AiReportTeamSnapshot,
+  cases: AiReportTroubleshootingCase[]
+): string {
+  const teamCases = cases.filter((c) => c.teamId === team.teamId).slice(0, 3);
+  const lines: string[] = [
+    `수업: ${team.courseName}`,
+    `역할: ${team.memberRole}`,
+    `트러블슈팅 ${team.troubleshootingCount}건 · 산출물 ${team.deliverableCount}건 · 피드백 ${team.feedbackSubmitted ? "완료" : "미제출"} · 회고 ${team.retrospectiveSubmitted ? "완료" : "미제출"} · 동료평가 ${team.peerReviewsSubmitted}건 · 교수평가 ${team.professorStudentEvalReceived || team.professorProjectEvalReceived ? "있음" : "없음"}`,
+  ];
+
+  if (team.deliverableFileNames.length > 0) {
+    lines.push(`산출물: ${team.deliverableFileNames.join(", ")}`);
+  }
+
+  for (const caseItem of teamCases) {
+    lines.push(`트러블슈팅: ${formatProblemSolvedLine(caseItem)}`);
+  }
+
+  if (teamCases.length === 0 && team.sampleProblems.length > 0) {
+    lines.push(`주요 이슈: ${team.sampleProblems.join(" / ")}`);
+  }
+
+  if (team.feedbackSnippet) lines.push(`팀 피드백: ${team.feedbackSnippet}`);
+  if (team.peerReviewSnippet) lines.push(`동료평가: ${team.peerReviewSnippet}`);
+  if (team.retrospectiveSnippet) lines.push(`회고 요약: ${team.retrospectiveSnippet}`);
+  if (team.professorFeedbackSnippet) lines.push(`교수 피드백: ${team.professorFeedbackSnippet}`);
+
+  return lines.filter(Boolean).join("\n");
 }
 
 function buildGrowthReflectionDraft(context: AiReportContext): string {
@@ -400,6 +487,207 @@ function buildGrowthReflectionDraft(context: AiReportContext): string {
   return "팀 활동·회고·평가 기록을 쌓으면 성장 회고 초안이 채워집니다. Edge·OpenAI 배포(H-002) 후 AI 문단 생성을 이용할 수 있습니다.";
 }
 
+/** 마이페이지·A4 미리보기 공통 집계 한 줄 */
+export function formatReportActivitySummary(context: AiReportContext): string {
+  return `집계: 트러블슈팅 ${context.totalTroubleshootingLogs}건 · 산출물 ${context.totalDeliverables}건 · 피드백 ${context.totalFeedbacksSubmitted} · 회고 ${context.totalRetrospectivesSubmitted} · 동료평가 ${context.totalPeerReviewsSubmitted} · 교수평가 ${context.totalProfessorStudentEvalsReceived}/${context.totalProfessorProjectEvalsReceived}팀`;
+}
+
+function averageTeamProgress(context: AiReportContext): number {
+  if (context.teams.length === 0) return 0;
+  return Math.round(
+    context.teams.reduce((sum, team) => sum + team.progress, 0) / context.teams.length
+  );
+}
+
+export interface MyPageSummaryCard {
+  label: string;
+  value: string;
+  note: string;
+}
+
+export interface MyPageCompetencyItem {
+  label: string;
+  value: number;
+  desc: string;
+}
+
+export interface MyPageActivityBullet {
+  title: string;
+  body: string;
+}
+
+function clampCompetencyScore(score: number): number {
+  return Math.max(40, Math.min(98, Math.round(score)));
+}
+
+/** 마이페이지 PAGE 01 상단 카드 4종 (A4 집계와 동일 기준) */
+export function buildMyPageSummaryCards(context: AiReportContext): MyPageSummaryCard[] {
+  const collaborationTotal =
+    context.totalFeedbacksSubmitted +
+    context.totalRetrospectivesSubmitted +
+    context.totalPeerReviewsSubmitted;
+
+  return [
+    {
+      label: "참여 팀 프로젝트",
+      value: `${context.teams.length}건`,
+      note: "Supabase 팀 멤버십 기준",
+    },
+    {
+      label: "평균 진행률",
+      value: `${averageTeamProgress(context)}%`,
+      note: "팀 progress 평균",
+    },
+    {
+      label: "트러블슈팅",
+      value: `${context.totalTroubleshootingLogs}건`,
+      note: `산출물 ${context.totalDeliverables}건`,
+    },
+    {
+      label: "협업 제출",
+      value: `${collaborationTotal}건`,
+      note: `교수평가 ${context.totalProfessorStudentEvalsReceived}/${context.totalProfessorProjectEvalsReceived}팀`,
+    },
+  ];
+}
+
+/** 마이페이지 PAGE 03 소개 문단 */
+export function buildMyPagePage3Intro(context: AiReportContext): string {
+  if (context.troubleshootingCases.length === 0) {
+    return `${context.userName}님의 문제해결 경험은 단순 오류 수정이 아니라, 원인 파악·구조 재정리·재발 방지까지 이어지는 방식으로 기록됩니다. (DB 트러블슈팅 로그가 없어 예시 사례를 표시합니다.)`;
+  }
+
+  const resolvedCount = context.troubleshootingCases.filter(
+    (c) => c.status === "resolved"
+  ).length;
+
+  return `${context.userName}님의 트러블슈팅 ${context.troubleshootingCases.length}건(해결 ${resolvedCount}건)이 팀 워크스페이스에 기록되어 있습니다. 아래는 실제 problem · plan · solution 필드입니다.`;
+}
+
+/** 마이페이지 PAGE 01 핵심 역량 진단 (DB 활동 기반 추정 점수) */
+export function buildMyPageCompetencyItems(context: AiReportContext): MyPageCompetencyItem[] {
+  const teamCount = Math.max(context.teams.length, 1);
+  const avgProgress = averageTeamProgress(context);
+  const deliverablePerTeam = context.totalDeliverables / teamCount;
+  const collaborationTotal =
+    context.totalFeedbacksSubmitted +
+    context.totalRetrospectivesSubmitted +
+    context.totalPeerReviewsSubmitted;
+  const collaborationDenom = Math.max(teamCount * 3, 1);
+  const resolvedCount = context.troubleshootingCases.filter((c) => c.status === "resolved").length;
+  const resolvedRate =
+    context.troubleshootingCases.length > 0
+      ? resolvedCount / context.troubleshootingCases.length
+      : 0;
+
+  const executionScore = clampCompetencyScore(avgProgress * 0.75 + deliverablePerTeam * 8);
+  const collaborationScore = clampCompetencyScore(48 + (collaborationTotal / collaborationDenom) * 48);
+  const techScore = clampCompetencyScore(
+    45 + context.skills.length * 5 + deliverablePerTeam * 10
+  );
+  const problemSolvingScore = clampCompetencyScore(
+    42 + context.totalTroubleshootingLogs * 6 + resolvedRate * 35
+  );
+
+  return [
+    {
+      label: "프로젝트 실행력",
+      value: executionScore,
+      desc: `팀 평균 진행률 ${avgProgress}% · 산출물 ${context.totalDeliverables}건 (DB 추정)`,
+    },
+    {
+      label: "협업 신뢰도",
+      value: collaborationScore,
+      desc: `피드백·회고·동료평가 제출 ${collaborationTotal}건 (DB 추정)`,
+    },
+    {
+      label: "기술·산출물",
+      value: techScore,
+      desc: `프로필 스택 ${context.skills.length}개 · 팀당 산출물 ${deliverablePerTeam.toFixed(1)}건`,
+    },
+    {
+      label: "문제 해결/회고",
+      value: problemSolvingScore,
+      desc: `트러블슈팅 ${context.totalTroubleshootingLogs}건 · 해결 ${resolvedCount}건 (DB 추정)`,
+    },
+  ];
+}
+
+/** 마이페이지 PAGE 01 간략 활동 요약 3줄 */
+export function buildMyPageActivityBullets(context: AiReportContext): MyPageActivityBullet[] {
+  const avgProgress = averageTeamProgress(context);
+  return [
+    {
+      title: "프로젝트",
+      body: `${context.teams.length}개 팀 참여 · 평균 진행률 ${avgProgress}%`,
+    },
+    {
+      title: "기록",
+      body: `트러블슈팅 ${context.totalTroubleshootingLogs}건 · 산출물 ${context.totalDeliverables}건`,
+    },
+    {
+      title: "협업",
+      body: `피드백 ${context.totalFeedbacksSubmitted} · 회고 ${context.totalRetrospectivesSubmitted} · 동료평가 ${context.totalPeerReviewsSubmitted} · 교수평가 ${context.totalProfessorStudentEvalsReceived}/${context.totalProfessorProjectEvalsReceived}팀`,
+    },
+  ];
+}
+
+/** A4·마이페이지 공통 요약 문장 (LLM 없음) */
+export function buildReportSummaryDraft(context: AiReportContext): string {
+  return context.teams.length > 0
+    ? `${context.userName}님은 ${context.teams.length}개 팀 프로젝트에 참여했습니다. 트러블슈팅 ${context.totalTroubleshootingLogs}건, 산출물 ${context.totalDeliverables}건, 팀 피드백 ${context.totalFeedbacksSubmitted}건, 회고록 ${context.totalRetrospectivesSubmitted}건, 동료평가 ${context.totalPeerReviewsSubmitted}건, 교수 평가(학생 ${context.totalProfessorStudentEvalsReceived}팀·프로젝트 ${context.totalProfessorProjectEvalsReceived}팀)가 기록되어 있습니다.`
+    : `${context.userName}님의 팀 활동 기록이 아직 없습니다. 팀에 배정된 뒤 다시 생성해 보세요.`;
+}
+
+/** 리포트 집계 → 마이페이지 프로젝트 카드 (PAGE 02·getProjectsForUser) */
+export function mapReportContextToMyPageProjects(context: AiReportContext): MyPageProject[] {
+  return context.teams.map((team) => {
+    const contributions = [
+      `트러블슈팅 ${team.troubleshootingCount}건`,
+      `산출물 ${team.deliverableCount}건`,
+      ...team.deliverableFileNames.slice(0, 2).map((name) => `파일: ${name}`),
+      ...(team.feedbackSubmitted ? ["팀 피드백 완료"] : []),
+      ...(team.retrospectiveSubmitted ? ["회고록 완료"] : []),
+      ...(team.peerReviewsSubmitted > 0 ? [`동료평가 ${team.peerReviewsSubmitted}건`] : []),
+      ...team.sampleProblems.slice(0, 2),
+    ];
+
+    return {
+      title: team.projectTitle,
+      subtitle: `${team.courseName} · ${team.teamName}`,
+      tags: [team.memberRole, "Supabase 집계"],
+      period: `진행률 ${team.progress}%`,
+      role: team.memberRole,
+      completionRate: Math.min(100, Math.max(0, team.progress)),
+      contributions,
+      problemCase: {
+        problem: team.sampleProblems[0] ?? "등록된 트러블슈팅 없음",
+        solution: team.sampleProblems[1] ?? "—",
+        result: team.professorFeedbackSnippet
+          ? `교수 피드백: ${team.professorFeedbackSnippet}`
+          : "팀 워크스페이스 DB 기록",
+      },
+      techStack:
+        context.skills.length > 0
+          ? context.skills
+          : team.deliverableFileNames.length > 0
+            ? ["산출물 업로드"]
+            : [],
+      insights:
+        "참여 팀·트러블슈팅·산출물·협업 제출 메타를 자동 집계한 카드입니다.",
+      peerReviews: [],
+      professorReview: team.professorFeedbackSnippet ?? "",
+    };
+  });
+}
+
+/** 마이페이지 PAGE 01 요약 문단 (A4 summary + 평균 진행률) */
+export function buildMyPageSummaryParagraph(context: AiReportContext): string {
+  const base = buildReportSummaryDraft(context);
+  if (context.teams.length === 0) return base;
+  return `${base} 평균 진행률은 ${averageTeamProgress(context)}%입니다.`;
+}
+
 /** LLM 없이 DB 맥락만으로 A4용 초안 JSON 생성 */
 export function buildDraftReportFromContext(
   context: AiReportContext
@@ -415,22 +703,10 @@ export function buildDraftReportFromContext(
     return `${t.courseName} · ${t.projectTitle} (${t.memberRole}, 진행 ${t.progress}%, 트러블슈팅 ${t.troubleshootingCount}건, 산출물 ${t.deliverableCount}건${extraText})`;
   });
 
-  const problems =
-    context.troubleshootingCases.length > 0
-      ? context.troubleshootingCases.map((c) => c.problem)
-      : context.teams.flatMap((t) => t.sampleProblems).slice(0, 8);
-
   return {
-    summary:
-      context.teams.length > 0
-        ? `${context.userName}님은 ${context.teams.length}개 팀 프로젝트에 참여했습니다. 트러블슈팅 ${context.totalTroubleshootingLogs}건, 산출물 ${context.totalDeliverables}건, 팀 피드백 ${context.totalFeedbacksSubmitted}건, 회고록 ${context.totalRetrospectivesSubmitted}건, 동료평가 ${context.totalPeerReviewsSubmitted}건, 교수 평가(학생 ${context.totalProfessorStudentEvalsReceived}팀·프로젝트 ${context.totalProfessorProjectEvalsReceived}팀)가 기록되어 있습니다.`
-        : `${context.userName}님의 팀 활동 기록이 아직 없습니다. 팀에 배정된 뒤 다시 생성해 보세요.`,
-    problems_solved:
-      problems.length > 0
-        ? problems
-        : ["등록된 트러블슈팅 로그가 없습니다."],
-    technologies:
-      context.skills.length > 0 ? context.skills : ["(프로필에 기술 스택을 추가해 주세요)"],
+    summary: buildReportSummaryDraft(context),
+    problems_solved: buildProblemsSolvedDraft(context),
+    technologies: buildTechnologiesDraft(context),
     role_description:
       teamLines.length > 0
         ? teamLines.join("\n")
@@ -438,22 +714,7 @@ export function buildDraftReportFromContext(
     growth_reflection: buildGrowthReflectionDraft(context),
     sections: context.teams.map((t) => ({
       title: `${t.projectTitle}`,
-      body: [
-        `수업: ${t.courseName}`,
-        `역할: ${t.memberRole}`,
-        `트러블슈팅 ${t.troubleshootingCount}건 · 산출물 ${t.deliverableCount}건 · 피드백 ${t.feedbackSubmitted ? "완료" : "미제출"} · 회고 ${t.retrospectiveSubmitted ? "완료" : "미제출"} · 동료평가 ${t.peerReviewsSubmitted}건 · 교수평가 ${t.professorStudentEvalReceived || t.professorProjectEvalReceived ? "있음" : "없음"}`,
-        t.feedbackSnippet ? `팀 피드백: ${t.feedbackSnippet}` : "",
-        t.peerReviewSnippet ? `동료평가: ${t.peerReviewSnippet}` : "",
-        t.retrospectiveSnippet ? `회고 요약: ${t.retrospectiveSnippet}` : "",
-        t.professorFeedbackSnippet
-          ? `교수 피드백: ${t.professorFeedbackSnippet}`
-          : "",
-        t.sampleProblems.length > 0
-          ? `주요 이슈: ${t.sampleProblems.join(" / ")}`
-          : "",
-      ]
-        .filter(Boolean)
-        .join("\n"),
+      body: buildTeamSectionBody(t, context.troubleshootingCases),
     })),
     generated_at: context.generatedAt,
     model: "draft-db-only",

@@ -35,8 +35,16 @@ import { auth } from "../firebase";
 import { supabase } from "../supabase";
 import {
   buildDraftReportFromContext,
+  buildMyPageActivityBullets,
+  buildMyPageCompetencyItems,
+  buildMyPagePage3Intro,
+  buildMyPageSummaryCards,
+  buildMyPageSummaryParagraph,
+  buildTechnologiesDraft,
+  formatReportActivitySummary,
   gatherAiReportContext,
   generateAiReport as generateAiReportFromEdge,
+  mapReportContextToMyPageProjects,
 } from "./ai-report";
 
 // Supabase-backed API facade for app pages.
@@ -862,29 +870,7 @@ async function getMyPageProjectsForUserFromDb(): Promise<MyPageProject[]> {
     const context = await gatherAiReportContext(currentUser.id);
     if (context.teams.length === 0) return [];
 
-    return context.teams.map((team) => ({
-      title: team.projectTitle,
-      subtitle: `${team.courseName} · ${team.teamName}`,
-      tags: [team.memberRole, "Supabase 집계"],
-      period: `진행률 ${team.progress}%`,
-      role: team.memberRole,
-      completionRate: Math.min(100, Math.max(0, team.progress)),
-      contributions: [
-        `트러블슈팅 로그 ${team.troubleshootingCount}건`,
-        `팀 산출물 ${team.deliverableCount}건`,
-        ...team.sampleProblems.slice(0, 2),
-      ],
-      problemCase: {
-        problem: team.sampleProblems[0] ?? "등록된 트러블슈팅 없음",
-        solution: team.sampleProblems[1] ?? "—",
-        result: `팀 활동이 Supabase에 기록됨`,
-      },
-      techStack: context.skills.length > 0 ? context.skills : [],
-      insights:
-        "이 카드는 참여 팀·트러블슈팅·산출물 메타를 자동 집계한 항목입니다. ai_my_page_projects 시드 데이터가 있으면 그쪽이 우선 표시됩니다.",
-      peerReviews: [],
-      professorReview: "",
-    }));
+    return mapReportContextToMyPageProjects(context);
   } catch {
     return [];
   }
@@ -1929,21 +1915,42 @@ async function getTeamDetailTroubleshootingLogsFromDb(teamId?: string): Promise<
 }
 
 const TEAM_DELIVERABLES_BUCKET = "ai_team_deliverables";
-const TEAM_DELIVERABLE_MAX_BYTES = 50 * 1024 * 1024;
+const TEAM_DELIVERABLE_MAX_BYTES = 500 * 1024 * 1024;
 const TEAM_DELIVERABLE_ALLOWED_EXT = new Set([
   "pdf",
   "zip",
+  "7z",
+  "rar",
+  "tar",
+  "gz",
   "ppt",
   "pptx",
   "png",
   "jpg",
   "jpeg",
   "webp",
+  "gif",
+  "svg",
   "txt",
   "md",
   "json",
+  "csv",
+  "ts",
+  "tsx",
+  "js",
+  "jsx",
+  "py",
+  "java",
+  "c",
+  "cpp",
+  "go",
+  "rs",
+  "sql",
+  "yaml",
+  "yml",
   "doc",
   "docx",
+  "xls",
   "xlsx",
 ]);
 
@@ -1961,6 +1968,21 @@ function createDeliverableId(teamId: string): string {
   return `del-${slug}-${Date.now()}`;
 }
 
+function normalizeDeliverableUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) throw new Error("링크를 입력해주세요.");
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const parsed = new URL(withProtocol);
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw new Error("http(s) 링크만 등록할 수 있습니다.");
+    }
+    return parsed.toString();
+  } catch {
+    throw new Error("올바른 링크 형식이 아닙니다.");
+  }
+}
+
 function mapDeliverableRow(row: {
   id: string;
   team_id: string;
@@ -1971,8 +1993,10 @@ function mapDeliverableRow(row: {
   file_size: number | null;
   mime_type: string | null;
   public_url: string;
+  storage_path?: string | null;
   created_at: string;
 }): TeamDeliverable {
+  const isLink = (row.storage_path ?? "").startsWith("link://");
   return {
     id: row.id,
     teamId: row.team_id,
@@ -1983,6 +2007,7 @@ function mapDeliverableRow(row: {
     fileSize: Number(row.file_size ?? 0),
     mimeType: row.mime_type ?? undefined,
     publicUrl: row.public_url,
+    kind: isLink ? "link" : "file",
     createdAt: asDate(row.created_at),
   };
 }
@@ -2006,7 +2031,7 @@ async function getTeamDeliverablesFromDb(teamId: string): Promise<TeamDeliverabl
   const { data, error } = await supabase
     .from("ai_team_deliverables")
     .select(
-      "id, team_id, course_id, uploaded_by_user_id, uploader_name, file_name, file_size, mime_type, public_url, created_at"
+      "id, team_id, course_id, uploaded_by_user_id, uploader_name, file_name, file_size, mime_type, public_url, storage_path, created_at"
     )
     .eq("team_id", teamId)
     .order("created_at", { ascending: false });
@@ -2024,10 +2049,10 @@ async function uploadTeamDeliverableInDb(teamId: string, file: File): Promise<Te
 
   const extension = getDeliverableExtension(file.name);
   if (!extension || !TEAM_DELIVERABLE_ALLOWED_EXT.has(extension)) {
-    throw new Error("지원하지 않는 파일 형식입니다. (pdf, zip, ppt, 이미지, 문서 등)");
+    throw new Error("지원하지 않는 파일 형식입니다. (예: zip, ts, py, pdf, png)");
   }
   if (file.size > TEAM_DELIVERABLE_MAX_BYTES) {
-    throw new Error("파일 크기는 50MB 이하여야 합니다.");
+    throw new Error("파일 크기는 500MB 이하여야 합니다.");
   }
 
   const deliverableId = createDeliverableId(teamId);
@@ -2076,6 +2101,47 @@ async function uploadTeamDeliverableInDb(teamId: string, file: File): Promise<Te
   return mapDeliverableRow(data);
 }
 
+async function addTeamDeliverableLinkInDb(
+  teamId: string,
+  input: { url: string; title?: string }
+): Promise<TeamDeliverable> {
+  const currentUser = await getCurrentAiUser();
+  if (!currentUser) throw new Error("로그인이 필요합니다.");
+  if (!teamId) throw new Error("팀 정보가 없습니다.");
+
+  const { courseId } = await assertTeamDeliverableAccess(teamId);
+  const normalizedUrl = normalizeDeliverableUrl(input.url);
+  const parsed = new URL(normalizedUrl);
+  const fallbackName = `${parsed.hostname}${parsed.pathname === "/" ? "" : parsed.pathname}`;
+  const title = input.title?.trim() || fallbackName;
+  const now = new Date().toISOString();
+  const deliverableId = createDeliverableId(teamId);
+
+  const { data, error } = await supabase
+    .from("ai_team_deliverables")
+    .insert({
+      id: deliverableId,
+      team_id: teamId,
+      course_id: courseId,
+      uploaded_by_user_id: currentUser.id,
+      uploader_name: currentUser.name,
+      file_name: title,
+      storage_path: `link://${deliverableId}`,
+      file_size: 0,
+      mime_type: "text/url",
+      public_url: normalizedUrl,
+      created_at: now,
+      updated_at: now,
+    })
+    .select(
+      "id, team_id, course_id, uploaded_by_user_id, uploader_name, file_name, file_size, mime_type, public_url, storage_path, created_at"
+    )
+    .single();
+
+  if (error) throw error;
+  return mapDeliverableRow(data);
+}
+
 async function deleteTeamDeliverableInDb(deliverableId: string): Promise<void> {
   const currentUser = await getCurrentAiUser();
   if (!currentUser) throw new Error("로그인이 필요합니다.");
@@ -2097,10 +2163,13 @@ async function deleteTeamDeliverableInDb(deliverableId: string): Promise<void> {
     throw new Error("본인이 업로드한 파일 또는 교수만 삭제할 수 있습니다.");
   }
 
-  const { error: storageError } = await supabase.storage
-    .from(TEAM_DELIVERABLES_BUCKET)
-    .remove([existing.storage_path]);
-  if (storageError) throw storageError;
+  const isLink = existing.storage_path.startsWith("link://");
+  if (!isLink) {
+    const { error: storageError } = await supabase.storage
+      .from(TEAM_DELIVERABLES_BUCKET)
+      .remove([existing.storage_path]);
+    if (storageError) throw storageError;
+  }
 
   const { error } = await supabase.from("ai_team_deliverables").delete().eq("id", deliverableId);
   if (error) throw error;
@@ -2762,6 +2831,7 @@ export const api = {
     resolveTroubleshootingLog: resolveTroubleshootingLogInDb,
     getDeliverables: getTeamDeliverablesFromDb,
     uploadDeliverable: uploadTeamDeliverableInDb,
+    addDeliverableLink: addTeamDeliverableLinkInDb,
     deleteDeliverable: deleteTeamDeliverableInDb,
   },
   projects: {
@@ -2781,6 +2851,14 @@ export const api = {
   aiReport: {
     gatherContext: gatherAiReportContext,
     buildDraftFromContext: buildDraftReportFromContext,
+    buildActivityBullets: buildMyPageActivityBullets,
+    buildCompetencyItems: buildMyPageCompetencyItems,
+    buildSummaryParagraph: buildMyPageSummaryParagraph,
+    buildSummaryCards: buildMyPageSummaryCards,
+    buildPage3Intro: buildMyPagePage3Intro,
+    buildTechnologies: buildTechnologiesDraft,
+    formatActivitySummary: formatReportActivitySummary,
+    mapToMyPageProjects: mapReportContextToMyPageProjects,
     generateReport: generateAiReportFromEdge,
   },
 };

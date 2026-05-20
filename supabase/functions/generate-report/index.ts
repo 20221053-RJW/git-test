@@ -44,10 +44,6 @@ function truncateText(text: string, max: number): string {
   return t.length > max ? `${t.slice(0, max)}…` : t;
 }
 
-function asStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
-}
-
 function flattenFeedbackSnippet(row: {
   selected_options?: unknown;
   custom_text?: string | null;
@@ -324,10 +320,125 @@ async function gatherContext(supabase: ReturnType<typeof createClient>, userId: 
   };
 }
 
+type EdgeGatherContext = Awaited<ReturnType<typeof gatherContext>>;
+
+/** OPENAI 없을 때 클라이언트 buildDraftFromContext 와 동등한 DB 초안 */
+function buildDraftReportFromEdgeContext(ctx: EdgeGatherContext): ReportResponse {
+  const userName = String(ctx.user.name ?? "학생");
+  const skills = asStringArray(ctx.user.skills);
+  const teamCount = ctx.teams.length;
+  const logCount = ctx.logs.length;
+
+  const summary =
+    teamCount > 0
+      ? `${userName}님은 ${teamCount}개 팀 프로젝트에 참여했습니다. 트러블슈팅 ${logCount}건, 산출물 ${ctx.deliverableCount}건, 팀 피드백 ${ctx.feedbackCount}건, 회고록 ${ctx.retrospectiveCount}건, 동료평가 ${ctx.peerReviewCount}건, 교수 평가(학생 ${ctx.professorStudentEvalCount}팀·프로젝트 ${ctx.professorProjectEvalCount}팀)가 기록되어 있습니다.`
+      : `${userName}님의 팀 활동 기록이 아직 없습니다. 팀에 배정된 뒤 다시 생성해 보세요.`;
+
+  const problems_solved =
+    logCount > 0
+      ? ctx.logs.map((log) => {
+          const problem = String(log.problem ?? "").trim();
+          const plan = String(log.plan ?? "").trim();
+          const solution = String(log.solution ?? "").trim();
+          const parts = [problem];
+          if (plan) parts.push(`대응: ${truncateText(plan, 80)}`);
+          if (solution) parts.push(`결과: ${truncateText(solution, 80)}`);
+          return parts.join(" — ");
+        })
+      : ["등록된 트러블슈팅 로그가 없습니다."];
+
+  const technologies =
+    skills.length > 0
+      ? skills
+      : ctx.deliverableCount > 0
+        ? [`팀 산출물 ${ctx.deliverableCount}건`]
+        : ["(프로필에 기술 스택을 추가해 주세요)"];
+
+  const role_description =
+    teamCount > 0
+      ? ctx.teams
+          .map((t) => {
+            const team = t as {
+              courseName: string;
+              projectTitle: string;
+              memberRole: string;
+              progress: number;
+              troubleshootingCount: number;
+              deliverableCount: number;
+            };
+            return `${team.courseName} · ${team.projectTitle} (${team.memberRole}, 진행 ${team.progress}%, 트러블슈팅 ${team.troubleshootingCount}건, 산출물 ${team.deliverableCount}건)`;
+          })
+          .join("\n")
+      : "참여한 팀 프로젝트가 없습니다.";
+
+  const growthLines: string[] = [];
+  for (const t of ctx.teams) {
+    const team = t as {
+      projectTitle: string;
+      retrospectiveSnippet?: string;
+      professorFeedbackSnippet?: string;
+      feedbackSnippet?: string;
+      peerReviewSnippet?: string;
+    };
+    const parts: string[] = [];
+    if (team.retrospectiveSnippet) parts.push(`회고 — ${team.retrospectiveSnippet}`);
+    if (team.professorFeedbackSnippet) parts.push(`교수 평가 — ${team.professorFeedbackSnippet}`);
+    if (team.feedbackSnippet) parts.push(`팀 피드백 — ${team.feedbackSnippet}`);
+    if (team.peerReviewSnippet) parts.push(`동료평가 — ${team.peerReviewSnippet}`);
+    if (parts.length > 0) {
+      growthLines.push(`[${team.projectTitle}] ${parts.join(" / ")}`);
+    }
+  }
+
+  const growth_reflection =
+    growthLines.length > 0
+      ? `${growthLines.join("\n")}\n\n(DB 활동 기반 초안입니다. OPENAI_API_KEY 등록 H-002 후 AI가 문단을 다듬습니다.)`
+      : logCount > 0
+        ? `트러블슈팅 ${logCount}건이 기록되어 있습니다. (H-002 후 AI 문단 생성)`
+        : "팀 활동·회고·평가 기록을 쌓으면 성장 회고 초안이 채워집니다.";
+
+  const sections = ctx.teams.map((t) => {
+    const team = t as {
+      projectTitle: string;
+      courseName: string;
+      memberRole: string;
+      troubleshootingCount: number;
+      deliverableCount: number;
+      feedbackSnippet?: string;
+      retrospectiveSnippet?: string;
+      professorFeedbackSnippet?: string;
+    };
+    return {
+      title: String(team.projectTitle),
+      body: [
+        `수업: ${team.courseName}`,
+        `역할: ${team.memberRole}`,
+        `트러블슈팅 ${team.troubleshootingCount}건 · 산출물 ${team.deliverableCount}건`,
+        team.feedbackSnippet ? `팀 피드백: ${team.feedbackSnippet}` : "",
+        team.retrospectiveSnippet ? `회고 요약: ${team.retrospectiveSnippet}` : "",
+        team.professorFeedbackSnippet ? `교수 피드백: ${team.professorFeedbackSnippet}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    };
+  });
+
+  return {
+    summary,
+    problems_solved,
+    technologies,
+    role_description,
+    growth_reflection,
+    sections: sections.length > 0 ? sections : undefined,
+    generated_at: new Date().toISOString(),
+    model: "draft-db-only",
+  };
+}
+
 async function callOpenAi(
   apiKey: string,
   locale: "ko" | "en",
-  context: Awaited<ReturnType<typeof gatherContext>>
+  context: EdgeGatherContext
 ): Promise<ReportResponse> {
   const lang = locale === "en" ? "English" : "Korean";
   const payload = {
@@ -416,18 +527,6 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
-  const openaiKey = Deno.env.get("OPENAI_API_KEY");
-  if (!openaiKey?.trim()) {
-    return jsonResponse(
-      {
-        code: "NOT_IMPLEMENTED",
-        message:
-          "OPENAI_API_KEY가 Supabase Edge Secret에 등록되지 않았습니다. H-002(28_human_action_items.md)를 완료한 뒤 functions deploy 하세요.",
-      },
-      501
-    );
-  }
-
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceRoleKey) {
@@ -444,6 +543,12 @@ Deno.serve(async (req: Request) => {
     const locale = body.locale === "en" ? "en" : "ko";
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const context = await gatherContext(supabase, userId);
+
+    const openaiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!openaiKey?.trim()) {
+      return jsonResponse(buildDraftReportFromEdgeContext(context));
+    }
+
     const report = await callOpenAi(openaiKey, locale, context);
 
     return jsonResponse(report);

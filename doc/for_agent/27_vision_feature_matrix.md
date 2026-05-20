@@ -1,7 +1,7 @@
 ﻿# 27 — vision.md 기능 추적 매트릭스
 
 > **원본:** `vision.md` · **관련:** `02_current_state.md` · `for_human/26_vision_features_status.md`  
-> **갱신:** 2026-05-20 코드·DB 대조
+> **갱신:** 2026-05-20 vision 기반 점검
 
 ## 문제의식 → 플랫폼 (요약)
 
@@ -13,6 +13,27 @@
 | 성장 이력 부재 | 마이페이지·AI 리포트 | §3 |
 
 **데이터 열:** `Supabase` = `supabase-api.ts` · `—` = 미연동
+
+---
+
+## 0. vision 상단 추가요청사항 (신규)
+
+| 요청 | 현재 | 추적 ID | 구현 방향 |
+|------|------|---------|-----------|
+| 워크스페이스 업로드 용량 제한 완화 + 링크 게시물 지원 | ✅ | T-024 | TeamDetail 파일 업로드 500MB + URL 게시물 등록/열기 |
+| 교수(김교수)에게 학생용 팀플 리포트 노출 차단 | ✅ | T-025 | `MyPage` role 가드 + 교수 안내 블록 + E2E #14 |
+| 수업 생성 코드 자동 생성(해시형) | ✅ | T-026 | `CC-XXXX-XXXX` 자동 생성 + 재생성 버튼 |
+| 일정 입력 캘린더 선택 | ✅ | T-027 | `CoursesPage` 일정 입력 `type=\"date\"` 전환 |
+
+---
+
+## 완성도 점검 (vision 기준)
+
+| 관점 | 점수(체감) | 메모 |
+|------|------------|------|
+| 기존 vision 3축 | ~75% | 핵심 흐름은 동작, RLS/배포는 인간 블로커 |
+| 신규 추가요청 4건 | 100% | T-024~T-027 완료 |
+| 전체 vision 기준 | ~63% | vision 상단 추가요청 반영 완료 |
 
 ---
 
@@ -56,10 +77,11 @@
 | 종료·진행 프로젝트 표시 | `MyPage` | ✅ | Supabase | 팀 집계·시드 |
 | 리포트 3페이지 | `MyPage` | ✅ | `gatherContext` | DB |
 | A4 인쇄 | `AiReportPrintView` | ✅ | draft | LLM ❌ |
-| AI 문단 생성 | MyPage 버튼 | 🔶 | Edge=클라 집계 | deploy·H-002 |
+| AI 문단 생성 | MyPage 버튼 | 🔶 | Edge draft 200 / LLM | deploy·H-002 |
 | 교수 평가 → 리포트 | `gatherContext` | ✅ | 번들 v2 | 스니펫·건수 |
+| 집계 새로고침 | MyPage 버튼 | ✅ | `resolveReportContext` | 캐시·강제 refresh |
 
-**달성도:** UI ~75% · 읽기 ~60% · AI ~60% (DB+Edge 코드, deploy 대기)
+**달성도:** UI ~78% · 읽기 ~62% · AI ~65% (DB·Edge 초안, LLM deploy 대기)
 
 ---
 

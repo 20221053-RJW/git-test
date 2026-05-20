@@ -15,7 +15,7 @@
 
 ## 작업 시작 전 (필수)
 
-1. `vision.md` 읽기 (수정 금지)
+1. `vision.md` 읽기 (수정 금지) + `vision_snapshot.md`와 대조해 신규 "추가요청사항" 탐지
 2. `doc/starter.txt` 읽기 — **§0 계획 문서 제출 후 착수**
 3. `02_current_state.md` · `05_todo.md` · `17_handoff.md` 확인
 4. **`for_human/28_human_action_items.md` 확인** — 미완료 항목 점검·완료 반영 (`28_human_action_items.md` §세션 시작)
@@ -58,9 +58,11 @@
 - [ ] 개발 단계 갱신 (MVP / Alpha / Beta / Launch)
 - [ ] `04_service_launch_flow.md` — 런칭 준비 항목
 - [ ] 완료/미완료 기능 동기화 (`27_vision_feature_matrix.md`)
+- [ ] `vision_snapshot.md` 동기화 (원본 `vision.md`에 변경/추가요청이 생겼을 때)
 - [ ] `for_human/01_project_status.md` — 인간용 상태
 - [ ] `for_human/28_human_action_items.md` — 신규 인간 항목·완료 반영 (필수)
 - [ ] `for_human/25_ai_work_log.md` — **맨 위에** 항목 삽입, **`YYYY-MM-DD HH:mm:ss`** 작업 시각 (필수); **계획**란에 `plans/YYMMDD-N.md` + 한 줄 요약
+- [ ] 사용자가 **「동료에게 전달할 간략한 설명 작성해줘」** 요청 시: 설명글 제공 + `for_human/25_ai_work_log.md`의 「동료 보고 체크포인트」에 `여기까지 동료에게 보고함` 최신 위치 갱신
 - [ ] `for_agent/plans/YYMMDD-N.md` — 실행 결과·상태 done; `current_session_plan.md` 인덱스 갱신 (세션에 계획이 있었을 때)
 
 ## 우선순위 (doit.md 최상위)

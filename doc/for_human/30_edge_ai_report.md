@@ -48,8 +48,9 @@ supabase functions deploy generate-report
 
 1. CampusConnect 로그인 → **마이페이지**  
 2. **AI 리포트 생성 (베타)** 클릭  
-3. 501이 아니고 요약 문단이 갱신되면 성공  
-4. 실패 시: Edge Functions → Logs 탭에서 오류 확인
+3. **OPENAI 없이 배포만 한 경우:** 「DB 집계 초안이 생성되었습니다」+ `model: draft-db-only` (200) — 미리보기와 동일한 DB 초안  
+4. **OPENAI 등록 후:** AI 문단(`gpt-4o-mini`)이 갱신되면 성공  
+5. 404·함수 미배포: 「DB 활동 미리보기」 안내 — Edge Functions → Logs 확인
 
 ## 5. AI에게 알리기
 
