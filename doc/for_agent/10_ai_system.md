@@ -18,6 +18,7 @@
 | `AiReportPrintView` | ✅ A4 `@page` — 「A4 인쇄 / PDF」 |
 | `generate-report` Edge | ✅ Gemini `GEMINI_API_KEY` 우선 · 없으면 DB 초안 200 · `verify_jwt=false` |
 | `recommend-troubleshooting` Edge | ✅ 팀 상세 AI 추천 카드 · 동일 Secret · `verify_jwt=false` |
+| AI 생성 중 UI | ✅ `AiGeneratingIndicator` · `cc-gemini-*` 무지개 shimmer (`MyPage`·`TeamDetailPage`) |
 
 ## 권장 아키텍처
 

@@ -661,11 +661,168 @@
   animation: cc-loading-pulse 1.4s ease-in-out infinite;
 }
 
+/* Gemini AI 텍스트 생성 중 — 무지개 그라데이션 흐름 */
+@keyframes cc-gemini-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+.cc-gemini-generating {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  max-width: 100%;
+}
+
+.cc-gemini-generating--sm {
+  gap: 0.3rem;
+}
+
+.cc-gemini-generating__beam {
+  display: block;
+  height: 3px;
+  width: min(100%, 10rem);
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    #4285f4 0%,
+    #9b72cb 22%,
+    #d96570 44%,
+    #f4a261 58%,
+    #9b72cb 78%,
+    #4285f4 100%
+  );
+  background-size: 200% 100%;
+  animation: cc-gemini-flow 2.2s linear infinite;
+}
+
+.cc-gemini-generating--sm .cc-gemini-generating__beam {
+  height: 2px;
+  max-width: 7rem;
+}
+
+.cc-gemini-generating__label {
+  font-weight: 600;
+  line-height: 1.4;
+  background: linear-gradient(
+    90deg,
+    #4285f4 0%,
+    #9b72cb 22%,
+    #d96570 44%,
+    #f4a261 58%,
+    #9b72cb 78%,
+    #4285f4 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: cc-gemini-flow 2.2s linear infinite;
+}
+
+.cc-gemini-generating--sm .cc-gemini-generating__label {
+  font-size: 0.75rem;
+}
+
+.cc-gemini-shimmer-text {
+  font-weight: inherit;
+  background: linear-gradient(
+    90deg,
+    #4285f4 0%,
+    #9b72cb 22%,
+    #d96570 44%,
+    #f4a261 58%,
+    #9b72cb 78%,
+    #4285f4 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: cc-gemini-flow 2.2s linear infinite;
+}
+
+.cc-gemini-shimmer-panel {
+  border-radius: 0.75rem;
+  background: linear-gradient(
+    90deg,
+    rgba(66, 133, 244, 0.04) 0%,
+    rgba(155, 114, 203, 0.1) 25%,
+    rgba(217, 101, 112, 0.08) 50%,
+    rgba(244, 162, 97, 0.1) 75%,
+    rgba(66, 133, 244, 0.04) 100%
+  );
+  background-size: 200% 100%;
+  animation: cc-gemini-flow 2.8s ease-in-out infinite;
+}
+
+.cc-gemini-shimmer-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.cc-gemini-shimmer-lines__bar {
+  height: 0.65rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    #e8ecf4 0%,
+    #4285f4 18%,
+    #9b72cb 36%,
+    #d96570 52%,
+    #f4a261 68%,
+    #9b72cb 84%,
+    #e8ecf4 100%
+  );
+  background-size: 200% 100%;
+  animation: cc-gemini-flow 2s linear infinite;
+  opacity: 0.85;
+}
+
+.cc-gemini-ai-box-loading {
+  border-color: transparent !important;
+  background-image: linear-gradient(#fff, #fff),
+    linear-gradient(
+      90deg,
+      #4285f4,
+      #9b72cb,
+      #d96570,
+      #f4a261,
+      #9b72cb,
+      #4285f4
+    );
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  background-size: auto, 200% 100%;
+  animation: cc-gemini-flow 2.2s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cc-loading-spinner__ring,
   .cc-loading-spinner__dot,
   .cc-loading-message,
-  .cc-loading-panel {
+  .cc-loading-panel,
+  .cc-gemini-generating__beam,
+  .cc-gemini-generating__label,
+  .cc-gemini-shimmer-text,
+  .cc-gemini-shimmer-panel,
+  .cc-gemini-shimmer-lines__bar,
+  .cc-gemini-ai-box-loading {
     animation: none;
+  }
+
+  .cc-gemini-generating__label,
+  .cc-gemini-shimmer-text {
+    color: #4285f4;
+    background: none;
+    -webkit-background-clip: unset;
+    background-clip: unset;
   }
 }

@@ -263,6 +263,8 @@ function TeamCardComponent({
 
 // 팀 목록 페이지의 실제 시작점입니다.
 // 이 컴포넌트가 팀 카드 목록, 공지 목록, 푸터를 한 화면에 조립합니다.
+type UnassignedStudent = { id: string; name: string; studentId: string };
+
 export default function TeamsPage() {
   const navigate = useNavigate();
   const { courseId } = useParams<{ courseId?: string }>();
@@ -275,6 +277,9 @@ export default function TeamsPage() {
   const [newTeamName, setNewTeamName] = useState("");
   const [newProjectTitle, setNewProjectTitle] = useState("");
   const [creating, setCreating] = useState(false);
+  const [unassignedStudents, setUnassignedStudents] = useState<UnassignedStudent[]>([]);
+  const [loadingUnassigned, setLoadingUnassigned] = useState(false);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
 
   const reloadTeams = React.useCallback(async () => {
     if (!courseId) return;
@@ -294,7 +299,74 @@ export default function TeamsPage() {
     void reloadTeams();
   }, [reloadTeams]);
 
+  useEffect(() => {
+    if (!showCreateModal || !courseId) return;
+
+    let cancelled = false;
+
+    async function loadUnassigned() {
+      setLoadingUnassigned(true);
+      try {
+        const [students, assignedIds] = await Promise.all([
+          api.students.getAll(courseId),
+          api.teams.getAssignedStudentIds(courseId),
+        ]);
+        if (cancelled) return;
+
+        const assigned = new Set(assignedIds);
+        setUnassignedStudents(
+          students
+            .filter((student) => !assigned.has(student.id))
+            .map((student) => ({
+              id: student.id,
+              name: student.name,
+              studentId: student.studentId,
+            }))
+        );
+      } catch {
+        if (!cancelled) setUnassignedStudents([]);
+      } finally {
+        if (!cancelled) setLoadingUnassigned(false);
+      }
+    }
+
+    void loadUnassigned();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showCreateModal, courseId]);
+
+  useEffect(() => {
+    if (!showCreateModal) {
+      setSelectedMemberIds(new Set());
+      return;
+    }
+    if (isStudent && user?.id) {
+      setSelectedMemberIds(new Set([user.id]));
+    } else {
+      setSelectedMemberIds(new Set());
+    }
+  }, [showCreateModal, isStudent, user?.id]);
+
   const isArchived = course?.status === "archived";
+
+  const toggleCreateMember = (studentId: string) => {
+    if (isStudent && studentId === user?.id) return;
+    setSelectedMemberIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(studentId)) next.delete(studentId);
+      else next.add(studentId);
+      return next;
+    });
+  };
+
+  const closeCreateModal = () => {
+    setShowCreateModal(false);
+    setNewTeamName("");
+    setNewProjectTitle("");
+    setSelectedMemberIds(new Set());
+  };
 
   const hasMyTeamInCourse = useMemo(
     () =>
@@ -330,10 +402,10 @@ export default function TeamsPage() {
         {showCreateModal && courseId && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-            onClick={() => setShowCreateModal(false)}
+            onClick={closeCreateModal}
           >
             <div
-              className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+              className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
               <h2 className="mb-4 text-lg font-bold text-gray-900">새 팀 만들기</h2>
@@ -352,28 +424,85 @@ export default function TeamsPage() {
                   placeholder="프로젝트 제목 (선택)"
                   className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 />
-                <div className="flex gap-2 justify-end">
+
+                <div data-testid="teams-create-member-picker">
+                  <p className="mb-2 text-sm font-bold text-gray-800">
+                    팀원 선택
+                    <span className="ml-2 font-normal text-gray-500">
+                      ({selectedMemberIds.size}명)
+                    </span>
+                  </p>
+                  {isStudent && (
+                    <p className="mb-2 text-xs text-gray-500">
+                      본인은 팀장으로 자동 포함됩니다. 아래에서 팀에 넣을 수강생을 클릭하세요.
+                    </p>
+                  )}
+                  {!isStudent && selectedMemberIds.size > 0 && (
+                    <p className="mb-2 text-xs text-gray-500">
+                      가장 먼저 선택한 학생이 팀장이 됩니다.
+                    </p>
+                  )}
+                  {loadingUnassigned ? (
+                    <p className="text-sm text-gray-500">수강생 목록 불러오는 중…</p>
+                  ) : unassignedStudents.length === 0 ? (
+                    <p className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-4 text-sm text-gray-500">
+                      팀에 배정되지 않은 수강생이 없습니다.
+                    </p>
+                  ) : (
+                    <div className="flex max-h-48 flex-wrap gap-2 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      {unassignedStudents.map((student) => {
+                        const selected = selectedMemberIds.has(student.id);
+                        const lockedSelf = isStudent && student.id === user?.id;
+                        return (
+                          <button
+                            key={student.id}
+                            type="button"
+                            data-testid={`teams-create-member-${student.id}`}
+                            disabled={lockedSelf}
+                            onClick={() => toggleCreateMember(student.id)}
+                            className={`rounded-full border px-3 py-1.5 text-left text-sm transition-colors ${
+                              selected
+                                ? "border-[#155dfc] bg-[#eff6ff] font-bold text-[#155dfc]"
+                                : "border-gray-300 bg-white text-gray-700 hover:border-[#155dfc]/50"
+                            } ${lockedSelf ? "cursor-default ring-2 ring-[#155dfc]/30" : ""}`}
+                          >
+                            <span>{student.name}</span>
+                            {student.studentId && (
+                              <span className="ml-1 text-xs font-normal text-gray-500">
+                                ({student.studentId})
+                              </span>
+                            )}
+                            {lockedSelf && (
+                              <span className="ml-1 text-xs font-bold text-[#155dfc]">팀장</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-2">
                   <button
                     type="button"
                     className="rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
-                    onClick={() => setShowCreateModal(false)}
+                    onClick={closeCreateModal}
                   >
                     취소
                   </button>
                   <button
                     type="button"
                     data-testid="teams-create-submit"
-                    disabled={creating}
+                    disabled={creating || !newTeamName.trim()}
                     onClick={async () => {
                       setCreating(true);
                       try {
                         const { teamId } = await api.teams.create(courseId, {
                           name: newTeamName,
                           projectTitle: newProjectTitle,
+                          memberUserIds: [...selectedMemberIds],
                         });
-                        setShowCreateModal(false);
-                        setNewTeamName("");
-                        setNewProjectTitle("");
+                        closeCreateModal();
                         await reloadTeams();
                         navigate(`/app/courses/${courseId}/teams/${teamId}`);
                       } catch (error) {

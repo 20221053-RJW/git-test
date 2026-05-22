@@ -96,6 +96,18 @@
 | `.cc-textarea` | 자기소개 등 다줄 입력 (`cc-input`와 동일 포커스) |
 | `.cc-course-card__meta` | 라벨(대문자+아이콘) / 값 2열 grid |
 
+## AI 생성 중 (Gemini shimmer)
+
+| 클래스·컴포넌트 | 용도 |
+|-----------------|------|
+| `AiGeneratingIndicator` | 무지개 빔 + 라벨 (`ai-report-loading`, `team-trouble-ai-loading`) |
+| `GeminiShimmerText` | 생성 중 문단 텍스트 그라데이션 |
+| `GeminiShimmerPanel` | 리포트 콜아웃·팀 AI 문단 배경 흐름 |
+| `GeminiShimmerLines` | 추천 카드 플레이스홀더 줄 |
+| `.cc-gemini-ai-box-loading` | AI 추천 박스 테두리 무지개 (`TeamDetailPage`) |
+
+`prefers-reduced-motion: reduce` 시 애니메이션 off · 라벨은 단색 `#4285f4`.
+
 ## 규칙
 
 - 새 UI는 Shadcn 패턴 + `--cc-*` 토큰

@@ -74,6 +74,10 @@
 - [ ] E2E 전체 green (H-003, H-004 시크릿)
 - [o] vision 추가요청 구현 완료 (T-024~T-027·T-050~T-056·T-081~T-083 완료)
 
+## 최근 검증 (2026-05-22, C-260522-56 · Gemini shimmer)
+
+- **AI 로딩 UI:** `AiGeneratingIndicator` · `cc-gemini-*` — 마이페이지 리포트·팀 트러블슈팅 추천 생성 중
+
 ## 최근 검증 (2026-05-22, vision #56~59 · `260522-47`)
 
 - **#56:** `cc-input`·`ProfileFieldLabel`·`MyPageProfilePage` 여백

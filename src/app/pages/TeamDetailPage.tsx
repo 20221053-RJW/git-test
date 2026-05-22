@@ -13,6 +13,10 @@ import { supabase } from "../supabase";
 import M3Button from "../components/layout/M3Button";
 import PageHeader from "../components/layout/PageHeader";
 import UserAvatar from "../components/UserAvatar";
+import {
+  AiGeneratingIndicator,
+  GeminiShimmerLines,
+} from "../components/AiGeneratingIndicator";
 import TeamPeerReviewPage from "./TeamPeerReviewPage";
 import TeamRetrospectivePage from "./TeamRetrospectivePage";
 import type {
@@ -1026,7 +1030,9 @@ export default function TeamDetailPage() {
               <div className="space-y-4">
                 <div
                   data-testid="team-trouble-ai-recommendation"
-                  className="rounded-[10px] border-2 border-dashed border-[#93c5fd] bg-gradient-to-br from-[#eff6ff] to-white p-4 shadow-sm"
+                  className={`rounded-[10px] border-2 border-dashed border-[#93c5fd] bg-gradient-to-br from-[#eff6ff] to-white p-4 shadow-sm ${
+                    aiRecommendationLoading ? "cc-gemini-ai-box-loading" : ""
+                  }`}
                 >
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     <span className="rounded-full bg-[#155dfc] px-2 py-0.5 text-[10px] font-bold text-white">
@@ -1045,9 +1051,14 @@ export default function TeamDetailPage() {
                     )}
                   </div>
                   {aiRecommendationLoading && (
-                    <p className="text-xs text-[#6a7282]" data-testid="team-trouble-ai-loading">
-                      팀 활동을 분석해 추천을 생성하는 중…
-                    </p>
+                    <>
+                      <AiGeneratingIndicator
+                        size="sm"
+                        message="팀 활동을 분석해 추천을 생성하는 중…"
+                        testId="team-trouble-ai-loading"
+                      />
+                      <GeminiShimmerLines active lines={3} />
+                    </>
                   )}
                   {!aiRecommendationLoading && aiRecommendationError && (
                     <p className="text-xs text-[#dc2626]" data-testid="team-trouble-ai-error">

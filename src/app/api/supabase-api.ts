@@ -3675,9 +3675,63 @@ async function getMyTeamIdInCourseFromDb(courseId: string, userId: string): Prom
   return member?.team_id ?? null;
 }
 
+async function assertStudentsUnassignedInCourse(courseId: string, userIds: string[]): Promise<void> {
+  if (userIds.length === 0) return;
+
+  const courseStudents = await getCourseUsers(courseId, "student");
+  const allowedIds = new Set(courseStudents.map((user) => user.id));
+  const assignedIds = new Set(await getAssignedStudentIdsInCourseFromDb(courseId));
+
+  for (const userId of userIds) {
+    if (!allowedIds.has(userId)) {
+      throw new Error("수업에 등록되지 않은 학생이 포함되어 있습니다.");
+    }
+    if (assignedIds.has(userId)) {
+      throw new Error("이미 다른 팀에 속한 학생은 선택할 수 없습니다.");
+    }
+  }
+}
+
+async function insertTeamMembersInDb(
+  teamId: string,
+  courseId: string,
+  userIds: string[],
+  leaderUserId: string
+): Promise<void> {
+  const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
+  if (uniqueIds.length === 0) return;
+
+  if (!uniqueIds.includes(leaderUserId)) {
+    throw new Error("팀장은 팀원 목록에 포함되어야 합니다.");
+  }
+
+  await assertStudentsUnassignedInCourse(courseId, uniqueIds);
+
+  const orderedIds = [leaderUserId, ...uniqueIds.filter((id) => id !== leaderUserId)];
+  const users = await getUsersByIds(orderedIds);
+  const now = new Date().toISOString();
+
+  const rows = orderedIds.map((userId, index) => {
+    const user = users.find((item) => item.id === userId);
+    return {
+      id: `tm-${teamId}-${index + 1}`,
+      team_id: teamId,
+      user_id: userId,
+      initial: user?.name?.slice(0, 1) ?? "?",
+      color: TEAM_MEMBER_COLORS[index % TEAM_MEMBER_COLORS.length],
+      role: userId === leaderUserId ? "leader" : "member",
+      sort_order: index + 1,
+      created_at: now,
+    };
+  });
+
+  const { error } = await supabase.from("ai_team_members").insert(rows);
+  if (error) throw error;
+}
+
 async function createTeamInDb(
   courseId: string,
-  input: { name: string; projectTitle?: string }
+  input: { name: string; projectTitle?: string; memberUserIds?: string[] }
 ): Promise<{ teamId: string }> {
   const { currentUser } = await assertActiveCourseMembership(courseId);
 
@@ -3713,24 +3767,18 @@ async function createTeamInDb(
 
   if (teamError) throw teamError;
 
+  const requestedIds = Array.from(new Set((input.memberUserIds ?? []).filter(Boolean)));
+
   if (currentUser.role === "student") {
     const existingTeamId = await getMyTeamIdInCourseFromDb(courseId, currentUser.id);
     if (existingTeamId) {
       throw new Error("이미 다른 팀에 속해 있습니다. 탈퇴 후 새 팀을 만들 수 있습니다.");
     }
 
-    const { error: memberError } = await supabase.from("ai_team_members").insert({
-      id: `tm-${teamId}-1`,
-      team_id: teamId,
-      user_id: currentUser.id,
-      initial: currentUser.name?.slice(0, 1) ?? "?",
-      color: TEAM_MEMBER_COLORS[0],
-      role: "leader",
-      sort_order: 1,
-      created_at: now,
-    });
-
-    if (memberError) throw memberError;
+    const memberIds = [currentUser.id, ...requestedIds.filter((id) => id !== currentUser.id)];
+    await insertTeamMembersInDb(teamId, courseId, memberIds, currentUser.id);
+  } else if (requestedIds.length > 0) {
+    await insertTeamMembersInDb(teamId, courseId, requestedIds, requestedIds[0]);
   }
 
   return { teamId };

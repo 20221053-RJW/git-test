@@ -62,6 +62,7 @@ React 18.3 · TypeScript · Vite 6 · React Router 7 · Tailwind 4 · Radix/Shad
 - [o] `/app/mypage/profile` · `MyPageShell` · `ai_users.school` (vision #30·#56~58)
 - [o] MyPage 리포트 ↔ 내 정보 분리 · `?tab=profile` 리다이렉트 (C-45~46)
 - [o] `cc-input`·`cc-textarea` 패딩 · `ProfileFieldLabel` 여백 (#56)
+- [o] `AiGeneratingIndicator` · `cc-gemini-*` — AI 생성 중 무지개 shimmer (C-260522-56)
 - [o] `LandingPage` 푸터 제거 (#59) · 로그인/회원가입 장식 카드 제거 (C-50)
 - [o] `StudentsNetworkPage` 「내 정보 수정」→ `/mypage/profile` (#58)
 - [o] `cc-app-shell` · `cc-course-code` · 수강자들 UX (C-47~48)

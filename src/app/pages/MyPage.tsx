@@ -13,6 +13,11 @@ import StudentReportA4Sheet, {
   ReportSectionTitle,
 } from "../components/StudentReportA4Sheet";
 import EvalSchemaNotice from "../components/EvalSchemaNotice";
+import {
+  AiGeneratingIndicator,
+  GeminiShimmerPanel,
+  GeminiShimmerText,
+} from "../components/AiGeneratingIndicator";
 import type { AiReportContext, AiReportGenerateResponse } from "../types/ai-report";
 
 const REPORT_PAGES = [
@@ -281,6 +286,8 @@ export default function MyPage() {
         : aiReportLoading
           ? "AI가 리포트 문단을 작성하는 중입니다…"
           : `${profileName} 학생의 활동 데이터를 불러오는 중입니다.`;
+
+  const aiTextShimmer = aiReportLoading && canViewStudentReport;
 
   const dbTechnologyChips = reportView
     ? reportView.technologyChips
@@ -603,9 +610,11 @@ export default function MyPage() {
                 </p>
               )}
               {aiReportLoading && (
-                <p className="text-[10px] font-medium text-[#155dfc]" data-testid="ai-report-loading">
-                  AI가 리포트 문단을 작성하는 중입니다…
-                </p>
+                <AiGeneratingIndicator
+                  size="sm"
+                  message="AI가 리포트 문단을 작성하는 중입니다…"
+                  testId="ai-report-loading"
+                />
               )}
               {!aiReportLoading && aiReportMessage && (
                 <p className="text-[10px] text-[#64748b]" data-testid="ai-report-message">
@@ -665,18 +674,22 @@ export default function MyPage() {
                       data-testid={reportContext ? "mypage-summary-paragraph" : undefined}
                     >
                       {summaryBullets.map((line) => (
-                        <li key={line.slice(0, 48)}>{line}</li>
+                        <li key={line.slice(0, 48)}>
+                          <GeminiShimmerText active={aiTextShimmer}>{line}</GeminiShimmerText>
+                        </li>
                       ))}
                     </ul>
                   ) : (
-                    <ReportCallout>
-                      <p
-                        className="text-[11px] leading-[1.65] text-[#334155]"
-                        data-testid={reportContext ? "mypage-summary-paragraph" : undefined}
-                      >
-                        {summaryParagraph}
-                      </p>
-                    </ReportCallout>
+                    <GeminiShimmerPanel active={aiTextShimmer}>
+                      <ReportCallout>
+                        <p
+                          className="text-[11px] leading-[1.65] text-[#334155]"
+                          data-testid={reportContext ? "mypage-summary-paragraph" : undefined}
+                        >
+                          <GeminiShimmerText active={aiTextShimmer}>{summaryParagraph}</GeminiShimmerText>
+                        </p>
+                      </ReportCallout>
+                    </GeminiShimmerPanel>
                   )}
                 </div>
 
@@ -752,7 +765,7 @@ export default function MyPage() {
                         >
                           <p className="text-[10px] font-black text-[#155dfc]">{item.title}</p>
                           <p className="mt-1 line-clamp-2 text-[10.5px] leading-snug text-[#475569]">
-                            {item.body}
+                            <GeminiShimmerText active={aiTextShimmer}>{item.body}</GeminiShimmerText>
                           </p>
                         </li>
                       ))}
@@ -866,12 +879,19 @@ export default function MyPage() {
                               )}
                             </p>
                             {teamDetailBodies[team.teamId] && (
-                              <p
-                                className="mt-2 line-clamp-3 rounded-lg border border-[#e8eef8] bg-[#f8fbff] px-2.5 py-2 text-[10px] leading-snug text-[#334155]"
-                                data-testid={index === 0 ? "mypage-team-ai-body" : undefined}
+                              <GeminiShimmerPanel
+                                active={aiTextShimmer}
+                                className="mt-2 rounded-lg border border-[#e8eef8] bg-[#f8fbff] px-2.5 py-2"
                               >
-                                {teamDetailBodies[team.teamId]}
-                              </p>
+                                <p
+                                  className="line-clamp-3 text-[10px] leading-snug text-[#334155]"
+                                  data-testid={index === 0 ? "mypage-team-ai-body" : undefined}
+                                >
+                                  <GeminiShimmerText active={aiTextShimmer}>
+                                    {teamDetailBodies[team.teamId]}
+                                  </GeminiShimmerText>
+                                </p>
+                              </GeminiShimmerPanel>
                             )}
                           </div>
                         </div>
@@ -939,18 +959,22 @@ export default function MyPage() {
                       data-testid={page3UsesDb ? "mypage-page3-intro" : undefined}
                     >
                       {page3Bullets.map((line) => (
-                        <li key={line.slice(0, 40)}>{line}</li>
+                        <li key={line.slice(0, 40)}>
+                          <GeminiShimmerText active={aiTextShimmer}>{line}</GeminiShimmerText>
+                        </li>
                       ))}
                     </ul>
                   ) : (
-                    <ReportCallout>
-                      <p
-                        className="text-[11px] leading-[1.65]"
-                        data-testid={page3UsesDb ? "mypage-page3-intro" : undefined}
-                      >
-                        {page3Intro}
-                      </p>
-                    </ReportCallout>
+                    <GeminiShimmerPanel active={aiTextShimmer}>
+                      <ReportCallout>
+                        <p
+                          className="text-[11px] leading-[1.65]"
+                          data-testid={page3UsesDb ? "mypage-page3-intro" : undefined}
+                        >
+                          <GeminiShimmerText active={aiTextShimmer}>{page3Intro}</GeminiShimmerText>
+                        </p>
+                      </ReportCallout>
+                    </GeminiShimmerPanel>
                   )}
                 </div>
 
