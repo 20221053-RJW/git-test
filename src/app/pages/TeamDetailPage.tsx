@@ -10,6 +10,9 @@ import TeamTroubleshootingSubmitModal, {
   type TroubleshootingFormPayload,
 } from "../components/TeamTroubleshootingSubmitModal";
 import { supabase } from "../supabase";
+import M3Button from "../components/layout/M3Button";
+import PageHeader from "../components/layout/PageHeader";
+import UserAvatar from "../components/UserAvatar";
 import TeamPeerReviewPage from "./TeamPeerReviewPage";
 import TeamRetrospectivePage from "./TeamRetrospectivePage";
 import type {
@@ -722,102 +725,68 @@ export default function TeamDetailPage() {
     [feedbackCounts]
   );
 
-  return (
-    <div className="min-h-screen bg-[#f0f0f0]">
-      <div className="mx-auto w-full max-w-[1504px] px-4 py-6 sm:px-6 lg:px-8">
-        {/* 헤더 */}
-        <div className="mb-10">
-          <Link
-            to={courseId ? `/app/courses/${courseId}/teams` : "/app/teams"}
-            className="text-[#155dfc] text-base font-medium hover:underline mb-4 inline-block"
+  const workspaceHeaderActions =
+    isProfessor && isEvaluationOpen ? (
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <M3Button variant="outlined" type="button" onClick={() => setShowStudentEvalModal(true)}>
+          학생 평가
+        </M3Button>
+        <M3Button variant="filled" type="button" onClick={() => setShowEvalModal(true)}>
+          프로젝트 평가
+        </M3Button>
+        {courseId ? (
+          <M3Button
+            variant="tonal"
+            to={`/app/courses/${courseId}/peer-reviews`}
+            data-testid="course-peer-reviews-overview-link"
           >
-            ← 뒤로가기
-          </Link>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <h1
-                className="break-words text-2xl font-black text-[#155dfc] sm:text-[30px]"
-                data-testid="team-workspace-title"
-              >
-                {teamHeader?.name ?? "팀 워크스페이스"}
-              </h1>
-              {teamHeader?.projectTitle ? (
-                <p
-                  className="mt-1 text-base font-bold text-[#334155] sm:text-lg"
-                  data-testid="team-workspace-project-title"
-                >
-                  {teamHeader.projectTitle}
-                </p>
-              ) : null}
-              {teamHeader?.badge ? (
-                <p className="mt-1 text-sm font-medium text-[#64748b]">{teamHeader.badge}</p>
-              ) : null}
-            </div>
-            {isProfessor ? (
-              isEvaluationOpen ? (
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={() => setShowStudentEvalModal(true)}
-                    className="bg-white border-2 border-[#155dfc] text-[#155dfc] px-6 py-2.5 rounded-[10px] font-bold text-base hover:bg-blue-50 transition-colors"
-                  >
-                    학생 평가
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowEvalModal(true)}
-                    className="bg-[#155dfc] text-white px-6 py-2.5 rounded-[10px] font-bold text-base hover:bg-blue-700 transition-colors"
-                  >
-                    프로젝트 평가
-                  </button>
-                  {courseId && (
-                    <Link
-                      to={`/app/courses/${courseId}/peer-reviews`}
-                      data-testid="course-peer-reviews-overview-link"
-                      className="rounded-[10px] border border-[#cbd5e1] bg-white px-6 py-2.5 text-center text-base font-bold text-[#334155] hover:bg-[#f8fafc]"
-                    >
-                      동료평가 전체
-                    </Link>
-                  )}
-                </div>
-              ) : (
-                <span className="rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-800">
-                  수업 종료 후 평가 가능
-                </span>
-              )
-            ) : isStudent ? (
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
-                {isEvaluationOpen ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setShowPeerReviewModal(true)}
-                      data-testid="team-peer-review-modal-open"
-                      className="border-2 border-[#155dfc] bg-white px-6 py-2.5 rounded-[10px] font-bold text-base text-[#155dfc] hover:bg-blue-50 transition-colors text-center"
-                    >
-                      조원평가
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowRetrospectiveModal(true)}
-                      data-testid="team-retrospective-modal-open"
-                      className="bg-[#155dfc] text-white px-6 py-2.5 rounded-[10px] font-bold text-base hover:bg-blue-700 transition-colors text-center"
-                    >
-                      {retrospectiveSubmitted ? "회고록 수정" : "회고록 작성"}
-                    </button>
-                  </>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        </div>
+            동료평가 전체
+          </M3Button>
+        ) : null}
+      </div>
+    ) : isProfessor ? (
+      <span className="m3-body-medium cc-badge-warning inline-flex items-center rounded-[var(--m3-shape-medium)] px-4 py-2 font-medium">
+        수업 종료 후 평가 가능
+      </span>
+    ) : isStudent && isEvaluationOpen ? (
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <M3Button
+          variant="outlined"
+          type="button"
+          onClick={() => setShowPeerReviewModal(true)}
+          data-testid="team-peer-review-modal-open"
+        >
+          조원평가
+        </M3Button>
+        <M3Button
+          variant="filled"
+          type="button"
+          onClick={() => setShowRetrospectiveModal(true)}
+          data-testid="team-retrospective-modal-open"
+        >
+          {retrospectiveSubmitted ? "회고록 수정" : "회고록 작성"}
+        </M3Button>
+      </div>
+    ) : null;
+
+  return (
+    <div className="cc-page-main w-full">
+        <PageHeader
+          backTo={courseId ? `/app/courses/${courseId}/teams` : "/app/teams"}
+          title={teamHeader?.name ?? "팀 워크스페이스"}
+          subtitle={teamHeader?.projectTitle}
+          subtitleTestId="team-workspace-project-title"
+          badge={teamHeader?.badge}
+          titleTestId="team-workspace-title"
+          actions={workspaceHeaderActions}
+        />
 
         {teammates.length > 0 && (
           <div
-            className="mb-6 rounded-[14px] border border-[#dbeafe] bg-white p-5 shadow-sm"
+            className="m3-surface-card mb-6 p-5"
             data-testid="team-workspace-members"
           >
-            <h3 className="mb-3 text-base font-bold text-[#1c398e]">👥 팀원</h3>
+            <h3 className="m3-title-medium mb-3 text-[var(--cc-on-surface)]">👥 팀원</h3>
             <div className="flex flex-wrap gap-3">
               {teammates.map((member) => {
                 const isLeader = member.role === "leader";
@@ -834,13 +803,12 @@ export default function TeamDetailPage() {
                         : "border-gray-200 bg-[#f8fafc] hover:border-[#155dfc] hover:bg-[#eff6ff]"
                     }`}
                   >
-                    <span
-                      className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white ${
-                        isLeader ? "bg-[#155dfc]" : "bg-gray-400"
-                      }`}
-                    >
-                      {(member.name ?? "?").charAt(0)}
-                    </span>
+                    <UserAvatar
+                      name={member.name ?? "팀원"}
+                      imageUrl={member.imageUrl}
+                      size="xs"
+                      className={!member.imageUrl ? (isLeader ? "!bg-[#155dfc]" : "!bg-gray-400") : ""}
+                    />
                     <div className="text-left">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <p className="text-sm font-bold text-gray-900">{member.name}</p>
@@ -1386,7 +1354,6 @@ export default function TeamDetailPage() {
             </button>
           </div>
         )}
-      </div>
 
       {/* 채팅 모달 */}
       {showChatModal && (
@@ -1395,6 +1362,7 @@ export default function TeamDetailPage() {
           onClick={() => setShowChatModal(false)}
           role="dialog"
           aria-modal="true"
+          aria-labelledby="team-chat-modal-title"
           data-testid="team-chat-modal-overlay"
         >
           <div
@@ -1406,13 +1374,17 @@ export default function TeamDetailPage() {
             <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200 rounded-t-[14px] flex-shrink-0">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 bg-green-400 rounded-full"></span>
-                <h2 className="text-base font-bold text-black">채팅방</h2>
+                <h2 id="team-chat-modal-title" className="text-base font-bold text-black">
+                  채팅방
+                </h2>
               </div>
               <button
+                type="button"
                 onClick={() => setShowChatModal(false)}
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-700 font-bold"
+                className="cc-touch-target flex h-10 w-10 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+                aria-label="채팅 닫기"
               >
-                ✕
+                <span aria-hidden="true">✕</span>
               </button>
             </div>
 
@@ -1466,7 +1438,11 @@ export default function TeamDetailPage() {
                     익명
                   </label>
                   <div className="flex-1 bg-[#f3f4f6] rounded-full px-4 py-2 flex items-center gap-2">
+                    <label htmlFor="team-chat-message-input" className="sr-only">
+                      채팅 메시지
+                    </label>
                     <input
+                      id="team-chat-message-input"
                       type="text"
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}

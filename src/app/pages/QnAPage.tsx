@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import type { Course, Question } from "../types";
 import { api } from "../api/supabase-api";
 import { useAuth } from "../contexts/AuthContext";
+import PageLoading from "../components/layout/PageLoading";
 
 export default function QnAPage() {
   const { user } = useAuth();
@@ -133,11 +134,7 @@ export default function QnAPage() {
   };
 
   if (loading) {
-    return (
-      <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
-        <p className="text-gray-600">로딩 중...</p>
-      </div>
-    );
+    return <PageLoading message="Q&A를 불러오는 중…" testId="qna-page-loading" />;
   }
 
   return (
@@ -161,7 +158,7 @@ export default function QnAPage() {
           <h2 className="text-lg font-bold text-gray-900">새 질문</h2>
 
           {courses.length === 0 ? (
-            <p className="text-sm text-amber-700">
+            <p className="cc-text-warning text-sm">
               등록된 수업이 없어 질문을 올릴 수 없습니다.{" "}
               <Link to="/app/courses" className="font-medium text-blue-600 underline">
                 수업 등록

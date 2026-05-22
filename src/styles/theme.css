@@ -2,29 +2,29 @@
 
 :root {
   --font-size: 16px;
-  --background: #ffffff;
-  --foreground: oklch(0.145 0 0);
-  --card: #ffffff;
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #030213;
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.95 0.0058 264.53);
-  --secondary-foreground: #030213;
-  --muted: #ececf0;
-  --muted-foreground: #717182;
-  --accent: #e9ebef;
-  --accent-foreground: #030213;
-  --destructive: #d4183d;
+  --background: var(--cc-page, #f8fafc);
+  --foreground: var(--cc-on-surface, #0f172a);
+  --card: var(--cc-surface, #ffffff);
+  --card-foreground: var(--cc-on-surface, #0f172a);
+  --popover: var(--cc-surface, #ffffff);
+  --popover-foreground: var(--cc-on-surface, #0f172a);
+  --primary: var(--cc-primary, #155dfc);
+  --primary-foreground: var(--cc-on-primary, #ffffff);
+  --secondary: var(--cc-surface-container, #f1f5f9);
+  --secondary-foreground: var(--cc-on-surface, #0f172a);
+  --muted: var(--cc-surface-sunken, #f1f5f9);
+  --muted-foreground: var(--cc-text-muted, #64748b);
+  --accent: var(--cc-accent-subtle, #eff6ff);
+  --accent-foreground: var(--cc-on-primary-container, #0c1e4a);
+  --destructive: var(--cc-error, #dc2626);
   --destructive-foreground: #ffffff;
-  --border: rgba(0, 0, 0, 0.1);
+  --border: var(--cc-border, #e2e8f0);
   --input: transparent;
-  --input-background: #f3f3f5;
-  --switch-background: #cbced4;
+  --input-background: var(--cc-surface-sunken, #f1f5f9);
+  --switch-background: var(--cc-slate-300, #cbd5e1);
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: oklch(0.708 0 0);
+  --ring: var(--cc-primary, #155dfc);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -126,6 +126,7 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", Roboto, system-ui, sans-serif;
     overflow-x: hidden;
   }
 
@@ -137,6 +138,7 @@
   html {
     font-size: var(--font-size);
     overflow-x: hidden;
+    scrollbar-gutter: stable;
   }
 
   h1 {

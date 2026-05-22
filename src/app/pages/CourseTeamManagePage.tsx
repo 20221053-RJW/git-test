@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { api } from "../api/supabase-api";
 import { useAuth } from "../contexts/AuthContext";
 import type { TeamManagementInfo } from "../types";
+import PageLoading from "../components/layout/PageLoading";
 
 export default function CourseTeamManagePage() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -84,11 +85,7 @@ export default function CourseTeamManagePage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <p className="font-medium text-[#4a5565]">팀 정보를 불러오는 중입니다...</p>
-      </div>
-    );
+    return <PageLoading message="팀 정보를 불러오는 중…" testId="course-team-manage-loading" />;
   }
 
   if (!isStudent) {
@@ -144,7 +141,7 @@ export default function CourseTeamManagePage() {
         )}
 
         {info.myRole === "leader" && !info.isArchived && (
-          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <div className="cc-alert-warning mb-6 rounded-xl px-4 py-3 text-sm">
             현재 <strong>팀장</strong>입니다. 아래에서 다른 팀원에게 팀장을 넘길 수 있습니다.
           </div>
         )}

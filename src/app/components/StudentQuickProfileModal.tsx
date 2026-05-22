@@ -1,4 +1,6 @@
 import type { StudentProfile } from "../types";
+import UserAvatar from "./UserAvatar";
+import { LoadingSpinner } from "./layout/PageLoading";
 
 type StudentQuickProfileModalProps = {
   profile: StudentProfile | null;
@@ -40,7 +42,18 @@ export default function StudentQuickProfileModal({
           </button>
         </div>
 
-        {loading && <p className="text-sm text-gray-500">프로필을 불러오는 중…</p>}
+        {loading && (
+          <div
+            className="flex flex-col items-center gap-3 py-10"
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+            data-testid="student-quick-profile-loading"
+          >
+            <LoadingSpinner size="sm" />
+            <p className="text-sm font-medium text-[var(--cc-text-secondary)]">프로필을 불러오는 중…</p>
+          </div>
+        )}
 
         {errorMessage && !loading && (
           <p className="text-sm font-medium text-red-600" data-testid="student-quick-profile-error">
@@ -50,10 +63,13 @@ export default function StudentQuickProfileModal({
 
         {profile && !loading && (
           <div className="space-y-4" data-testid="student-quick-profile-body">
-            <div>
+            <div className="flex items-center gap-3">
+              <UserAvatar name={profile.name} imageUrl={profile.imageUrl} size="md" />
+              <div>
               <p className="text-base font-bold text-[#101828]">{profile.name}</p>
               <p className="text-sm text-[#6a7282]">{profile.studentId}</p>
               <p className="text-sm text-[#6a7282]">{profile.major}</p>
+              </div>
             </div>
             {profile.bio && (
               <div>

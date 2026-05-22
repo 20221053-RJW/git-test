@@ -1,10 +1,47 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import {
+  BookOpen,
+  ChevronDown,
+  ClipboardList,
+  GraduationCap,
+  Home,
+  Megaphone,
+  Star,
+  Users,
+  UsersRound,
+} from "lucide-react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { api } from "../api/supabase-api";
 import { useAuth } from "../contexts/AuthContext";
+import AppSideNav from "../components/layout/AppSideNav";
+import SideNavItem from "../components/layout/SideNavItem";
 import Footer from "../components/Footer";
 import Navigation from "../components/Navigation";
+import SkipLink from "../components/SkipLink";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
+import { getAppShellClassName } from "./appShell";
+
+function courseNavIcon(key: string) {
+  switch (key) {
+    case "overview":
+      return BookOpen;
+    case "students":
+      return Users;
+    case "teams":
+      return UsersRound;
+    case "announcements":
+      return Megaphone;
+    case "peer-reviews-overview":
+      return ClipboardList;
+    case "peer-review":
+    case "my-peer-reviews":
+      return Star;
+    case "professor-evals":
+      return GraduationCap;
+    default:
+      return undefined;
+  }
+}
 
 function MyTeamSideNavGroup({
   courseId,
@@ -42,10 +79,10 @@ function MyTeamSideNavGroup({
   const expanded = (open || isGroupActive) && !disabled;
 
   const rowActiveClass = isGroupActive
-    ? "bg-[#155dfc] text-white shadow-sm"
+    ? "m3-nav-item--active"
     : disabled
-      ? "cursor-not-allowed bg-gray-100 text-gray-400"
-      : "bg-gray-50 text-gray-600 hover:bg-[#eff6ff] hover:text-[#155dfc]";
+      ? "cursor-not-allowed opacity-40"
+      : "";
 
   const goToWorkspace = () => {
     if (disabled) return;
@@ -61,7 +98,7 @@ function MyTeamSideNavGroup({
       data-testid="course-detail-side-my-team-group"
     >
       <div
-        className={`flex w-full overflow-hidden rounded-xl text-sm font-bold transition-colors duration-200 ${rowActiveClass}`}
+        className={`m3-nav-item m3-nav-item--split w-full transition-colors duration-200 ${rowActiveClass}`}
       >
         <button
           type="button"
@@ -69,9 +106,12 @@ function MyTeamSideNavGroup({
           onClick={goToWorkspace}
           data-testid="course-detail-side-my-team"
           aria-expanded={expanded}
-          className="flex flex-1 items-center whitespace-nowrap px-4 py-3 text-left disabled:cursor-not-allowed"
+          className="flex flex-1 items-center gap-2 whitespace-nowrap px-3 py-2.5 text-left disabled:cursor-not-allowed"
         >
-          내 팀
+          <span className="m3-nav-item__icon" aria-hidden>
+            <Home className="h-4 w-4" strokeWidth={2} />
+          </span>
+          <span className="m3-nav-item__label">내 팀</span>
         </button>
         <button
           type="button"
@@ -82,12 +122,13 @@ function MyTeamSideNavGroup({
           }}
           aria-label="내 팀 하위 메뉴 펼치기"
           data-testid="course-detail-side-my-team-toggle"
-          className="flex items-center justify-center px-3 py-3 disabled:cursor-not-allowed"
+          className="flex shrink-0 items-center justify-center self-stretch border-l border-transparent px-2.5 py-3 disabled:cursor-not-allowed [.m3-nav-item--active_&]:border-[var(--cc-primary-border)]"
         >
           <ChevronDown
             className={`h-4 w-4 shrink-0 transition-transform duration-300 ease-in-out ${
               expanded ? "rotate-180" : ""
             }`}
+            aria-hidden
           />
         </button>
       </div>
@@ -103,60 +144,52 @@ function MyTeamSideNavGroup({
           }`}
         >
           <div
-            className="mt-1 flex flex-col gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-sm"
+            className="mt-1 flex flex-col gap-1 rounded-[var(--m3-shape-large)] border border-[var(--cc-outline-variant)] bg-[var(--cc-surface-container)] p-1"
             data-testid="course-detail-side-my-team-submenu"
           >
             {myTeamId ? (
-              <Link
+              <SideNavItem
                 to={workspacePath}
                 data-testid="course-detail-side-my-team-workspace"
                 onClick={() => setOpen(false)}
                 tabIndex={expanded ? 0 : -1}
-                className={`whitespace-nowrap rounded-lg px-3 py-2.5 text-sm font-bold transition-colors ${
-                  isWorkspaceActive
-                    ? "bg-[#eff6ff] text-[#155dfc]"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-[#155dfc]"
-                }`}
+                active={isWorkspaceActive}
+                sub
               >
                 워크스페이스
-              </Link>
+              </SideNavItem>
             ) : (
-              <Link
+              <SideNavItem
                 to={teamsListPath}
                 data-testid="course-detail-side-my-team-workspace"
                 onClick={() => setOpen(false)}
                 tabIndex={expanded ? 0 : -1}
-                className="whitespace-nowrap rounded-lg px-3 py-2.5 text-sm font-bold text-amber-800 transition-colors hover:bg-amber-50"
+                attention
+                sub
               >
                 팀 참여하기
-              </Link>
+              </SideNavItem>
             )}
-            <Link
+            <SideNavItem
               to={membersPath}
               data-testid="course-detail-side-my-team-members"
               onClick={() => setOpen(false)}
               tabIndex={expanded ? 0 : -1}
-              className={`whitespace-nowrap rounded-lg px-3 py-2.5 text-sm font-bold transition-colors ${
-                isMembersActive
-                  ? "bg-[#eff6ff] text-[#155dfc]"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-[#155dfc]"
-              }`}
+              active={isMembersActive}
+              sub
             >
               나의 팀 멤버
-            </Link>
-            <Link
+            </SideNavItem>
+            <SideNavItem
               to={managePath}
               data-testid="course-detail-side-team-manage"
               onClick={() => setOpen(false)}
               tabIndex={expanded ? 0 : -1}
-              className={`whitespace-nowrap rounded-lg px-3 py-2.5 text-sm font-bold transition-colors ${
-                isManageActive
-                  ? "bg-[#eff6ff] text-[#155dfc]"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-[#155dfc]"
-              }`}
+              active={isManageActive}
+              sub
             >
               팀 관리
-            </Link>
+            </SideNavItem>
           </div>
         </div>
       </div>
@@ -283,31 +316,21 @@ function CourseSideNavigation() {
   ] as const;
 
   return (
-    <aside className="w-full lg:w-[220px] lg:shrink-0">
-      <div className="rounded-2xl border border-gray-200 bg-white/95 p-3 shadow-sm backdrop-blur lg:sticky lg:top-24 lg:p-4">
-        <p className="mb-3 px-1 text-sm font-black text-gray-500">수업 메뉴</p>
-        <nav className="flex flex-col gap-2">
+    <AppSideNav label="수업 메뉴" labelId="course-side-nav-label">
           {sideNavItems.map((item) => {
             if (item.key === "overview") {
               return (
                 <React.Fragment key="nav-block-start">
-                  <Link
+                  <SideNavItem
                     key={item.key}
                     to={item.path || "#"}
                     data-testid={item.testId}
-                    onClick={(e) => {
-                      if (item.disabled) e.preventDefault();
-                    }}
-                    className={`whitespace-nowrap rounded-xl px-4 py-3 text-sm font-bold transition-colors ${
-                      item.active
-                        ? "bg-[#155dfc] text-white shadow-sm"
-                        : item.disabled
-                          ? "cursor-not-allowed bg-gray-100 text-gray-400"
-                          : "bg-gray-50 text-gray-600 hover:bg-[#eff6ff] hover:text-[#155dfc]"
-                    }`}
+                    active={item.active}
+                    disabled={item.disabled}
+                    icon={courseNavIcon(item.key)}
                   >
                     {item.label}
-                  </Link>
+                  </SideNavItem>
                   {isStudent && (
                     <MyTeamSideNavGroup
                       courseId={courseId}
@@ -321,52 +344,42 @@ function CourseSideNavigation() {
             }
 
             return (
-              <Link
+              <SideNavItem
                 key={item.key}
                 to={item.path || "#"}
                 data-testid={item.testId}
-                onClick={(e) => {
-                  if (item.disabled) e.preventDefault();
-                }}
-                className={`whitespace-nowrap rounded-xl px-4 py-3 text-sm font-bold transition-colors ${
-                  item.active
-                    ? "bg-[#155dfc] text-white shadow-sm"
-                    : item.disabled
-                      ? "cursor-not-allowed bg-gray-100 text-gray-400"
-                      : "bg-gray-50 text-gray-600 hover:bg-[#eff6ff] hover:text-[#155dfc]"
-                }`}
+                active={item.active}
+                disabled={item.disabled}
+                icon={courseNavIcon(item.key)}
               >
                 {item.label}
-              </Link>
+              </SideNavItem>
             );
           })}
-        </nav>
-      </div>
-    </aside>
+    </AppSideNav>
   );
 }
 
 export default function MainLayout() {
+  useDocumentTitle();
   const location = useLocation();
   const showCourseSideNavigation =
     /^\/app\/courses\/[^/]+/.test(location.pathname) ||
     location.pathname.startsWith("/app/students") ||
     location.pathname.startsWith("/app/teams");
-  const isCourseTeamsListPage = /^\/app\/courses\/[^/]+\/teams\/?$/.test(location.pathname);
-  const courseContentMaxWidth = isCourseTeamsListPage
-    ? "max-w-[min(100%,1920px)]"
-    : "max-w-7xl";
+  const appShellClass = getAppShellClassName(location.pathname);
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-gradient-to-b from-gray-50 to-white">
+    <div className="flex w-full flex-col bg-[var(--cc-surface-container)]">
+      <SkipLink />
       <Navigation />
-      <main className="flex-1 w-full">
+      <main id="main-content" className="cc-main-viewport w-full" tabIndex={-1}>
         {showCourseSideNavigation ? (
           <div
-            className={`mx-auto flex w-full ${courseContentMaxWidth} flex-col gap-4 px-4 py-4 sm:gap-6 sm:py-6 lg:flex-row lg:px-8`}
+            className={`flex w-full flex-col gap-4 py-4 sm:gap-6 sm:py-6 lg:flex-row lg:items-start ${appShellClass}`}
           >
             <CourseSideNavigation />
-            <div className="min-w-0 flex-1">
+            <div className="cc-page-main">
               <Outlet />
             </div>
           </div>

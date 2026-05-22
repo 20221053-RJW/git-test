@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { api } from "../api/supabase-api";
 import StudentQuickProfileModal from "../components/StudentQuickProfileModal";
+import PageLoading from "../components/layout/PageLoading";
 import { useAuth } from "../contexts/AuthContext";
 import type { Course, StudentProfile, TeamMember } from "../types";
 
@@ -92,16 +93,12 @@ export default function CourseDetailPage() {
   };
 
   if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <p className="text-gray-600">{"\uB85C\uB529 \uC911..."}</p>
-      </div>
-    );
+    return <PageLoading message="수업 정보를 불러오는 중…" testId="course-detail-loading" />;
   }
 
   if (!course) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="cc-page-main w-full py-4">
         <p className="text-gray-600">{"\uACFC\uBAA9\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."}</p>
         <Link to="/app/courses" className="text-blue-600 hover:underline mt-4 inline-block">
           {"\uBAA9\uB85D\uC73C\uB85C \uB3CC\uC544\uAC00\uAE30"}
@@ -111,7 +108,7 @@ export default function CourseDetailPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="cc-page-main w-full">
       <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-8">
         <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>

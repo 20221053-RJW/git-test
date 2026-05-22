@@ -1,40 +1,57 @@
-import React from "react";
+import { useLocation } from "react-router";
+import { getAppShellClassName } from "../layouts/appShell";
+import PlaceholderFooterLink from "./PlaceholderFooterLink";
 
 type FooterProps = {
   variant?: "default" | "compact";
 };
 
 export default function Footer({ variant = "default" }: FooterProps) {
+  const location = useLocation();
+  const shellClass = getAppShellClassName(location.pathname);
+
+  const footerLinks = (
+    <>
+      <PlaceholderFooterLink className="hover:text-white">이용약관</PlaceholderFooterLink>
+      <PlaceholderFooterLink className="hover:text-white">개인정보처리방침</PlaceholderFooterLink>
+      <PlaceholderFooterLink className="hover:text-white">FAQ</PlaceholderFooterLink>
+    </>
+  );
+
   if (variant === "compact") {
     return (
-      <footer className="bg-[#0f172a] px-4 py-6 sm:px-8">
-        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 text-sm sm:grid-cols-3">
+      <footer className="bg-[var(--cc-footer)] py-6" role="contentinfo">
+        <div className={`${shellClass} grid grid-cols-1 gap-6 text-sm sm:grid-cols-3`}>
           <div>
-            <h3 className="font-bold text-white mb-2">CampusConnect</h3>
-            <p className="text-gray-400 text-xs">
+            <h3 className="mb-2 font-bold text-white">CampusConnect</h3>
+            <p className="text-xs text-gray-300">
               학생들의 팀 프로젝트 협업을 위한 올인원 플랫폼
             </p>
           </div>
 
           <div>
-            <h4 className="font-semibold text-white mb-2">연락처</h4>
-            <div className="space-y-1 text-xs text-gray-400">
-              <p>support@campusconnect.com</p>
-              <p>02-1234-5678</p>
+            <h4 className="mb-2 font-semibold text-white">연락처</h4>
+            <div className="space-y-1 text-xs text-gray-300">
+              <p>
+                <a href="mailto:support@campusconnect.com" className="underline-offset-2 hover:underline">
+                  support@campusconnect.com
+                </a>
+              </p>
+              <p>
+                <a href="tel:+82212345678" className="underline-offset-2 hover:underline">
+                  02-1234-5678
+                </a>
+              </p>
             </div>
           </div>
 
           <div>
-            <h4 className="font-semibold text-white mb-2">바로가기</h4>
-            <div className="flex gap-3 text-xs text-gray-400">
-              <a href="#" className="hover:text-white">이용약관</a>
-              <a href="#" className="hover:text-white">개인정보처리방침</a>
-              <a href="#" className="hover:text-white">FAQ</a>
-            </div>
+            <h4 className="mb-2 font-semibold text-white">바로가기</h4>
+            <div className="flex flex-wrap gap-3 text-xs text-gray-300">{footerLinks}</div>
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto mt-4 pt-4 border-t border-gray-800 text-center text-xs text-gray-500">
+        <div className={`${shellClass} mt-4 border-t border-gray-700 pt-4 text-center text-xs text-gray-300`}>
           <p>© 2026 CampusConnect. All rights reserved. 본 서비스는 교육 목적으로 제작된 프로젝트입니다.</p>
         </div>
       </footer>
@@ -42,35 +59,57 @@ export default function Footer({ variant = "default" }: FooterProps) {
   }
 
   return (
-    <footer className="bg-[#111827] text-white mt-16">
-      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-4 py-10 sm:px-6 md:grid-cols-3 md:gap-10 lg:px-8">
+    <footer className="mt-16 bg-[var(--cc-footer)] text-white" role="contentinfo">
+      <div className={`${shellClass} grid grid-cols-1 gap-8 py-10 md:grid-cols-3 md:gap-10`}>
         <div>
-          <p className="text-xl font-bold mb-2">CampusConnect</p>
-          <p className="text-gray-400 text-sm leading-relaxed">
+          <p className="mb-2 text-xl font-bold">CampusConnect</p>
+          <p className="text-sm leading-relaxed text-gray-300">
             학생들의 팀 프로젝트 협업을 위한
             <br />
             올인원 플랫폼
           </p>
         </div>
         <div>
-          <p className="font-semibold mb-3">연락처</p>
-          <ul className="text-gray-400 text-sm space-y-2">
-            <li>✉ support@campusconnect.com</li>
-            <li>📞 02-1234-5678</li>
-            <li>📍 서울특별시 광진구 능동로 209</li>
+          <p className="mb-3 font-semibold">연락처</p>
+          <ul className="space-y-2 text-sm text-gray-300">
+            <li>
+              <a href="mailto:support@campusconnect.com" className="underline-offset-2 hover:underline">
+                support@campusconnect.com
+              </a>
+            </li>
+            <li>
+              <a href="tel:+82212345678" className="underline-offset-2 hover:underline">
+                02-1234-5678
+              </a>
+            </li>
+            <li>서울특별시 광진구 능동로 209</li>
           </ul>
         </div>
         <div>
-          <p className="font-semibold mb-3">바로가기</p>
-          <ul className="text-gray-400 text-sm space-y-2">
-            <li><a href="#" className="hover:text-white transition-colors">이용약관</a></li>
-            <li><a href="#" className="hover:text-white transition-colors">개인정보처리방침</a></li>
-            <li><a href="#" className="hover:text-white transition-colors">공지사항</a></li>
-            <li><a href="#" className="hover:text-white transition-colors">FAQ</a></li>
+          <p className="mb-3 font-semibold">바로가기</p>
+          <ul className="space-y-2 text-sm text-gray-300">
+            <li>
+              <PlaceholderFooterLink className="hover:text-white transition-colors">
+                이용약관
+              </PlaceholderFooterLink>
+            </li>
+            <li>
+              <PlaceholderFooterLink className="hover:text-white transition-colors">
+                개인정보처리방침
+              </PlaceholderFooterLink>
+            </li>
+            <li>
+              <PlaceholderFooterLink className="hover:text-white transition-colors">
+                공지사항
+              </PlaceholderFooterLink>
+            </li>
+            <li>
+              <PlaceholderFooterLink className="hover:text-white transition-colors">FAQ</PlaceholderFooterLink>
+            </li>
           </ul>
         </div>
       </div>
-      <div className="border-t border-gray-800 py-6 text-center text-gray-500 text-xs space-y-1">
+      <div className={`${shellClass} space-y-1 border-t border-gray-700 py-6 text-center text-xs text-gray-300`}>
         <p>© 2026 CampusConnect. All rights reserved.</p>
         <p>본 서비스는 교육 목적으로 제작된 프로젝트입니다.</p>
       </div>

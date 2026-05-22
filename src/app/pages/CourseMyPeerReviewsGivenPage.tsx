@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { api, type MyPeerReviewGivenItem } from "../api/supabase-api";
 import EvalSchemaNotice from "../components/EvalSchemaNotice";
+import PageLoading from "../components/layout/PageLoading";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function CourseMyPeerReviewsGivenPage() {
@@ -52,7 +53,7 @@ export default function CourseMyPeerReviewsGivenPage() {
 
   if (!isStudent) {
     return (
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm font-bold text-amber-900">
+      <div className="cc-alert-warning rounded-xl p-6 text-sm font-bold">
         학생 계정에서만 「내 조원평가」를 조회할 수 있습니다.
       </div>
     );
@@ -78,7 +79,9 @@ export default function CourseMyPeerReviewsGivenPage() {
         legacyPeerDisplayTable={legacyPeerDisplayTable}
       />
 
-      {loading && <p className="text-sm text-[#64748b]">불러오는 중…</p>}
+      {loading && (
+        <PageLoading layout="inline" size="sm" message="내가 남긴 평가를 불러오는 중…" testId="my-peer-reviews-given-loading" />
+      )}
       {error && (
         <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">
           {error}
@@ -99,12 +102,12 @@ export default function CourseMyPeerReviewsGivenPage() {
           >
             <h2 className="text-lg font-black text-[#1c398e]">{item.teammateName}</h2>
             {item.goodKeywords.length > 0 && (
-              <p className="mt-2 text-sm text-emerald-800">
+              <p className="cc-text-success mt-2 text-sm">
                 <span className="font-bold">강점:</span> {item.goodKeywords.join(", ")}
               </p>
             )}
             {item.badKeywords.length > 0 && (
-              <p className="mt-1 text-sm text-amber-800">
+              <p className="cc-text-warning mt-1 text-sm">
                 <span className="font-bold">보완:</span> {item.badKeywords.join(", ")}
               </p>
             )}

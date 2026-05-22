@@ -6,6 +6,8 @@ export interface BaseProfile {
   name: string;
   email: string;
   role: UserRole;
+  /** ai_users.image — data URL 또는 공개 URL */
+  imageUrl?: string;
 }
 
 // 사용자 관련 타입
@@ -81,6 +83,7 @@ export interface TeamMember {
   initial?: string;
   color?: string;
   role?: "leader" | "member";
+  imageUrl?: string;
 }
 
 // 팀 카드 안의 최근 활동 기록입니다.
@@ -276,6 +279,7 @@ export interface PeerReviewTeammate {
   name: string;
   contribution: number;
   role?: "leader" | "member";
+  imageUrl?: string;
 }
 
 /** 수업별 내 팀 관리 화면 */

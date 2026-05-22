@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { api, type MyPageArchivedCourse } from "../api/supabase-api";
 import EvalSchemaNotice from "../components/EvalSchemaNotice";
+import PageLoading from "../components/layout/PageLoading";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function MyPageArchivedCoursesPage() {
@@ -55,7 +56,7 @@ export default function MyPageArchivedCoursesPage() {
 
   if (!isStudent) {
     return (
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm font-bold text-amber-900">
+      <div className="cc-alert-warning rounded-xl p-6 text-sm font-bold">
         학생 계정에서만 과거 수업을 조회할 수 있습니다.
       </div>
     );
@@ -84,7 +85,9 @@ export default function MyPageArchivedCoursesPage() {
         legacyPeerDisplayTable={legacyPeerDisplayTable}
       />
 
-      {loading && <p className="text-sm text-[#64748b]">불러오는 중…</p>}
+      {loading && (
+        <PageLoading layout="inline" size="sm" message="과거 수업을 불러오는 중…" testId="archived-courses-loading" />
+      )}
       {error && (
         <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">
           {error}

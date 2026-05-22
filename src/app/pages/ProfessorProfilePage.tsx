@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api/supabase-api";
 import { useAuth } from "../contexts/AuthContext";
 import type { ProfessorProfile } from "../types";
+import PageLoading from "../components/layout/PageLoading";
 
 export default function ProfessorProfilePage() {
   const { user, isProfessor, isAdmin, refreshProfile } = useAuth();
@@ -40,11 +41,7 @@ export default function ProfessorProfilePage() {
   }
 
   if (loading) {
-    return (
-      <div className="container mx-auto max-w-4xl px-4 py-8">
-        <p className="text-gray-600">프로필을 불러오는 중…</p>
-      </div>
-    );
+    return <PageLoading message="프로필을 불러오는 중…" testId="professor-profile-loading" />;
   }
 
   const display = profile ?? {
@@ -62,7 +59,7 @@ export default function ProfessorProfilePage() {
     <div className="container mx-auto max-w-4xl px-4 py-8">
       <div className="rounded-lg bg-white p-8 shadow-md">
         <div className="mb-6 flex items-center">
-          <div className="mr-6 flex h-24 w-24 items-center justify-center rounded-full bg-indigo-600 text-3xl font-bold text-white">
+          <div className="mr-6 flex h-24 w-24 items-center justify-center rounded-full bg-[var(--cc-primary)] text-3xl font-bold text-[var(--cc-on-primary)]">
             {display.name.charAt(0)}
           </div>
           <div>
@@ -136,7 +133,7 @@ export default function ProfessorProfilePage() {
             type="submit"
             data-testid="professor-profile-save"
             disabled={saving}
-            className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-60"
+            className="rounded-lg bg-[var(--cc-primary)] px-5 py-2 text-sm font-bold text-[var(--cc-on-primary)] hover:bg-[var(--cc-primary-hover)] disabled:opacity-60"
           >
             {saving ? "저장 중…" : "저장"}
           </button>

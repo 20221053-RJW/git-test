@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router";
+import PlaceholderFooterLink from "../components/PlaceholderFooterLink";
+import { useDocumentTitle } from "../hooks/useDocumentTitle";
 import { useAuth } from "../contexts/AuthContext";
 import type { Signupinput } from "../contexts/AuthContext";
 import { UserRole } from "../types";
@@ -20,6 +22,7 @@ const SIGNUP_SKILL_PRESETS = [
 ] as const;
 
 export default function SignInPage() {
+  useDocumentTitle();
   // 페이지 이동을 도와주는 함수입니다.
   // 예: 회원가입 성공 후 "/app/courses" 페이지로 이동할 때 사용합니다.
   const navigate = useNavigate();
@@ -335,10 +338,10 @@ export default function SignInPage() {
 
           <div>
             <h4 className="font-semibold text-white mb-2">바로가기</h4>
-            <div className="flex gap-3 text-xs text-gray-400">
-              <a href="#" className="hover:text-white">이용약관</a>
-              <a href="#" className="hover:text-white">개인정보처리방침</a>
-              <a href="#" className="hover:text-white">FAQ</a>
+            <div className="flex flex-wrap gap-3 text-xs text-gray-300">
+              <PlaceholderFooterLink className="hover:text-white">이용약관</PlaceholderFooterLink>
+              <PlaceholderFooterLink className="hover:text-white">개인정보처리방침</PlaceholderFooterLink>
+              <PlaceholderFooterLink className="hover:text-white">FAQ</PlaceholderFooterLink>
             </div>
           </div>
         </div>

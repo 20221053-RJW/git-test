@@ -1,6 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
+import { getAppShellClassName } from "../layouts/appShell";
+import UserAvatar from "./UserAvatar";
 
 interface NavItem {
   label: string;
@@ -10,6 +12,8 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: "수업", path: "/app/courses" },
 ];
+
+const DESKTOP_NAV_MQ = "(min-width: 768px)";
 
 export default function Navigation() {
   const location = useLocation();
@@ -26,66 +30,96 @@ export default function Navigation() {
     return location.pathname === path;
   };
 
+  useEffect(() => {
+    setIsOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const mq = window.matchMedia(DESKTOP_NAV_MQ);
+    const sync = () => {
+      if (mq.matches) setIsOpen(false);
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  const appShellClass = getAppShellClassName(location.pathname);
+
   return (
-    <header className="sticky top-0 z-40 w-full border-b-3 border-[#3676ff] bg-black/95 shadow-lg backdrop-blur">
-      <div className="mx-auto flex min-h-16 w-full max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+    <header className="m3-top-app-bar sticky top-0 z-40 w-full" data-testid="app-top-nav">
+      <div
+        className={`relative flex min-h-[var(--cc-nav-height)] items-center justify-between gap-3 py-2 ${appShellClass}`}
+      >
         <Link to={logoPath} className="flex min-w-0 items-center">
-          <h1 className="truncate text-xl font-bold tracking-wide text-white sm:text-2xl">
-            CampusConnect
-          </h1>
+          <span className="m3-top-app-bar__title truncate">CampusConnect</span>
         </Link>
+
+        {/* 모바일 전용 — m3-icon-btn 사용 금지(display가 md:hidden을 덮음) */}
         <button
           type="button"
-          className="rounded-lg border border-white/15 px-3 py-2 text-sm font-bold text-white md:hidden"
-          onClick={() => setIsOpen(!isOpen)}
-          aria-label="메뉴 열기"
+          className="inline-flex min-h-10 items-center rounded-[var(--m3-shape-full)] border border-[var(--cc-footer-border)] px-3 py-2 text-[var(--cc-on-footer-muted)] transition-colors hover:bg-white/10 md:hidden"
+          onClick={() => setIsOpen((prev) => !prev)}
+          aria-label={isOpen ? "메뉴 닫기" : "메뉴 열기"}
+          aria-expanded={isOpen}
+          aria-controls="app-top-nav-menu"
+          data-testid="app-top-nav-menu-toggle"
         >
-          {isOpen ? "닫기" : "메뉴"}
+          <span className="m3-top-app-bar__menu-toggle px-1">{isOpen ? "닫기" : "메뉴"}</span>
         </button>
+
         <div
-          className={`w-full flex-col items-stretch gap-3 md:flex md:w-auto md:flex-row md:items-center md:gap-8 ${isOpen ? "flex" : "hidden"}`}
+          id="app-top-nav-menu"
+          className={`absolute left-0 right-0 top-full z-50 flex-col gap-2 border-b border-[var(--cc-footer-border)] bg-[var(--cc-footer)] px-4 py-3 shadow-[var(--m3-elevation-2)] md:static md:flex md:w-auto md:flex-row md:items-center md:border-0 md:bg-transparent md:p-0 md:shadow-none ${
+            isOpen ? "flex" : "hidden md:flex"
+          }`}
         >
           {shouldShowTopNav && (
-            <nav className="flex flex-col gap-2 md:flex-row md:items-center md:gap-8">
+            <nav className="flex flex-col gap-1 md:flex-row md:items-center md:gap-1" aria-label="주요 메뉴">
               {navItems.map((item) => (
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`rounded-lg border-b-2 px-3 py-2 text-center font-semibold transition-colors md:px-0 md:py-0 ${
-                    isActive(item.path)
-                      ? "border-[#3676ff] bg-white/10 text-[#3676ff] md:bg-transparent"
-                      : "border-transparent text-gray-400 hover:bg-white/10 hover:text-white md:hover:bg-transparent"
+                  onClick={() => setIsOpen(false)}
+                  className={`m3-top-app-bar__nav-link text-center ${
+                    isActive(item.path) ? "m3-top-app-bar__nav-link--active" : ""
                   }`}
                 >
-                  <span>{item.label}</span>
+                  {item.label}
                 </Link>
               ))}
             </nav>
           )}
-          <div className="flex flex-col items-stretch gap-4 md:flex-row md:items-center">
+          <div className="flex flex-col items-stretch gap-2 border-t border-[var(--cc-footer-border)] pt-2 md:flex-row md:items-center md:border-0 md:pt-0 md:pl-2">
             <Link
               to="/app/mypage"
-              className="flex items-center justify-center gap-2 rounded-lg px-3 py-2 hover:bg-white/10 md:px-0 md:py-0"
+              onClick={() => setIsOpen(false)}
+              className="m3-top-app-bar__nav-link flex items-center justify-center gap-2 md:inline-flex"
             >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#2f67df]">
-                <span className="text-white text-sm font-bold">{user?.name.charAt(0) || "U"}</span>
-              </div>
-              <div className="border-b border-transparent">
-                <span
-                  className={`text-sm font-medium ${
-                    location.pathname === "/app/mypage" ? "text-[#1862ff]" : "text-white"
-                  }`}
-                >
-                  {user?.name || "사용자"}
-                </span>
-              </div>
+              <UserAvatar
+                name={user?.name || "사용자"}
+                imageUrl={user?.imageUrl}
+                size="xs"
+              />
+              <span
+                className={
+                  location.pathname === "/app/mypage"
+                    ? "m3-top-app-bar__user-name m3-top-app-bar__user-name--active"
+                    : "m3-top-app-bar__user-name m3-top-app-bar__user-name--idle"
+                }
+              >
+                {user?.name || "사용자"}
+              </span>
             </Link>
             {isAuthenticated && (
               <button
                 type="button"
                 data-testid="logout-button"
-                onClick={() => logout()}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-white/10 hover:text-white"
+                onClick={() => {
+                  setIsOpen(false);
+                  logout();
+                }}
+                className="m3-top-app-bar__nav-link cc-touch-target"
               >
                 로그아웃
               </button>

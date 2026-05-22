@@ -99,7 +99,7 @@ function TeamCardComponent({
     <div
       // 카드 아무 곳이나 눌러도 해당 팀 상세 페이지로 이동하게 합니다.
       onClick={onClick}
-      className={`flex h-full min-w-0 flex-col cursor-pointer overflow-hidden rounded-[14px] border bg-white shadow-[2px_4px_4px_2px_rgba(224,224,224,0.28)] transition-all hover:-translate-y-0.5 hover:shadow-lg ${
+      className={`cc-hover-elevate flex h-full min-w-0 flex-col cursor-pointer overflow-hidden rounded-[14px] border bg-white shadow-[2px_4px_4px_2px_rgba(224,224,224,0.28)] ${
         isMyTeam ? "border-[#155dfc] ring-2 ring-[#bfdbfe]" : "border-gray-200"
       }`}
     >
@@ -241,11 +241,19 @@ function TeamCardComponent({
         {team.members.map((member) => (
           <div
             key={member.id}
-            className={`w-8 h-8 ${member.color} rounded-full flex items-center justify-center border-2 border-white shadow-sm`}
+            className={`w-8 h-8 ${member.imageUrl ? "" : member.color} rounded-full flex items-center justify-center border-2 border-white shadow-sm overflow-hidden`}
           >
-            <span className="text-[10px] font-bold text-[#364153]">
-              {member.initial}
-            </span>
+            {member.imageUrl ? (
+              <img
+                src={member.imageUrl}
+                alt={member.name ? `${member.name} 프로필` : "팀원 프로필"}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <span className="text-[10px] font-bold text-[#364153]">
+                {member.initial}
+              </span>
+            )}
           </div>
         ))}
       </div>
@@ -297,9 +305,7 @@ export default function TeamsPage() {
   );
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
-      {/* 팀 목록: 상위 MainLayout과 함께 가로를 넓혀 데스크탑 5열 그리드를 수용합니다 (vision #20). */}
-      <div className="w-full min-w-0 flex-1 py-2 sm:py-4">
+    <div className="cc-page-main w-full">
         {/* 페이지 제목과 새 팀 만들기 버튼이 있는 상단 영역입니다. */}
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-black tracking-tight text-[#155dfc] sm:text-3xl">
@@ -467,7 +473,6 @@ export default function TeamsPage() {
             ))}
           </div>
         </div>
-      </div>
     </div>
   );
 }

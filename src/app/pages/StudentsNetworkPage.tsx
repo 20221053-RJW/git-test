@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useParams } from "react-router";
 import { Search, BookOpen, Clock, MapPin, FlaskConical, User, Pencil, Shuffle } from "lucide-react";
 import { api } from "../api/supabase-api";
+import PageLoading from "../components/layout/PageLoading";
 import { useAuth } from "../contexts/AuthContext";
 import type { Course, ProfessorProfile } from "../types";
 import {
@@ -955,20 +956,23 @@ export default function StudentsNetworkPage() {
 
   const selfStudent = useMemo(() => {
     const fromList = students.find((s) => s.isSelf);
-    if (fromList) return fromList;
-    if (isStudent && user?.role === "student") {
-      return {
-        id: user.id,
-        name: user.name,
-        isSelf: true,
-        major: user.major ?? "",
-        bio: user.bio ?? "",
-        tags: normalizeStudentTags([], user.skills),
-        avatar: nameToAvatarInitial(user.name),
-      } satisfies Student;
-    }
-    return null;
-  }, [students, isStudent, user]);
+    const base: Student | null =
+      fromList ??
+      (isStudent && user?.role === "student"
+        ? {
+            id: user.id,
+            name: user.name,
+            isSelf: true,
+            major: user.major ?? "",
+            bio: user.bio ?? "",
+            tags: normalizeStudentTags([], user.skills),
+            avatar: nameToAvatarInitial(user.name),
+          }
+        : null);
+    if (!base) return null;
+    if (user?.imageUrl) return { ...base, image: user.imageUrl };
+    return base;
+  }, [students, isStudent, user, user?.imageUrl]);
 
   const displaySelfStudent = useMemo(
     () => (selfStudent ? enrichStudentForDisplay(selfStudent, editForm) : null),
@@ -1022,17 +1026,13 @@ export default function StudentsNetworkPage() {
   }, [courseId, isProfessor, isAdmin]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#f3f4f6] flex items-center justify-center">
-        <p className="text-[#4a5565] font-medium">수강자 정보를 불러오는 중입니다...</p>
-      </div>
-    );
+    return <PageLoading message="수강자 정보를 불러오는 중…" testId="students-network-loading" />;
   }
 
   if (!selfStudent && isStudent) {
     return (
-      <div className="min-h-screen bg-[#f3f4f6] flex items-center justify-center px-4">
-        <p className="text-center text-[#4a5565] font-medium">
+      <div className="cc-page-main flex min-h-[12rem] w-full items-center justify-center px-4 py-8">
+        <p className="text-center font-medium text-[var(--cc-text-secondary)]">
           이 수업 수강자 목록에 본인이 아직 없습니다. 수업 코드로 등록했는지 확인해 주세요.
         </p>
       </div>
@@ -1041,8 +1041,8 @@ export default function StudentsNetworkPage() {
 
   if (!isStudent && students.length === 0) {
     return (
-      <div className="min-h-screen bg-[#f3f4f6] flex items-center justify-center">
-        <p className="text-[#4a5565] font-medium">이 수업에 등록된 학생이 없습니다.</p>
+      <div className="cc-page-main flex min-h-[12rem] w-full items-center justify-center py-8">
+        <p className="font-medium text-[var(--cc-text-secondary)]">이 수업에 등록된 학생이 없습니다.</p>
       </div>
     );
   }
@@ -1065,10 +1065,8 @@ export default function StudentsNetworkPage() {
   const isArchived = course?.status === "archived";
 
   return (
-    // 전체 페이지 컨테이너
-    <div className="flex min-h-screen flex-col bg-gray-50">
-      <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
-        <h2 className="mb-6 text-2xl font-black text-[#155dfc] sm:text-3xl">수강자들 네트워크</h2>
+    <div className="cc-page-main w-full">
+        <h2 className="m3-headline-medium cc-text-primary mb-6">수강자들 네트워크</h2>
 
         {isArchived && (
           <div className="mb-6 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-600 shadow-sm">
@@ -1087,7 +1085,7 @@ export default function StudentsNetworkPage() {
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-lg font-bold text-[#1e3a6e]">{professor.name}</span>
-                    <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-0.5 rounded-full border border-amber-200">교수</span>
+                    <span className="cc-badge-info rounded-full px-2 py-0.5 text-xs font-bold">교수</span>
                   </div>
                   <p className="text-[#4a6fa5] text-sm">{professor.department}</p>
                 </div>
@@ -1234,7 +1232,6 @@ export default function StudentsNetworkPage() {
             <p>"{searchQuery}"에 해당하는 수강자를 찾을 수 없습니다.</p>
           </div>
         )}
-      </div>
 
       {selectedStudent && (
         <StudentProfileModal

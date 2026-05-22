@@ -84,7 +84,7 @@ export default function TeamRetrospectivePage() {
       </div>
 
       {!isEvaluationOpen && (
-        <div className="mb-6 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+        <div className="cc-alert-warning mb-6 rounded px-4 py-3 text-sm font-bold">
           교수가 수업을 종료(아카이브)한 뒤에만 회고록을 작성할 수 있습니다.
         </div>
       )}

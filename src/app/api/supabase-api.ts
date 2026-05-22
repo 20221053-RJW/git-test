@@ -86,6 +86,11 @@ type CourseQueryOptions = {
   status?: CourseStatus | "all";
 };
 
+function resolveUserImageUrl(user: Pick<AiUser, "image" | "avatar">): string | undefined {
+  const url = user.image?.trim() || user.avatar?.trim();
+  return url || undefined;
+}
+
 function toStudentProfile(user: AiUser): StudentProfile {
   return {
     id: user.id,
@@ -96,6 +101,7 @@ function toStudentProfile(user: AiUser): StudentProfile {
     major: user.major ?? "",
     skills: asArray<string>(user.skills),
     bio: user.bio ?? undefined,
+    imageUrl: resolveUserImageUrl(user),
   };
 }
 
@@ -109,6 +115,7 @@ function toProfessorProfile(user: AiUser): ProfessorProfile {
     office: user.office ?? "",
     officeHours: user.office_hours ?? "",
     researchAreas: asArray<string>(user.research_areas),
+    imageUrl: resolveUserImageUrl(user),
   };
 }
 
@@ -597,6 +604,7 @@ async function getTeamCardsFromDb(courseId?: string): Promise<TeamCard[]> {
           initial: member.initial ?? user?.avatar ?? user?.name.slice(0, 1) ?? "",
           color: member.color ?? "",
           role: member.role ?? undefined,
+          imageUrl: user ? resolveUserImageUrl(user) : undefined,
         };
       }),
     activities: activities
@@ -695,7 +703,7 @@ function mapAiUserToNetworkStudent(student: AiUser, isSelf: boolean): NetworkStu
     bio: student.bio?.trim() ?? "",
     tags: mergedTags,
     avatar: student.avatar?.trim() || name.slice(0, 1),
-    image: student.image ?? undefined,
+    image: resolveUserImageUrl(student),
   };
 }
 
@@ -1257,7 +1265,7 @@ async function getMyPageProfileFromDb(): Promise<MyPageProfile> {
       name: currentUser.name,
       email: currentUser.email,
       schoolAndMajor: currentUser.role === "professor" ? "컴퓨터공학부 교수" : "컴퓨터공학과 학생",
-      imageUrl: currentUser.image ?? currentUser.avatar ?? undefined,
+      imageUrl: resolveUserImageUrl(currentUser),
     };
   }
 
@@ -2265,6 +2273,7 @@ async function getTeamMembersWithNamesFromDb(teamId: string) {
     return {
       userId: member.user_id ?? member.id,
       name: user?.name ?? "팀원",
+      imageUrl: user ? resolveUserImageUrl(user) : undefined,
       contribution: role === "leader" ? 100 : 80,
       role,
       sort_order: member.sort_order,
@@ -2293,6 +2302,9 @@ async function getTeamDetailTeammatesFromDb(teamId?: string): Promise<PeerReview
   );
 
   const roleByUserId = new Map(roster.map((member) => [member.userId, member.role] as const));
+  const imageUrlByUserId = new Map(
+    roster.map((member) => [member.userId, member.imageUrl] as const)
+  );
 
   const detailRows = detailResult.data ?? [];
   if (detailRows.length > 0) {
@@ -2303,6 +2315,7 @@ async function getTeamDetailTeammatesFromDb(teamId?: string): Promise<PeerReview
         name: row.name,
         contribution: row.contribution,
         role: roleByUserId.get(userId) ?? "member",
+        imageUrl: imageUrlByUserId.get(userId),
         sort_order: row.sort_order,
         team_id: teamId,
       };
@@ -2314,6 +2327,7 @@ async function getTeamDetailTeammatesFromDb(teamId?: string): Promise<PeerReview
     name: member.name,
     contribution: member.contribution,
     role: member.role,
+    imageUrl: member.imageUrl,
     sort_order: member.sort_order,
     team_id: teamId,
   }));
@@ -3566,12 +3580,12 @@ async function getTeamWorkspaceHeaderFromDb(teamId: string) {
 
 const AUTO_TEAM_BADGE = "자동배정";
 const TEAM_MEMBER_COLORS = [
-  "bg-blue-100",
-  "bg-purple-100",
-  "bg-green-100",
-  "bg-amber-100",
-  "bg-pink-100",
-  "bg-cyan-100",
+  "cc-team-avatar-tint-1",
+  "cc-team-avatar-tint-2",
+  "cc-team-avatar-tint-3",
+  "cc-team-avatar-tint-4",
+  "cc-team-avatar-tint-5",
+  "cc-team-avatar-tint-1",
 ];
 
 async function assertProfessorCanManageCourse(courseId: string) {

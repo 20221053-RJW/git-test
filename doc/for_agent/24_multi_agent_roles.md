@@ -16,7 +16,7 @@
 | 데이터 | 09, 22 | Supabase migrations, seed | 스키마·시드 운영 중 |
 | AI 시스템 | 10 | `ai-report.ts`, Edge `generate-report` | 집계·A4 ~35%; LLM H-002 |
 | 인프라 / DevOps | 13, 04 | `vercel.json`, `.github/workflows` | E2E CI; 배포 H-005 |
-| 디자인 | 12 | Figma, `src/imports/` | 인간 결정 대기 |
+| 디자인 | **18**, 12 | `campus-connect-tokens.css`, `layout/PageHeader` | 토큰·네비·팀 WS 1차 (~40%) |
 | QA | 14, 15 | `tests/e2e/` | E2E 7플로우 + auth guard |
 | 문서화 | 26, 23, 00 | `doc/` | 시스템 구축됨 |
 | 리서치 | 27, vision | — | 기능-구현 매핑 |

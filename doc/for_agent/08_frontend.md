@@ -29,9 +29,22 @@ React 18.3 · TypeScript · Vite 6 · React Router 7 · Tailwind 4 · Radix/Shad
 
 ## 주요 컴포넌트
 
-- `Navigation.tsx` — 로그아웃 `data-testid="logout-button"`
+- `Navigation.tsx` — `cc-app-shell` · 모바일 `md:hidden` 메뉴 · `data-testid="logout-button"`
+- `Footer.tsx` — `cc-app-shell` (헤더와 동일 가로폭)
+- `UserAvatar.tsx` — `imageUrl` / 이니셜 (네비·팀·프로필 모달)
+- `layouts/MainLayout.tsx` — `cc-main-viewport` · `CourseSideNavigation` · `MyTeamSideNavGroup`
+- `layouts/appShell.ts` — `getAppShellClassName(pathname)` (shell / wide)
+- `layout/PageHeader.tsx`, `SectionCard.tsx`, `AppSideNav.tsx`, `SideNavItem.tsx`, `PageLoading.tsx`
+- `courses/CourseListCard.tsx` — 수업 목록 카드
 - `AiReportPrintView.tsx` — A4 인쇄
-- `ProtectedRoute.tsx`, `CourseScopedRedirect.tsx`
+- `ProtectedRoute.tsx` — 인증 로딩 시 `PageLoading` fullscreen
+
+## 프로필 이미지
+
+- DB: `ai_users.image` (data URL)
+- 타입: `BaseProfile.imageUrl`
+- 저장: `api.myPage.updateAvatar` → `AuthContext.refreshProfile()`
+- 표시: `UserAvatar`, `mapAiUserToNetworkStudent`, 팀 멤버 `imageUrl`
 
 ## 상태 관리
 
@@ -44,6 +57,8 @@ React 18.3 · TypeScript · Vite 6 · React Router 7 · Tailwind 4 · Radix/Shad
 - [o] ProtectedRoute, course-scoped URL
 - [o] 종료 수업 UI·읽기 전용 배너
 - [o] MyPage DB 리포트·인쇄
+- [o] `cc-app-shell` 상단·수업 레이아웃 가로 정렬 (C-260522-31)
+- [o] 프로필 이미지 전역 연동 (C-260522-32)
 
 ## 다음
 

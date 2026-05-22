@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router";
 import type { Answer, Question } from "../types";
 import { api } from "../api/supabase-api";
 import { useAuth } from "../contexts/AuthContext";
+import PageLoading from "../components/layout/PageLoading";
 
 export default function QnADetailPage() {
   const { questionId } = useParams<{ questionId: string }>();
@@ -108,11 +109,7 @@ export default function QnADetailPage() {
   const pageClass = "mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:px-8";
 
   if (loading) {
-    return (
-      <div className={pageClass}>
-        <p className="text-gray-600">로딩 중...</p>
-      </div>
-    );
+    return <PageLoading message="질문을 불러오는 중…" testId="qna-detail-loading" />;
   }
 
   if (!question || !questionId) {

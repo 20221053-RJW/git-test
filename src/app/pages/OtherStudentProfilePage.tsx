@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "react-router";
 import { api } from "../api/supabase-api";
 import type { StudentProfile } from "../types";
+import UserAvatar from "../components/UserAvatar";
+import PageLoading from "../components/layout/PageLoading";
 
 export default function OtherStudentProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -23,11 +25,7 @@ export default function OtherStudentProfilePage() {
   }, [id]);
 
   if (loading) {
-    return (
-      <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
-        <p className="text-gray-600">{"\uB85C\uB529 \uC911..."}</p>
-      </div>
-    );
+    return <PageLoading message="프로필을 불러오는 중…" testId="other-student-profile-loading" />;
   }
 
   if (!profile) {
@@ -42,9 +40,7 @@ export default function OtherStudentProfilePage() {
     <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
       <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-8">
         <div className="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-green-600 text-2xl font-bold text-white sm:h-24 sm:w-24 sm:text-3xl">
-            {profile.name.charAt(0)}
-          </div>
+          <UserAvatar name={profile.name} imageUrl={profile.imageUrl} size="lg" />
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{profile.name}</h1>
             <p className="text-gray-600">{profile.studentId}</p>

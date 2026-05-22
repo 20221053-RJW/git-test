@@ -2,12 +2,13 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router";
 import type { Project } from "../types";
 import { api } from "../api/supabase-api";
+import PageLoading from "../components/layout/PageLoading";
 
 const statusColors = {
-  planning: "bg-gray-100 text-gray-800",
-  "in-progress": "bg-blue-100 text-blue-800",
-  review: "bg-yellow-100 text-yellow-800",
-  completed: "bg-green-100 text-green-800",
+  planning: "cc-badge-neutral",
+  "in-progress": "cc-badge-info",
+  review: "cc-badge-warning",
+  completed: "cc-badge-success",
 };
 
 const statusLabels = {
@@ -29,15 +30,11 @@ export default function ProjectsPage() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <p className="text-gray-600">{"\uB85C\uB529 \uC911..."}</p>
-      </div>
-    );
+    return <PageLoading message="프로젝트를 불러오는 중…" testId="projects-page-loading" />;
   }
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="cc-page-main w-full py-4">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-black tracking-tight text-gray-900 sm:text-3xl">{"\uD300 \uD504\uB85C\uC81D\uD2B8"}</h1>
         <button className="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700 sm:w-auto">
@@ -60,7 +57,7 @@ export default function ProjectsPage() {
             <Link
               key={project.id}
               to={`/app/courses/${project.courseId}/teams/${project.teamId}`}
-              className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg sm:p-6"
+              className="cc-hover-elevate rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6"
             >
               <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <h2 className="text-xl font-bold text-gray-900">

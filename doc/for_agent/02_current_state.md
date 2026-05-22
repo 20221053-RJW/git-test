@@ -1,13 +1,13 @@
 ﻿# 02 — 현재 상태 (항상 최신 유지)
 
 > **관련:** `05_todo.md` · `17_handoff.md` · `27_vision_feature_matrix.md` · `28_human_action_items.md`  
-> **마지막 갱신:** 2026-05-22 · **단계:** Alpha → Beta 진입 중 · **전체 진행률:** ~80%
+> **마지막 갱신:** 2026-05-22 (저녁) · **단계:** Alpha → Beta 진입 중 · **전체 진행률:** ~82%
 
 ## 스냅샷
 
 | 영역 | % | 상태 |
 |------|---|------|
-| 프론트엔드 UI | 88 | vision #1~#45 대부분 완료, 평가·리포트·모달 |
+| 프론트엔드 UI | 91 | M3·셸·`PageLoading`·`CourseListCard`·`SideNavItem`·첫 화면 푸터·레이아웃 안정화 |
 | 데이터 연동 (읽기) | 65 | `supabase-api.ts` → Supabase `ai_*` · 아카이브 평가·회고 시드 |
 | 데이터 연동 (쓰기) | 56 | Q&A·트러블슈팅·채팅·피드백·회고록·네트워크·산출물 |
 | 인증 | 58 | Firebase + `ai_users` + JWT 스캐폴드(기본 off) + ProtectedRoute |
@@ -69,6 +69,19 @@
 - [ ] 프로덕션 배포 실행 (T-042, H-005)
 - [ ] E2E 전체 green (H-003, H-004 시크릿)
 - [o] vision 추가요청 구현 완료 (T-024~T-027·T-050~T-056·T-081~T-083 완료)
+
+## 최근 검증 (2026-05-22, 저녁)
+
+- **C-260522-36~39:** 레이아웃·`cc-main-viewport`(푸터 스크롤 후) · `PageLoading` · `CourseListCard` · `SideNavItem` · doc 동기화 (`260522-36`)
+- **레이아웃:** `scrollbar-gutter: stable` · `cc-page-main` · `cc-hover-elevate`(카드 translate 제거) · `Footer`→`cc-app-shell`
+- **로딩:** `PageLoading`/`LoadingSpinner` — 수업·Q&A·네트워크·인증 등 · `prefers-reduced-motion` 대응
+- **수업 카드:** `cc-course-card` — 학기/상태·메타 dl·**제목+코드 한 줄** (`CourseListCard.tsx`)
+- **좌측 네비:** 아이콘+라벨 · 활성 왼쪽 강조 · `m3-nav-item--split`(내 팀+▼ 한 줄)
+
+## 최근 검증 (2026-05-22, 오후)
+
+- **C-260522-30~35:** 상단 네비 Noto·`cc-app-shell` · 프로필 `imageUrl` · 반응형 감사 `32` · 사이드 네비 토큰 통일
+- **반응형:** P1 일부 완료(shell·푸터 정렬) — 교수 평가 모달 `px-16` 등 잔여 → `32`
 
 ## 최근 검증 (2026-05-22)
 
@@ -175,5 +188,6 @@
 
 ## 다음 즉시 액션
 
+→ AI 선행 (선택): 반응형 P1 잔여 — `TeamDetailPage` 평가 모달 패딩 (`32` §1)  
 → AI 선행: E2E #6 A4 버튼 라벨 정렬 · 완료 기능 회귀  
 → 인간 블로커: T-011(H-001) · H-004(CI E2E) · T-042(H-005)

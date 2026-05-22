@@ -1,6 +1,10 @@
 import React, { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { api } from "../api/supabase-api";
+import M3Button from "../components/layout/M3Button";
+import PageHeader from "../components/layout/PageHeader";
+import PageLoading from "../components/layout/PageLoading";
+import CourseListCard from "../components/courses/CourseListCard";
 import { useAuth } from "../contexts/AuthContext";
 import type { Course, CourseStatus, CreateCourseInput } from "../types";
 
@@ -166,55 +170,49 @@ export default function CoursesPage() {
   };
 
   if (loading) {
+    return <PageLoading shell message="수업 목록을 불러오는 중…" testId="courses-page-loading" />;
+  }
+
+  if (!isAuthenticated) {
     return (
-      <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <p className="text-gray-600">{"\uB85C\uB529 \uC911..."}</p>
+      <div className="cc-app-shell py-4 sm:py-6">
+        <p className="cc-text-secondary">{"\uB85C\uADF8\uC778\uC774 \uD544\uC694\uD569\uB2C8\uB2E4"}</p>
       </div>
     );
   }
 
-  if (!isAuthenticated) return <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{"\uB85C\uADF8\uC778\uC774 \uD544\uC694\uD569\uB2C8\uB2E4"}</div>;
-
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-gray-900 sm:text-3xl">
-            {statusFilter === "active" ? "현재 진행 수업" : "종료된 수업"}
-          </h1>
-          <p className="mt-1 text-gray-600">{"\uCD1D"} {courses.length}{"\uAC1C \uACFC\uBAA9"}</p>
-        </div>
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
-            {(["active", "archived"] as CourseStatus[]).map((status) => (
-              <button
-                key={status}
-                type="button"
-                onClick={() => setStatusFilter(status)}
-                className={`rounded-lg px-4 py-2 text-sm font-bold transition-colors ${
-                  statusFilter === status ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                {status === "active" ? "현재진행수업" : "종료된 수업"}
-              </button>
-            ))}
+    <div className="cc-app-shell w-full py-4 sm:py-6">
+      <PageHeader
+        title={statusFilter === "active" ? "현재 진행 수업" : "종료된 수업"}
+        subtitle={`총 ${courses.length}개 과목`}
+        actions={
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="m3-chip-group" role="tablist" aria-label="수업 상태">
+              {(["active", "archived"] as CourseStatus[]).map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  role="tab"
+                  aria-selected={statusFilter === status}
+                  onClick={() => setStatusFilter(status)}
+                  className={`m3-chip ${statusFilter === status ? "m3-chip--selected" : ""}`}
+                >
+                  {status === "active" ? "현재 진행 수업" : "종료된 수업"}
+                </button>
+              ))}
+            </div>
+            {canManageCourses ? (
+              <M3Button variant="filled" type="button" onClick={openCreateModal}>
+                + 수업 생성
+              </M3Button>
+            ) : null}
           </div>
-
-          {canManageCourses && (
-            <button
-              type="button"
-              onClick={openCreateModal}
-              className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-blue-700"
-            >
-              + 수업 생성
-            </button>
-          )}
-        </div>
-      </div>
+        }
+      />
 
       {errorMessage && (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+        <div role="alert" aria-live="polite" className="cc-alert-error mb-4 rounded-xl px-4 py-3 text-sm font-medium">
           {errorMessage}
         </div>
       )}
@@ -223,58 +221,59 @@ export default function CoursesPage() {
         <form
           onSubmit={handleJoinCourse}
           data-testid="courses-join-by-code-banner"
-          className="mb-6 flex flex-col gap-3 rounded-2xl border border-blue-100 bg-blue-50/50 p-4 sm:flex-row sm:items-end sm:gap-4 sm:p-5"
+          className="cc-alert-info mb-6 flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-end sm:gap-4 sm:p-5"
         >
           <div className="flex-1">
-            <p className="mb-1 text-sm font-bold text-gray-900">수업 코드로 등록</p>
-            <p className="mb-2 text-xs text-gray-600">교수에게 받은 코드를 입력하세요 (예: WEB-2026)</p>
+            <label htmlFor="courses-join-code-banner" className="cc-label mb-1 block font-bold">
+              수업 코드로 등록
+            </label>
+            <p id="courses-join-code-hint" className="cc-text-secondary mb-2 text-xs">
+              교수에게 받은 코드를 입력하세요 (예: WEB-2026)
+            </p>
             <input
+              id="courses-join-code-banner"
               type="text"
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value)}
               placeholder="수업 코드"
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-describedby="courses-join-code-hint"
+              className="cc-input px-3 py-2 text-sm"
               required
             />
           </div>
-          <button
-            type="submit"
-            disabled={joining}
-            className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60 sm:shrink-0"
-          >
+          <M3Button type="submit" variant="filled" disabled={joining} className="sm:shrink-0">
             {joining ? "등록 중..." : "수업 등록"}
-          </button>
+          </M3Button>
         </form>
       )}
 
       {courses.length === 0 ? (
         <div
           data-testid="courses-empty-state"
-          className="rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center sm:p-10"
+          className="m3-surface-card border-dashed p-8 text-center sm:p-10"
         >
-          <p className="text-gray-600">등록된 수업이 없습니다.</p>
+          <p className="cc-text-secondary">등록된 수업이 없습니다.</p>
           {isStudent && statusFilter === "active" && (
             <form
               onSubmit={handleJoinCourse}
               data-testid="courses-join-by-code-empty"
               className="mx-auto mt-6 max-w-sm space-y-3 text-left"
             >
-              <p className="text-sm text-gray-500">수업 코드로 등록하세요 (예: WEB-2026, DB-2026)</p>
+              <label htmlFor="courses-join-code-empty" className="cc-label">
+                수업 코드로 등록하세요 (예: WEB-2026, DB-2026)
+              </label>
               <input
+                id="courses-join-code-empty"
                 type="text"
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value)}
                 placeholder="수업 코드"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="cc-input px-3 py-2 text-sm"
                 required
               />
-              <button
-                type="submit"
-                disabled={joining}
-                className="w-full rounded-lg bg-blue-600 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
-              >
+              <M3Button type="submit" variant="filled" disabled={joining} className="w-full">
                 {joining ? "등록 중..." : "수업 등록"}
-              </button>
+              </M3Button>
             </form>
           )}
         </div>
@@ -285,88 +284,17 @@ export default function CoursesPage() {
             const canArchiveCourse = canManageThisCourse && course.status === "active";
 
             return (
-          <Link
-            key={course.id}
-            to={`/app/courses/${course.id}`}
-            className="group rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:border-blue-200 hover:shadow-lg sm:p-6"
-          >
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <h2 className="text-lg font-black text-gray-900 sm:text-xl">
-                {course.name}
-              </h2>
-              <div className="flex shrink-0 flex-col items-end gap-1">
-                <span className="rounded bg-blue-100 px-2 py-1 text-xs text-blue-800">{course.code}</span>
-                {canManageCourses && course.status === "active" && (
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      copyCourseCode(course.code);
-                    }}
-                    className="text-xs font-medium text-blue-600 hover:underline"
-                  >
-                    코드 복사
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {course.status === "archived" && (
-              <span className="mb-3 inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold text-gray-600">
-                아카이브
-              </span>
-            )}
-
-            {course.description && (
-              <p className="text-gray-600 text-sm mb-3 line-clamp-2">
-                {course.description}
-              </p>
-            )}
-
-            <div className="space-y-1 text-sm">
-              <p className="text-gray-600">{"\uAD50\uC218"}: {course.professor}</p>
-              <p className="text-gray-600">{"\uC2DC\uAC04"}: {course.schedule}</p>
-              {course.room && (
-                <p className="text-gray-600">{"\uAC15\uC758\uC2E4"}: {course.room}</p>
-              )}
-              <p className="text-gray-600">
-                {"\uC218\uAC15\uC0DD"}: {course.students}
-                {course.maxStudents && `/${course.maxStudents}`}{"\uBA85"}
-              </p>
-              <p className="text-gray-600">{"\uD300\uD50C \uC2A4\uD14C\uC774\uC9C0"}: {course.stageCount ?? course.stages?.length ?? 0}{"\uAC1C"}</p>
-            </div>
-
-            {canArchiveCourse && (
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  handleArchiveCourse(course);
-                }}
-                className="mt-4 w-full rounded-lg border border-red-200 px-3 py-2 text-sm font-bold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                수업 종료
-              </button>
-            )}
-            {canManageThisCourse && (
-              <button
-                type="button"
-                data-testid={`course-delete-${course.id}`}
-                disabled={submitting}
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  void handleDeleteCourse(course);
-                }}
-                className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-bold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                수업 삭제
-              </button>
-            )}
-          </Link>
+              <CourseListCard
+                key={course.id}
+                course={course}
+                canManageCourses={canManageCourses}
+                canArchiveCourse={canArchiveCourse}
+                canManageThisCourse={canManageThisCourse}
+                submitting={submitting}
+                onCopyCode={copyCourseCode}
+                onArchive={handleArchiveCourse}
+                onDelete={(c) => void handleDeleteCourse(c)}
+              />
             );
           })}
         </div>

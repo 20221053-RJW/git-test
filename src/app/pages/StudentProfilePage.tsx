@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
 import type { StudentProfile } from "../types";
+import UserAvatar from "../components/UserAvatar";
 
 export default function StudentProfilePage() {
   const { user } = useAuth();
@@ -20,9 +21,7 @@ export default function StudentProfilePage() {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="bg-white rounded-lg shadow-md p-8">
         <div className="flex items-center mb-6">
-          <div className="w-24 h-24 bg-blue-600 rounded-full flex items-center justify-center text-white text-3xl font-bold mr-6">
-            {profile.name.charAt(0)}
-          </div>
+          <UserAvatar name={profile.name} imageUrl={profile.imageUrl} size="lg" className="mr-6" />
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{profile.name}</h1>
             <p className="text-gray-600">{profile.studentId ?? ""}</p>

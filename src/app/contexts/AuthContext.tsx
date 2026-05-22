@@ -45,17 +45,26 @@ type AiUserRow = {
   major?: string | null;
   skills?: unknown;
   bio?: string | null;
+  image?: string | null;
+  avatar?: string | null;
   department?: string | null;
   office?: string | null;
   office_hours?: string | null;
   research_areas?: unknown;
 };
 
+function resolveImageUrl(userData: AiUserRow): string | undefined {
+  const url = userData.image?.trim() || userData.avatar?.trim();
+  return url || undefined;
+}
+
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
 function toProfile(userData: AiUserRow): AdminProfile | StudentProfile | ProfessorProfile {
+  const imageUrl = resolveImageUrl(userData);
+
   if (userData.role === "student") {
     return {
       id: userData.id,
@@ -66,6 +75,7 @@ function toProfile(userData: AiUserRow): AdminProfile | StudentProfile | Profess
       major: userData.major ?? "",
       skills: asArray<string>(userData.skills),
       bio: userData.bio ?? undefined,
+      imageUrl,
     };
   }
 
@@ -79,6 +89,7 @@ function toProfile(userData: AiUserRow): AdminProfile | StudentProfile | Profess
       office: userData.office ?? "",
       officeHours: userData.office_hours ?? "",
       researchAreas: asArray<string>(userData.research_areas),
+      imageUrl,
     };
   }
 
@@ -87,6 +98,7 @@ function toProfile(userData: AiUserRow): AdminProfile | StudentProfile | Profess
     name: userData.name,
     email: userData.email,
     role: "admin",
+    imageUrl,
   };
 }
 
