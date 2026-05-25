@@ -1636,7 +1636,7 @@ async function getDirectMessagesFromDb(
   if (error) {
     if (isMissingRelationError(error)) {
       throw new Error(
-        "1:1 채팅(ai_direct_messages)이 아직 준비되지 않았습니다. 관리자에게 `npm run supabase:apply-remote-full` 적용을 요청해 주세요."
+        "1:1 채팅(ai_direct_messages) 테이블이 없습니다. Supabase에 마이그레이션을 적용해 주세요."
       );
     }
     throw error;
@@ -1703,7 +1703,7 @@ async function sendDirectMessageInDb(
   if (error) {
     if (isMissingRelationError(error)) {
       throw new Error(
-        "1:1 채팅(ai_direct_messages)이 아직 준비되지 않았습니다. 관리자에게 `npm run supabase:apply-remote-full` 적용을 요청해 주세요."
+        "1:1 채팅(ai_direct_messages) 테이블이 없습니다. Supabase에 마이그레이션을 적용해 주세요."
       );
     }
     throw error;
@@ -3128,7 +3128,7 @@ function formatDeliverableStorageError(error: unknown): Error {
   const message = error instanceof Error ? error.message : String(error);
   if (/bucket|not found|404|Bucket/i.test(message)) {
     return new Error(
-      "산출물 저장소가 아직 준비되지 않았습니다. 관리자에게 H-012(Storage 버킷 ai_team_deliverables) 적용을 요청해 주세요."
+      "산출물 Storage 버킷(ai_team_deliverables)이 없습니다. Supabase에 마이그레이션을 적용해 주세요."
     );
   }
   return error instanceof Error ? error : new Error(message);
@@ -3398,7 +3398,7 @@ function toCourseMaterialStorageError(error: { message?: string }): Error {
   const lower = raw.toLowerCase();
   if (lower.includes("bucket") && (lower.includes("not found") || lower.includes("not exist"))) {
     return new Error(
-      "강의 자료 Storage 버킷이 아직 없습니다. Supabase에 `20260523205000`·`20260523210000` 마이그레이션을 적용하거나 `npm run supabase:apply-remote-full`을 실행해 주세요."
+      "강의 자료 Storage 버킷(ai_course_materials)이 없습니다. Supabase에 마이그레이션을 적용해 주세요."
     );
   }
   return new Error(raw);

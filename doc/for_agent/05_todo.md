@@ -219,7 +219,7 @@
 | T-201 | vision #82 수업코드 등록 버튼 정렬 | [o] | `cc-courses-join-row` |
 | T-202 | vision #80 전역 모달 AppModal | [o] | TeamDetail·Courses·MyPage·Network |
 | T-203 | vision #84 교수 「팀 참여하기」 숨김 | [o] | `MainLayout` 학생만 `MyTeamSideNavGroup` |
-| T-204 | vision #83 강의자료 Storage | [o] | 마이그레이션 · `apply_remote_full` 빌드 · H-012 |
+| T-204 | vision #83 강의자료 Storage | [o] | MCP 원격 적용 완료 (2026-05-25) |
 
 ### vision #60~#84 (신규, 2026-05-23)
 
@@ -234,7 +234,7 @@
 | — | #78 팀 스테이지 관리 | [o] | `updateCompletedStages` (기존) |
 | — | #80 전역 모달 portal | [o] | T-199·T-202 |
 | — | #81·#82 프로필·수업등록 UI | [o] | T-200·T-201 |
-| — | #83 강의자료 버킷 | 🔶 | T-204 · H-012 원격 SQL |
+| — | #83 강의자료 버킷 | [o] | T-204 · MCP 원격 적용 |
 | — | #84 교수 네비 | [o] | T-203 |
 
 ## 완료됨 (최근)

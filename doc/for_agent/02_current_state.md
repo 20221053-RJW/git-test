@@ -7,7 +7,7 @@
 
 | 영역 | % | 상태 |
 |------|---|------|
-| 프론트엔드 UI | 95 | vision #60~#84 · 교수 네비 수정 · 강의자료 Storage SQL(H-012) |
+| 프론트엔드 UI | 95 | vision #60~#84 · 교수 네비 · 강의자료·산출물 Storage MCP 적용 |
 | 데이터 연동 (읽기) | 65 | `supabase-api.ts` → Supabase `ai_*` · 아카이브 평가·회고 시드 |
 | 데이터 연동 (쓰기) | 56 | Q&A·트러블슈팅·채팅·피드백·회고록·네트워크·산출물 |
 | 인증 | 58 | Firebase + `ai_users` + JWT 스캐폴드(기본 off) + ProtectedRoute |

@@ -29,6 +29,9 @@ const courseMaterials = fs.readFileSync(
 );
 const courseMaterialsStorage = fs.readFileSync(
   path.join(root, "supabase/migrations/20260523210000_course_materials_storage_policies.sql"),
+  "utf8"
+);
+const directMessagesLegacy = fs.readFileSync(
   path.join(root, "supabase/migrations/20260525143000_direct_messages_deliverable_legacy.sql"),
   "utf8"
 );
@@ -43,6 +46,8 @@ const out =
   courseMaterials +
   "\n\n" +
   courseMaterialsStorage +
+  "\n\n-- ========== 2c. 1:1 채팅·레거시 산출물 subtitle ==========\n\n" +
+  directMessagesLegacy +
   "\n\n-- ========== 3. 조회 인덱스 (멤버십·팀·수업) ==========\n\n" +
   hotPathIndexes;
 

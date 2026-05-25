@@ -7,6 +7,14 @@
 
 ---
 
+### 2026-05-25 — 밀린 Supabase SQL MCP 일괄 적용 (H-012 제거)
+
+| 항목 | 내용 |
+|------|------|
+| **원격** | `course_materials_deliverable_subtitle` · `course_materials_storage_policies` · `direct_messages_deliverable_legacy` · `storage_deliverables_500mb` |
+| **효과** | 산출물 `subtitle` · 강의자료 버킷·RLS · 1:1 채팅 테이블 |
+| **doc** | `28` H-012 완료·미완료 제거 · `29` #83·#93·#103 ✅ · `build-apply-remote-full.mjs` 1:1 채팅 포함 수정 |
+
 ### 2026-05-25 15:25:00 — vision #107·#52·#97·#115
 
 | 항목 | 내용 |

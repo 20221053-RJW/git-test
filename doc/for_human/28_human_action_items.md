@@ -12,7 +12,7 @@
 | 순서 | 문서 |
 |------|------|
 | 전체 순서 | **[00_pre_launch_order.md](./00_pre_launch_order.md)** |
-| SQL 5분 | **[29_supabase_bundle_sql.md](./29_supabase_bundle_sql.md)** |
+| SQL (MCP) | Cursor **Supabase MCP** `apply_migration` — 인간은 MCP 연결만 |
 | AI 리포트 (H-002 ✅, 문제 시만) | **[30_edge_ai_report.md](./30_edge_ai_report.md)** |
 | RLS 결정 3분 | **[31_rls_beta_decision.md](./31_rls_beta_decision.md)** |
 | 회고록 SQL 3분 | **[32_retrospective_sql.md](./32_retrospective_sql.md)** |
@@ -20,7 +20,6 @@
 | SQL 후 확인 5분 | **[35_smoke_test_after_bundle.md](./35_smoke_test_after_bundle.md)** |
 | 리포트 집계 3분 | **[37_verify_ai_report.md](./37_verify_ai_report.md)** |
 | 김학생 아카이브 시드 5분 | **[38_archived_kim_student_setup.md](./38_archived_kim_student_setup.md)** |
-| **원클릭 SQL (권장)** | `npm run supabase:apply-remote-full` → `supabase/apply_remote_full.sql` |
 
 ---
 
@@ -31,7 +30,6 @@
 | [ ] | H-001 | 높음 | RLS Beta 결정 — **[31](./31_rls_beta_decision.md)** · 승인 후 **[33 JWT](./33_firebase_supabase_jwt_setup.md)** | DB 행 단위 보안 | “RLS 적용 승인” 또는 “RLS 보류” |
 | [ ] | H-004 | 중간 | GitHub Secrets — **[34_github_ci_secrets.md](./34_github_ci_secrets.md)** (`E2E_*`, `VITE_*`, 선택 `E2E_PROFESSOR_*`) | PR마다 CI E2E | 「H-004 완료」 |
 | [ ] | H-006 | 낮음 | 이용약관·개인정보·학교 AI 사용 규정 확인 | 런칭 전 법무 | 내부 승인 메모 |
-| [ ] | H-012 | 중간 | 강의자료 Storage — `npm run supabase:apply-remote-full` 후 SQL Editor Run (또는 `20260523205000`+`20260523210000`) | vision #83 버킷 not found | 강의개요에서 PDF 업로드 성공 |
 
 ---
 
@@ -39,6 +37,7 @@
 
 | ID | 완료 시각 | 할 일 |
 |----|-----------|------|
+| H-012 | 2026-05-25 | **강의자료·산출물·1:1 채팅 SQL** — Supabase MCP `apply_migration` (subtitle·`ai_course_materials`·`ai_direct_messages`) |
 | H-005 | 2026-05-22 | **프로덕션 배포** — `vercel --prod` · Production https://git-test-cp.vercel.app (`VITE_*` Vercel 설정) |
 | H-011 | 2026-05-22 14:13:32 | **원클릭 SQL** — MCP 적용·`verify:archived-kim` evalReady·reportOk |
 | H-010 | 2026-05-22 14:13:32 | 교수 평가 DB·시드 (H-011 포함) |
@@ -55,6 +54,7 @@
 
 | 시각 | ID | 결과 | 메모 |
 |------|----|------|------|
+| 2026-05-25 | H-012 | pass | MCP `course_materials_deliverable_subtitle`·`course_materials_storage_policies`·`direct_messages_deliverable_legacy`·`storage_deliverables_500mb` |
 | 2026-05-22 | H-005 | pass | 사용자 「H-005 완료」·`vercel --prod` Production https://git-test-cp.vercel.app |
 | 2026-05-22 | H-003 | pass | 사용자 「H-003 완료」·`.env` E2E_TEST_* 설정 확인 |
 | 2026-05-22 14:13:32 | H-011 | pass | `verify:archived-kim` ok (evalReady=true, feedback=2) |
