@@ -4,6 +4,8 @@ import { api, type DirectMessageThread } from "../api/supabase-api";
 import DirectChatPanel from "../components/DirectChatPanel";
 import PageLoading from "../components/layout/PageLoading";
 import { useAuth } from "../contexts/AuthContext";
+import { useIsSmUp } from "../hooks/useIsSmUp";
+import { markDirectMessageThreadSeen } from "../utils/navInboxSeen";
 
 export default function CourseDirectMessagesPage() {
   const { courseId = "" } = useParams<{ courseId: string }>();
@@ -14,6 +16,7 @@ export default function CourseDirectMessagesPage() {
   const [error, setError] = useState<string | null>(null);
 
   const selectedPeerId = searchParams.get("peer") ?? "";
+  const isSmUp = useIsSmUp();
 
   useEffect(() => {
     if (!courseId) return;
@@ -40,8 +43,27 @@ export default function CourseDirectMessagesPage() {
 
   const selectedThread = threads.find((t) => t.peerUserId === selectedPeerId);
 
+  useEffect(() => {
+    if (!user?.id || !courseId || !selectedThread) return;
+    markDirectMessageThreadSeen(
+      user.id,
+      courseId,
+      selectedThread.peerUserId,
+      selectedThread.lastAt
+    );
+  }, [user?.id, courseId, selectedThread?.peerUserId, selectedThread?.lastAt]);
+
   const selectPeer = (peerUserId: string) => {
     setSearchParams({ peer: peerUserId });
+  };
+
+  const chatPanelProps = {
+    courseId,
+    peerUserId: selectedPeerId,
+    peerName: selectedThread?.peerName ?? "상대",
+    currentUserId: user?.id,
+    currentUserName: user?.name ?? "나",
+    enabled: true as const,
   };
 
   return (
@@ -104,20 +126,19 @@ export default function CourseDirectMessagesPage() {
           </aside>
 
           <div className="hidden min-w-0 flex-1 flex-col sm:flex">
-            <DirectChatPanel
-              courseId={courseId}
-              peerUserId={selectedPeerId}
-              peerName={selectedThread?.peerName ?? "상대"}
-              currentUserId={user?.id}
-              currentUserName={user?.name ?? "나"}
-              enabled={Boolean(selectedPeerId)}
-            />
+            {selectedPeerId && isSmUp ? (
+              <DirectChatPanel key={selectedPeerId} {...chatPanelProps} />
+            ) : (
+              <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-500">
+                왼쪽 목록에서 대화를 선택하세요
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {selectedPeerId && (
-        <div className="fixed inset-0 z-40 flex flex-col bg-white sm:hidden" data-testid="direct-chat-mobile-panel">
+      {selectedPeerId && !isSmUp && (
+        <div className="fixed inset-0 z-40 flex flex-col bg-white" data-testid="direct-chat-mobile-panel">
           <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
             <button
               type="button"
@@ -127,15 +148,7 @@ export default function CourseDirectMessagesPage() {
               ← 목록
             </button>
           </div>
-          <DirectChatPanel
-            courseId={courseId}
-            peerUserId={selectedPeerId}
-            peerName={selectedThread?.peerName ?? "상대"}
-            currentUserId={user?.id}
-            currentUserName={user?.name ?? "나"}
-            enabled
-            className="flex-1"
-          />
+          <DirectChatPanel key={selectedPeerId} {...chatPanelProps} className="flex-1" />
         </div>
       )}
     </div>

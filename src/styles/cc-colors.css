@@ -171,6 +171,237 @@
   color: var(--cc-success);
 }
 
+/* 폼 필드 (모달·설정 — Tailwind gray/blue 대신) */
+.cc-field {
+  display: block;
+}
+
+.cc-form-label {
+  font-size: var(--m3-label-large-size);
+  font-weight: 700;
+  color: var(--cc-text-secondary);
+}
+
+.cc-field > .cc-input,
+.cc-field > .cc-textarea,
+.cc-field > input:not([type="checkbox"]):not([type="radio"]),
+.cc-field > textarea {
+  margin-top: 0.25rem;
+}
+
+.cc-field-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.cc-field-row > .cc-input {
+  margin-top: 0;
+}
+
+.cc-input--readonly-surface {
+  background-color: var(--cc-surface-muted);
+  cursor: default;
+}
+
+.cc-btn-tonal-sm {
+  flex-shrink: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--m3-shape-medium);
+  border: 1px solid var(--cc-primary-border);
+  background-color: var(--cc-accent-subtle);
+  font-size: var(--m3-body-medium-size);
+  font-weight: 700;
+  color: var(--cc-on-primary-container);
+  transition: background-color 0.2s;
+}
+
+.cc-btn-tonal-sm:hover {
+  background-color: var(--cc-blue-100);
+}
+
+.cc-modal-title {
+  font-size: var(--m3-title-large-size);
+  font-weight: 800;
+  color: var(--cc-on-surface);
+}
+
+.cc-modal-subtitle {
+  margin-top: 0.25rem;
+  font-size: var(--m3-body-medium-size);
+  color: var(--cc-text-muted);
+}
+
+.cc-icon-btn-ghost {
+  border-radius: var(--m3-shape-medium);
+  padding: 0.25rem 0.75rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--cc-text-muted);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.cc-icon-btn-ghost:hover {
+  background-color: var(--cc-surface-container);
+  color: var(--cc-on-surface);
+}
+
+.cc-surface-muted-block {
+  background-color: var(--cc-surface-muted);
+}
+
+.cc-surface-interactive {
+  border: 1px solid var(--cc-border);
+  background-color: var(--cc-surface-muted);
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.cc-surface-interactive:hover {
+  border-color: var(--cc-primary-border);
+  background-color: var(--cc-accent-subtle);
+}
+
+.cc-link-banner {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: var(--m3-shape-medium);
+  border: 1px solid var(--cc-primary-border);
+  background-color: var(--cc-accent-subtle);
+  padding: 0.625rem 1rem;
+  font-size: var(--m3-body-medium-size);
+  font-weight: 500;
+  color: var(--cc-primary);
+  transition: background-color 0.2s;
+}
+
+.cc-link-banner:hover {
+  background-color: var(--cc-blue-100);
+  text-decoration: underline;
+}
+
+.cc-dnd-line {
+  pointer-events: none;
+  border-radius: var(--m3-shape-full);
+  background-color: var(--cc-primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--cc-primary) 25%, transparent);
+}
+
+.cc-unread-dot {
+  border-radius: var(--m3-shape-full);
+  background-color: var(--cc-error);
+}
+
+/* AI 통합 진행상황 요약 (팀 상세) — primary-container 톤 */
+.cc-ai-insight-panel {
+  margin-bottom: 1.5rem;
+  border-radius: var(--cc-radius-lg);
+  border: 1px solid var(--cc-primary-border);
+  background: linear-gradient(
+    to right,
+    var(--cc-primary-container),
+    var(--cc-secondary-container)
+  );
+  padding: 1.5rem;
+  box-shadow: var(--cc-shadow-sm);
+}
+
+.cc-ai-insight-panel__title {
+  margin-bottom: 0.5rem;
+  font-size: var(--m3-title-large-size);
+  font-weight: 700;
+  color: var(--cc-on-primary-container);
+}
+
+.cc-ai-insight-panel__meta {
+  margin-bottom: 0.5rem;
+  font-size: var(--m3-body-medium-size);
+  color: var(--cc-link);
+}
+
+.cc-ai-insight-panel__summary {
+  font-size: var(--m3-body-medium-size);
+  line-height: 1.625;
+  color: var(--cc-on-primary-container);
+}
+
+.cc-ai-insight-list {
+  margin-top: 0.75rem;
+}
+
+.cc-ai-insight-list > li + li {
+  margin-top: 0.25rem;
+}
+
+.cc-ai-insight-list--strength {
+  font-size: var(--m3-body-medium-size);
+  color: var(--cc-on-primary-container);
+}
+
+.cc-ai-insight-list--gap {
+  margin-top: 0.5rem;
+  font-size: var(--m3-body-medium-size);
+  color: color-mix(in srgb, var(--cc-on-primary-container) 85%, var(--cc-warning));
+}
+
+.cc-ai-insight-subblock {
+  margin-top: 1rem;
+  border-radius: var(--m3-shape-medium);
+  border: 1px solid var(--cc-outline-variant);
+  background-color: color-mix(in srgb, var(--cc-surface) 60%, transparent);
+  padding: 0.75rem;
+}
+
+.cc-ai-insight-subblock__label {
+  font-size: 0.625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cc-ai-insight-subblock--next {
+  border-color: var(--cc-primary-border);
+}
+
+.cc-ai-insight-subblock--next .cc-ai-insight-subblock__label {
+  color: var(--cc-on-primary-container);
+}
+
+.cc-ai-insight-subblock--next .cc-ai-insight-subblock__list {
+  margin-top: 0.25rem;
+  font-size: var(--m3-body-medium-size);
+  color: var(--cc-on-primary-container);
+}
+
+.cc-ai-insight-subblock--risk {
+  border-color: var(--cc-error-border);
+}
+
+.cc-ai-insight-subblock--risk .cc-ai-insight-subblock__label {
+  color: var(--cc-error);
+}
+
+.cc-ai-insight-subblock--risk .cc-ai-insight-subblock__list {
+  margin-top: 0.25rem;
+  font-size: var(--m3-body-medium-size);
+  color: color-mix(in srgb, var(--cc-error) 80%, var(--cc-on-surface));
+}
+
+.cc-ai-insight-subblock--improve {
+  border-color: var(--cc-success-border);
+}
+
+.cc-ai-insight-subblock--improve .cc-ai-insight-subblock__label {
+  color: var(--cc-success);
+}
+
+.cc-ai-insight-subblock--improve .cc-ai-insight-subblock__list {
+  margin-top: 0.25rem;
+  font-size: var(--m3-body-medium-size);
+  color: color-mix(in srgb, var(--cc-success) 75%, var(--cc-on-surface));
+}
+
 /* 사이드 네비 — .m3-nav-item 과 동일 토큰 (마이페이지 호환 별칭) */
 .cc-side-nav-item {
   display: block;

@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router";
 import { api } from "../api/supabase-api";
 import PageLoading from "../components/layout/PageLoading";
 import { useAuth } from "../contexts/AuthContext";
+import { markCourseAnnouncementsSeen } from "../utils/navInboxSeen";
 import type { Announcement, Course } from "../types";
 
 export default function CourseAnnouncementsPage() {
@@ -22,6 +23,10 @@ export default function CourseAnnouncementsPage() {
     ]);
     setCourse(courseData ?? null);
     setAnnouncements(announcementData);
+    if (user?.id && courseId) {
+      const maxSort = Math.max(0, ...announcementData.map((a) => a.sortOrder ?? 0));
+      markCourseAnnouncementsSeen(user.id, courseId, maxSort);
+    }
   };
 
   useEffect(() => {

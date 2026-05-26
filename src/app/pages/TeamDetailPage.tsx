@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
 import {
   fetchTeamProgressInsightFromEdge,
+  isShallowProgressInsight,
   normalizeProgressInsightForDisplay,
 } from "../api/ai-team-progress";
 import { api, buildTeamProgressInsight } from "../api/supabase-api";
@@ -17,8 +18,8 @@ import TeamTroubleshootingSubmitModal, {
 } from "../components/TeamTroubleshootingSubmitModal";
 import { supabase } from "../supabase";
 import {
-  deliverableLinkLabel,
-  externalDeliverableHref,
+  deliverableDeployLinkLabel,
+  deliverableDeployUrl,
 } from "../utils/deliverableLinks";
 import AppModal from "../components/layout/AppModal";
 import M3Button from "../components/layout/M3Button";
@@ -36,9 +37,6 @@ import type {
   Course,
   PeerReviewStudent,
   TeamDeliverable,
-  TeamSubmissionFeedbackItem,
-  TeamSubmissionRetrospectiveItem,
-  TeamSubmissionPeerReviewItem,
   TroubleshootingLog,
   PeerReviewTeammate,
   StudentProfile,
@@ -218,15 +216,6 @@ export default function TeamDetailPage() {
     holisticComment: "",
   });
   const [savingProfessorEval, setSavingProfessorEval] = useState(false);
-  const [teamSubmissionFeedbacks, setTeamSubmissionFeedbacks] = useState<
-    TeamSubmissionFeedbackItem[]
-  >([]);
-  const [teamSubmissionRetrospectives, setTeamSubmissionRetrospectives] = useState<
-    TeamSubmissionRetrospectiveItem[]
-  >([]);
-  const [teamSubmissionPeerReviews, setTeamSubmissionPeerReviews] = useState<
-    TeamSubmissionPeerReviewItem[]
-  >([]);
 
   const [allStudents, setAllStudents] = useState<PeerReviewStudent[]>([]);
   const [troubleshootingLogs, setTroubleshootingLogs] = useState<TroubleshootingLog[]>([]);
@@ -306,18 +295,20 @@ export default function TeamDetailPage() {
     architecture_risks: string[];
     improvements: string[];
     model: string;
+    used_memory?: boolean;
+    new_deliverables_analyzed?: number;
   } | null>(null);
   const [insightLoading, setInsightLoading] = useState(false);
 
-  const latestLinkDeliverable = useMemo(() => {
-    const withUrl = deliverables.filter((d) => {
-      const url = d.publicUrl?.trim() ?? "";
-      return /^https?:\/\//i.test(url);
-    });
-    if (withUrl.length === 0) return null;
-    return [...withUrl].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  const latestDeployLink = useMemo(() => {
+    const withDeploy = deliverables
+      .map((d) => ({ d, url: deliverableDeployUrl(d) }))
+      .filter((x): x is { d: TeamDeliverable; url: string } => Boolean(x.url));
+    if (withDeploy.length === 0) return null;
+    const latest = [...withDeploy].sort(
+      (a, b) => new Date(b.d.createdAt).getTime() - new Date(a.d.createdAt).getTime()
     )[0];
+    return { deliverable: latest.d, url: latest.url };
   }, [deliverables]);
 
   useEffect(() => {
@@ -336,7 +327,12 @@ export default function TeamDetailPage() {
         buildTeamProgressInsight(deliverables, troubleshootingLogs)
       );
 
-      if (edge?.summary) {
+      const useEdge =
+        Boolean(edge?.summary) &&
+        edge.model !== "draft-db-only" &&
+        !isShallowProgressInsight(edge);
+
+      if (useEdge) {
         setProgressInsight(edge);
       } else {
         setProgressInsight(fallback);
@@ -807,15 +803,9 @@ export default function TeamDetailPage() {
     void Promise.all([
       api.teamDetail.getProfessorStudentEvals(selectedTeamId),
       api.teamDetail.getProfessorProjectEval(selectedTeamId),
-      api.teamDetail.getTeamSubmissionFeedbacks(selectedTeamId),
-      api.teamDetail.getTeamSubmissionRetrospectives(selectedTeamId),
-      api.teamDetail.getTeamSubmissionPeerReviews(selectedTeamId),
-    ]).then(([studentEvals, savedProjectEval, feedbacks, retrospectives, peerReviews]) => {
+    ]).then(([studentEvals, savedProjectEval]) => {
       setStudentEvalInputs((prev) => ({ ...prev, ...studentEvals }));
       setProjectEval(savedProjectEval);
-      setTeamSubmissionFeedbacks(feedbacks);
-      setTeamSubmissionRetrospectives(retrospectives);
-      setTeamSubmissionPeerReviews(peerReviews);
     });
   }, [selectedTeamId, isProfessor, isAdmin]);
 
@@ -986,62 +976,65 @@ export default function TeamDetailPage() {
         {/* AI 통합 진행상황 요약 */}
         <GeminiShimmerPanel
           active={insightLoading}
-          className="mb-6 rounded-[14px] border border-[#c6d2ff] bg-gradient-to-r from-[#bfd3ff] to-[#e8e9ff] p-6 shadow-sm"
+          className="cc-ai-insight-panel"
           data-testid="team-progress-insight-panel"
         >
           <h3
-            className={`mb-2 text-lg font-bold text-[#312c85] ${
+            className={`cc-ai-insight-panel__title ${
               insightLoading ? "cc-gemini-shimmer-text" : ""
             }`}
           >
             ✨ AI 통합 진행상황 요약
           </h3>
+          {!insightLoading && progressInsight && (progressInsight.used_memory || (progressInsight.new_deliverables_analyzed ?? 0) > 0) ? (
+            <p className="cc-ai-insight-panel__meta" data-testid="team-progress-insight-meta">
+              {progressInsight.used_memory ? "이전 분석 기억 반영" : "첫 분석"}
+              {(progressInsight.new_deliverables_analyzed ?? 0) > 0
+                ? ` · 신규 산출물 ${progressInsight.new_deliverables_analyzed}건 ZIP/소스 읽음`
+                : progressInsight.used_memory
+                  ? " · 신규 파일 없음(로그·채팅만 갱신)"
+                  : ""}
+            </p>
+          ) : null}
           {insightLoading && !progressInsight?.summary ? (
             <GeminiShimmerLines active lines={3} className="mb-2" />
           ) : (
             <>
-              <p className="text-sm leading-relaxed text-[#372aac]">
+              <p className="cc-ai-insight-panel__summary">
                 {progressInsight?.summary ?? "팀 활동 데이터를 분석 중입니다."}
               </p>
-              {(progressInsight?.strengths?.length ?? 0) > 0 && (
-                <ul className="mt-3 space-y-1 text-xs text-[#4338ca]">
-                  {progressInsight!.strengths.slice(0, 3).map((item) => (
-                    <li key={item}>· {item}</li>
-                  ))}
-                </ul>
-              )}
               {(progressInsight?.gaps?.length ?? 0) > 0 && (
-                <ul className="mt-2 space-y-1 text-xs text-[#6b21a8]">
-                  {progressInsight!.gaps.slice(0, 3).map((item) => (
+                <ul className="cc-ai-insight-list cc-ai-insight-list--gap space-y-1">
+                  {progressInsight!.gaps.slice(0, 2).map((item) => (
                     <li key={item}>△ {item}</li>
                   ))}
                 </ul>
               )}
               {(progressInsight?.next_steps?.length ?? 0) > 0 && (
-                <div className="mt-4 rounded-lg border border-[#c4b5fd] bg-white/60 px-3 py-2">
-                  <p className="text-[10px] font-black text-[#5b21b6]">다음에 할 일</p>
-                  <ul className="mt-1 space-y-1 text-xs text-[#4c1d95]">
-                    {progressInsight!.next_steps.slice(0, 4).map((item) => (
+                <div className="cc-ai-insight-subblock cc-ai-insight-subblock--next">
+                  <p className="cc-ai-insight-subblock__label">다음에 할 일</p>
+                  <ul className="cc-ai-insight-subblock__list space-y-1">
+                    {progressInsight!.next_steps.slice(0, 2).map((item) => (
                       <li key={item}>→ {item}</li>
                     ))}
                   </ul>
                 </div>
               )}
               {(progressInsight?.architecture_risks?.length ?? 0) > 0 && (
-                <div className="mt-3 rounded-lg border border-[#fecaca] bg-white/50 px-3 py-2">
-                  <p className="text-[10px] font-black text-[#991b1b]">아키텍처·구조 주의</p>
-                  <ul className="mt-1 space-y-1 text-xs text-[#7f1d1d]">
-                    {progressInsight!.architecture_risks.slice(0, 3).map((item) => (
+                <div className="cc-ai-insight-subblock cc-ai-insight-subblock--risk">
+                  <p className="cc-ai-insight-subblock__label">아키텍처·구조 주의</p>
+                  <ul className="cc-ai-insight-subblock__list space-y-1">
+                    {progressInsight!.architecture_risks.slice(0, 1).map((item) => (
                       <li key={item}>⚠ {item}</li>
                     ))}
                   </ul>
                 </div>
               )}
               {(progressInsight?.improvements?.length ?? 0) > 0 && (
-                <div className="mt-3 rounded-lg border border-[#bbf7d0] bg-white/50 px-3 py-2">
-                  <p className="text-[10px] font-black text-[#166534]">개선 방향</p>
-                  <ul className="mt-1 space-y-1 text-xs text-[#14532d]">
-                    {progressInsight!.improvements.slice(0, 3).map((item) => (
+                <div className="cc-ai-insight-subblock cc-ai-insight-subblock--improve">
+                  <p className="cc-ai-insight-subblock__label">개선 방향</p>
+                  <ul className="cc-ai-insight-subblock__list space-y-1">
+                    {progressInsight!.improvements.slice(0, 1).map((item) => (
                       <li key={item}>✦ {item}</li>
                     ))}
                   </ul>
@@ -1051,79 +1044,6 @@ export default function TeamDetailPage() {
           )}
         </GeminiShimmerPanel>
 
-        {(isProfessor || isAdmin) && (
-          <div
-            className="mb-6 rounded-[14px] border border-[#c6d2ff] bg-white p-5 shadow-sm"
-            data-testid="professor-team-submissions"
-          >
-            <h3 className="text-base font-bold text-[#1e3a6e] mb-3">팀 제출 현황</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              피드백 {teamSubmissionFeedbacks.length}건 · 동료평가{" "}
-              {teamSubmissionPeerReviews.length}건 · 회고록 {teamSubmissionRetrospectives.length}건
-              {teamSubmissionFeedbacks.length === 0 &&
-                teamSubmissionPeerReviews.length === 0 &&
-                teamSubmissionRetrospectives.length === 0 &&
-                " (번들 v2 SQL 미실행 시 비어 있을 수 있습니다)"}
-            </p>
-            {teamSubmissionFeedbacks.length > 0 && (
-              <div className="mb-4 space-y-2">
-                <p className="text-xs font-bold text-gray-500 uppercase">피드백</p>
-                {teamSubmissionFeedbacks.map((item) => (
-                  <div
-                    key={`fb-${item.authorName}`}
-                    className="rounded-lg border border-gray-100 bg-[#f8fafc] px-3 py-2 text-sm"
-                  >
-                    <span className="font-medium text-[#155dfc]">{item.authorName}</span>
-                    {item.selectedOptions.length > 0 && (
-                      <span className="text-gray-700"> — {item.selectedOptions.join(", ")}</span>
-                    )}
-                    {item.customText && (
-                      <p className="mt-1 text-gray-600">{item.customText}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            {teamSubmissionPeerReviews.length > 0 && (
-              <div className="mb-4 space-y-2">
-                <p className="text-xs font-bold text-gray-500 uppercase">동료평가</p>
-                {teamSubmissionPeerReviews.map((item) => (
-                  <div
-                    key={`pr-${item.teammateId}-${item.goodKeywords.join("-")}`}
-                    className="rounded-lg border border-gray-100 bg-[#f8fafc] px-3 py-2 text-sm"
-                  >
-                    <span className="font-medium text-[#155dfc]">{item.teammateName}</span>
-                    {item.goodKeywords.length > 0 && (
-                      <span className="text-gray-700"> · 👍 {item.goodKeywords.join(", ")}</span>
-                    )}
-                    {item.badKeywords.length > 0 && (
-                      <span className="text-gray-600"> · 👎 {item.badKeywords.join(", ")}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            {teamSubmissionRetrospectives.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-bold text-gray-500 uppercase">회고록</p>
-                {teamSubmissionRetrospectives.map((item) => (
-                  <div
-                    key={`retro-${item.authorName}`}
-                    className="rounded-lg border border-gray-100 bg-[#f8fafc] px-3 py-2 text-sm"
-                  >
-                    <span className="font-medium text-[#155dfc]">{item.authorName}</span>
-                    <p className="mt-1 text-gray-600 line-clamp-2">
-                      {item.sections.role.custom ||
-                        item.sections.role.auto ||
-                        "내용 없음"}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* 2열 레이아웃 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* 왼쪽: 프로젝트 산출물 & 공간 */}
@@ -1132,17 +1052,17 @@ export default function TeamDetailPage() {
               📁 프로젝트 산출물 & 공간
             </h2>
 
-            {latestLinkDeliverable && (
+            {latestDeployLink && (
               <a
-                href={externalDeliverableHref(latestLinkDeliverable.publicUrl)}
+                href={latestDeployLink.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 data-testid="team-deliverable-latest-link-banner"
                 className="mb-4 block rounded-[10px] border border-[#93c5fd] bg-[#eff6ff] px-4 py-2.5 text-sm font-medium text-[#155dfc] truncate transition-colors hover:bg-[#dbeafe] hover:underline"
                 onClick={(e) => e.stopPropagation()}
-                title={latestLinkDeliverable.publicUrl}
+                title={latestDeployLink.url}
               >
-                {deliverableLinkLabel(latestLinkDeliverable)}
+                {deliverableDeployLinkLabel(latestDeployLink.deliverable)}
               </a>
             )}
 

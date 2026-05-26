@@ -2,6 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/supabase-api";
 import { supabase } from "../supabase";
 import type { ChatMessage } from "../types";
+import {
+  markDirectMessageSentBySelf,
+  markDirectMessageThreadSeen,
+  NAV_INBOX_REFRESH_EVENT,
+  sameNavInboxUserId,
+} from "../utils/navInboxSeen";
 
 function mapDirectMessageRow(
   row: { id: string; sender_user_id: string; text: string; created_at: string },
@@ -23,6 +29,16 @@ function mapDirectMessageRow(
     isMine,
     isAnon: false,
   };
+}
+
+function removeSupabaseChannelByName(channelName: string) {
+  const topicVariants = [channelName, `realtime:${channelName}`];
+  for (const ch of supabase.getChannels()) {
+    const topic = (ch as { topic?: string }).topic;
+    if (topic && topicVariants.some((variant) => topic === variant || topic.endsWith(channelName))) {
+      void supabase.removeChannel(ch);
+    }
+  }
 }
 
 export function useDirectChat(
@@ -65,8 +81,11 @@ export function useDirectChat(
   useEffect(() => {
     if (!enabled || !courseId || !peerUserId || !currentUserId) return;
 
+    const channelName = `direct-chat-${courseId}-${currentUserId}-${peerUserId}`;
+    removeSupabaseChannelByName(channelName);
+
     const channel = supabase
-      .channel(`direct-chat-${courseId}-${currentUserId}-${peerUserId}`)
+      .channel(channelName)
       .on(
         "postgres_changes",
         {
@@ -89,6 +108,16 @@ export function useDirectChat(
           if (!inThread) return;
 
           const mapped = mapDirectMessageRow(row, currentUserId, currentUserName, peerName);
+          if (sameNavInboxUserId(row.sender_user_id, currentUserId)) {
+            markDirectMessageSentBySelf(currentUserId, courseId, peerUserId, row.created_at);
+          } else {
+            markDirectMessageThreadSeen(
+              currentUserId,
+              courseId,
+              peerUserId,
+              row.created_at
+            );
+          }
           setMessages((prev) => {
             if (prev.some((msg) => msg.id === mapped.id)) return prev;
             return [...prev, mapped];
@@ -108,6 +137,9 @@ export function useDirectChat(
     setError(null);
     try {
       const sent = await api.directMessages.send(courseId, peerUserId, draft);
+      const sentAtIso = new Date().toISOString();
+      markDirectMessageSentBySelf(currentUserId, courseId, peerUserId, sentAtIso);
+      window.dispatchEvent(new CustomEvent(NAV_INBOX_REFRESH_EVENT));
       setMessages((prev) => [...prev, sent]);
       setDraft("");
     } catch (err) {

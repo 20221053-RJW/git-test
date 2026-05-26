@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
 import { getAppShellClassName } from "../layouts/appShell";
-import UserAvatar from "./UserAvatar";
+import NavProfileInbox from "./NavProfileInbox";
 
 interface NavItem {
   label: string;
@@ -90,27 +90,15 @@ export default function Navigation() {
               ))}
             </nav>
           )}
-          <div className="flex flex-col items-stretch gap-2 border-t border-[var(--cc-footer-border)] pt-2 md:flex-row md:items-center md:border-0 md:pt-0 md:pl-2">
-            <Link
-              to="/app/mypage"
-              onClick={() => setIsOpen(false)}
-              className="m3-top-app-bar__nav-link flex items-center justify-center gap-2 md:inline-flex"
-            >
-              <UserAvatar
-                name={user?.name || "사용자"}
-                imageUrl={user?.imageUrl}
-                size="xs"
-              />
-              <span
-                className={
-                  location.pathname === "/app/mypage"
-                    ? "m3-top-app-bar__user-name m3-top-app-bar__user-name--active"
-                    : "m3-top-app-bar__user-name m3-top-app-bar__user-name--idle"
-                }
-              >
-                {user?.name || "사용자"}
-              </span>
-            </Link>
+          <div className="flex flex-col items-stretch gap-2 border-t border-[var(--cc-footer-border)] pt-2 md:flex-row md:items-stretch md:border-0 md:pt-0 md:pl-2">
+            <NavProfileInbox
+              userName={user?.name || "사용자"}
+              userImageUrl={user?.imageUrl}
+              userId={user?.id}
+              isAuthenticated={isAuthenticated}
+              onNavigate={() => setIsOpen(false)}
+              mobileMenuOpen={isOpen}
+            />
             {isAuthenticated && (
               <button
                 type="button"

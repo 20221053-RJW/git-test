@@ -6,8 +6,13 @@ import M3Button from "../components/layout/M3Button";
 import PageHeader from "../components/layout/PageHeader";
 import PageLoading from "../components/layout/PageLoading";
 import CourseListCard from "../components/courses/CourseListCard";
+import StageNameListEditor, {
+  createStageRow,
+  type StageRow,
+} from "../components/courses/StageNameListEditor";
 import { useAuth } from "../contexts/AuthContext";
 import { useDebouncedRealtimeReload } from "../hooks/useDebouncedRealtimeReload";
+import { defaultNewCourseDates } from "../utils/courseDates";
 import type { Course, CourseStatus, CreateCourseInput } from "../types";
 
 const defaultStageNames = ["아이디어 기획", "서비스 디자인", "프론트 개발", "백엔드 개발", "발표 및 배포"];
@@ -24,6 +29,7 @@ const emptyForm: CreateCourseInput = {
   code: "",
   semester: "2026-1",
   schedule: "",
+  ...defaultNewCourseDates(),
   room: "",
   maxStudents: undefined,
   description: "",
@@ -36,6 +42,9 @@ export default function CoursesPage() {
   const [statusFilter, setStatusFilter] = useState<CourseStatus>("active");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [form, setForm] = useState<CreateCourseInput>(emptyForm);
+  const [stageRows, setStageRows] = useState<StageRow[]>(
+    emptyForm.stages.map((name) => createStageRow(name))
+  );
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const { isAuthenticated, isProfessor, isAdmin, isStudent, user } = useAuth();
@@ -44,12 +53,21 @@ export default function CoursesPage() {
 
   const canManageCourses = isProfessor || isAdmin;
   const openCreateModal = () => {
-    setForm({ ...emptyForm, code: generateAutoCourseCode() });
+    const nextStages = [...emptyForm.stages];
+    setForm({
+      ...emptyForm,
+      code: generateAutoCourseCode(),
+      ...defaultNewCourseDates(),
+      stages: nextStages,
+    });
+    setStageRows(nextStages.map((name) => createStageRow(name)));
     setShowCreateModal(true);
   };
 
-  const loadCourses = useCallback(async (status: CourseStatus) => {
-    setLoading(true);
+  const loadCourses = useCallback(async (status: CourseStatus, options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setLoading(true);
+    }
     setErrorMessage("");
 
     try {
@@ -58,7 +76,9 @@ export default function CoursesPage() {
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "수업 목록을 불러오지 못했습니다.");
     } finally {
-      setLoading(false);
+      if (!options?.silent) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -82,36 +102,33 @@ export default function CoursesPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const updateStage = (index: number, value: string) => {
-    setForm((prev) => ({
-      ...prev,
-      stages: prev.stages.map((stage, stageIndex) => (stageIndex === index ? value : stage)),
-    }));
-  };
-
-  const addStage = () => {
-    setForm((prev) => ({ ...prev, stages: [...prev.stages, ""] }));
-  };
-
-  const removeStage = (index: number) => {
-    setForm((prev) => ({ ...prev, stages: prev.stages.filter((_, stageIndex) => stageIndex !== index) }));
+  const syncStagesToForm = (rows: StageRow[]) => {
+    setStageRows(rows);
+    setForm((prev) => ({ ...prev, stages: rows.map((r) => r.name) }));
   };
 
   const handleCreateCourse = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (submitting) return;
     setSubmitting(true);
     setErrorMessage("");
 
     try {
-      await api.courses.create({
+      const created = await api.courses.create({
         ...form,
         code: form.code.trim(),
-        stages: form.stages.filter((stage) => stage.trim()),
+        stages: stageRows.map((row) => row.name.trim()).filter(Boolean),
       });
-      setForm(emptyForm);
       setShowCreateModal(false);
+      setForm({
+        ...emptyForm,
+        code: generateAutoCourseCode(),
+        ...defaultNewCourseDates(),
+      });
+      setStageRows(emptyForm.stages.map((name) => createStageRow(name)));
       setStatusFilter("active");
-      await loadCourses("active");
+      setCourses((prev) => [created, ...prev.filter((course) => course.id !== created.id)]);
+      await loadCourses("active", { silent: true });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "수업을 생성하지 못했습니다.");
     } finally {
@@ -159,7 +176,8 @@ export default function CoursesPage() {
 
     try {
       await api.courses.delete(course.id);
-      await loadCourses(statusFilter);
+      setCourses((prev) => prev.filter((item) => item.id !== course.id));
+      await loadCourses(statusFilter, { silent: true });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "수업을 삭제하지 못했습니다.");
     } finally {
@@ -341,139 +359,145 @@ export default function CoursesPage() {
           >
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-xl font-black text-gray-900">수업 생성</h2>
-                <p className="mt-1 text-sm text-gray-500">수업 기본 정보와 팀플 스테이지를 입력합니다.</p>
+                <h2 className="cc-modal-title">수업 생성</h2>
+                <p className="cc-modal-subtitle">수업 기본 정보와 팀플 스테이지를 입력합니다.</p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
-                className="rounded-lg px-3 py-1 text-xl font-bold text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                className="cc-icon-btn-ghost"
+                aria-label="닫기"
               >
                 ×
               </button>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <label className="text-sm font-bold text-gray-700">
+              <label className="cc-field cc-form-label">
                 수업명
                 <input
                   required
                   value={form.name}
                   onChange={(event) => updateForm("name", event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-normal outline-none focus:border-blue-500"
+                  className="cc-input"
                 />
               </label>
-              <label className="text-sm font-bold text-gray-700">
+              <label className="cc-field cc-form-label">
                 수업 코드
-                <div className="mt-1 flex gap-2">
+                <div className="cc-field-row">
                   <input
                     required
                     value={form.code}
                     readOnly
-                    className="w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 font-normal outline-none"
+                    className="cc-input cc-input--readonly-surface"
                   />
                   <button
                     type="button"
                     onClick={() => updateForm("code", generateAutoCourseCode())}
-                    className="shrink-0 rounded-lg border border-blue-200 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-50"
+                    className="cc-btn-tonal-sm"
                   >
                     재생성
                   </button>
                 </div>
               </label>
-              <label className="text-sm font-bold text-gray-700">
+              <label className="cc-field cc-form-label sm:col-span-2">
                 학기
                 <input
                   required
                   value={form.semester}
                   onChange={(event) => updateForm("semester", event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-normal outline-none focus:border-blue-500"
+                  className="cc-input"
                 />
               </label>
-              <label className="text-sm font-bold text-gray-700">
-                일정
+              <div className="grid grid-cols-2 gap-4 sm:col-span-2">
+                <label className="cc-field cc-form-label">
+                  시작일
+                  <input
+                    type="date"
+                    required
+                    value={form.startDate}
+                    onChange={(event) => updateForm("startDate", event.target.value)}
+                    className="cc-input"
+                    data-testid="course-create-start-date"
+                  />
+                </label>
+                <label className="cc-field cc-form-label">
+                  종료일
+                  <input
+                    type="date"
+                    required
+                    min={form.startDate || undefined}
+                    value={form.endDate}
+                    onChange={(event) => updateForm("endDate", event.target.value)}
+                    className="cc-input"
+                    data-testid="course-create-end-date"
+                  />
+                </label>
+              </div>
+              <label className="cc-field cc-form-label sm:col-span-2">
+                강의 시간
                 <input
-                  type="date"
-                  required
                   value={form.schedule}
                   onChange={(event) => updateForm("schedule", event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-normal outline-none focus:border-blue-500"
+                  placeholder="예: 월, 수 14:00–16:00"
+                  className="cc-input"
+                  data-testid="course-create-schedule"
                 />
               </label>
-              <label className="text-sm font-bold text-gray-700">
+              <label className="cc-field cc-form-label">
                 강의실
                 <input
                   value={form.room}
                   onChange={(event) => updateForm("room", event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-normal outline-none focus:border-blue-500"
+                  className="cc-input"
                 />
               </label>
-              <label className="text-sm font-bold text-gray-700">
+              <label className="cc-field cc-form-label">
                 최대 인원
                 <input
                   type="number"
                   min={0}
                   value={form.maxStudents ?? ""}
                   onChange={(event) => updateForm("maxStudents", event.target.value ? Number(event.target.value) : undefined)}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-normal outline-none focus:border-blue-500"
+                  className="cc-input"
                 />
               </label>
             </div>
 
-            <label className="mt-4 block text-sm font-bold text-gray-700">
+            <label className="cc-field cc-form-label mt-4">
               설명
               <textarea
                 value={form.description}
                 onChange={(event) => updateForm("description", event.target.value)}
-                className="mt-1 min-h-24 w-full rounded-lg border border-gray-300 px-3 py-2 font-normal outline-none focus:border-blue-500"
+                className="cc-textarea min-h-24"
               />
             </label>
 
             <div className="mt-5">
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-sm font-bold text-gray-700">팀플 스테이지</p>
-                <button type="button" onClick={addStage} className="text-sm font-bold text-blue-600 hover:underline">
+                <p className="cc-form-label">팀플 스테이지</p>
+                <button
+                  type="button"
+                  onClick={() => syncStagesToForm([...stageRows, createStageRow()])}
+                  className="m3-btn m3-btn--text !min-h-0 !py-1"
+                >
                   + 단계 추가
                 </button>
               </div>
-              <div className="space-y-2">
-                {form.stages.map((stage, index) => (
-                  <div key={index} className="flex gap-2">
-                    <input
-                      required={index === 0}
-                      value={stage}
-                      onChange={(event) => updateStage(index, event.target.value)}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
-                      placeholder={`${index + 1}단계`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeStage(index)}
-                      disabled={form.stages.length === 1}
-                      className="rounded-lg border border-gray-200 px-3 text-sm font-bold text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      삭제
-                    </button>
-                  </div>
-                ))}
-              </div>
+              <StageNameListEditor
+                rows={stageRows}
+                onRowsChange={syncStagesToForm}
+                inputTestIdPrefix="course-create-stage"
+              />
             </div>
 
             <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(false)}
-                className="rounded-lg border border-gray-300 px-5 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50"
-              >
+              <M3Button type="button" variant="outlined" onClick={() => setShowCreateModal(false)}>
                 취소
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
+              </M3Button>
+              <M3Button type="submit" variant="filled" disabled={submitting}>
                 {submitting ? "저장 중..." : "생성"}
-              </button>
+              </M3Button>
             </div>
           </form>
       </AppModal>

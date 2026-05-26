@@ -2,12 +2,13 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api } from "../api/supabase-api";
 import { useAuth } from "../contexts/AuthContext";
+import { markCourseAnnouncementsSeen } from "../utils/navInboxSeen";
 import type { Course } from "../types";
 
 export default function CourseAnnouncementComposePage() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
-  const { isProfessor, isAdmin } = useAuth();
+  const { isProfessor, isAdmin, user } = useAuth();
   const canManage = isProfessor || isAdmin;
 
   const [course, setCourse] = useState<Course | null>(null);
@@ -62,7 +63,10 @@ export default function CourseAnnouncementComposePage() {
           if (course?.status !== "active") return;
           setSaving(true);
           try {
-            await api.announcements.create(courseId, { title, description, dDay });
+            const created = await api.announcements.create(courseId, { title, description, dDay });
+            if (user?.id && created.sortOrder != null) {
+              markCourseAnnouncementsSeen(user.id, courseId, created.sortOrder);
+            }
             navigate(listPath);
           } catch (error) {
             alert(error instanceof Error ? error.message : "공지 등록에 실패했습니다.");

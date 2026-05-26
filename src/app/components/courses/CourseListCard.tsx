@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router";
-import { Clock, Copy, GitBranch, MapPin, User, Users } from "lucide-react";
+import { Calendar, Clock, Copy, GitBranch, MapPin, User, Users } from "lucide-react";
+import { formatCoursePeriod } from "../../utils/courseDates";
 import type { Course } from "../../types";
 
 type CourseListCardProps = {
@@ -24,6 +25,7 @@ export default function CourseListCard({
   onArchive,
   onDelete,
 }: CourseListCardProps) {
+  const periodLabel = formatCoursePeriod(course.startDate, course.endDate);
   const stageCount = course.stageCount ?? course.stages?.length ?? 0;
   const studentLabel = course.maxStudents
     ? `${course.students}/${course.maxStudents}명`
@@ -84,10 +86,19 @@ export default function CourseListCard({
             </dt>
             <dd className="cc-course-card__meta-value">{course.professor}</dd>
           </div>
+          {periodLabel ? (
+            <div className="cc-course-card__meta-item">
+              <dt className="cc-course-card__meta-label">
+                <Calendar className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                수업 기간
+              </dt>
+              <dd className="cc-course-card__meta-value">{periodLabel}</dd>
+            </div>
+          ) : null}
           <div className="cc-course-card__meta-item">
             <dt className="cc-course-card__meta-label">
               <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              시간
+              강의 시간
             </dt>
             <dd className="cc-course-card__meta-value">{course.schedule}</dd>
           </div>

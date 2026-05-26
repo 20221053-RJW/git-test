@@ -52,6 +52,9 @@ export interface Course {
   professor: string;
   professorId: string;
   schedule: string;
+  /** YYYY-MM-DD — vision #160 */
+  startDate?: string;
+  endDate?: string;
   room?: string;
   students: number;
   maxStudents?: number;
@@ -69,6 +72,8 @@ export interface CreateCourseInput {
   code: string;
   semester: string;
   schedule: string;
+  startDate: string;
+  endDate: string;
   room?: string;
   maxStudents?: number;
   description?: string;
@@ -102,6 +107,9 @@ export interface Announcement {
   title: string;
   description: string;
   dDay: number;
+  sortOrder?: number;
+  courseId?: string;
+  authorUserId?: string;
 }
 
 export interface Team {

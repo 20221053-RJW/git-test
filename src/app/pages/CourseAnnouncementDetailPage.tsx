@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { api } from "../api/supabase-api";
 import PageLoading from "../components/layout/PageLoading";
+import { useAuth } from "../contexts/AuthContext";
+import { markCourseAnnouncementsSeen } from "../utils/navInboxSeen";
 import type { Announcement, Course } from "../types";
 
 export default function CourseAnnouncementDetailPage() {
@@ -9,6 +11,7 @@ export default function CourseAnnouncementDetailPage() {
     courseId: string;
     announcementId: string;
   }>();
+  const { user } = useAuth();
   const [course, setCourse] = useState<Course | null>(null);
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,6 +39,10 @@ export default function CourseAnnouncementDetailPage() {
         const found = list.find((row) => row.id === announcementId) ?? null;
         setAnnouncement(found);
         setNotFound(!found);
+        if (user?.id && courseId && list.length > 0) {
+          const maxSort = Math.max(0, ...list.map((a) => a.sortOrder ?? 0));
+          markCourseAnnouncementsSeen(user.id, courseId, maxSort);
+        }
       } catch {
         if (!cancelled) {
           setAnnouncement(null);

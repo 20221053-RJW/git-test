@@ -119,7 +119,7 @@ function TeamCardComponent({
         {hasUnreadActivity && (
           <span
             data-testid="team-card-activity-unread"
-            className="absolute right-4 top-4 h-2.5 w-2.5 rounded-full bg-red-400 ring-2 ring-white"
+            className="cc-unread-dot-pulse absolute right-4 top-4 h-2.5 w-2.5 rounded-full bg-[#ef4444] ring-2 ring-white"
             title="확인하지 않은 새 활동"
             aria-hidden
           />

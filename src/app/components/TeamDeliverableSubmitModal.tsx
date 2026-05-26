@@ -6,6 +6,7 @@ import type { TeamDeliverable } from "../types";
 import {
   formatByteSize,
   zipProjectFolderExcludingDeps,
+  type ProjectSourceZipProgress,
   type ProjectSourceZipStats,
 } from "../utils/projectSourceZip";
 
@@ -50,15 +51,17 @@ export default function TeamDeliverableSubmitModal({
   const isFileEdit = isEdit && editing.kind !== "link";
 
   const [form, setForm] = useState<TeamDeliverableFormPayload>(emptyForm);
-  const [zipping, setZipping] = useState(false);
-  const [zipStats, setZipStats] = useState<ProjectSourceZipStats | null>(null);
+  const [preparingFolder, setPreparingFolder] = useState(false);
+  const [folderProgress, setFolderProgress] = useState<ProjectSourceZipProgress | null>(null);
+  const [folderStats, setFolderStats] = useState<ProjectSourceZipStats | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const projectFolderInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    setZipping(false);
-    setZipStats(null);
+    setPreparingFolder(false);
+    setFolderProgress(null);
+    setFolderStats(null);
     if (isEdit && editing) {
       const embeddedLink =
         editing.kind === "link" ? editing.publicUrl : extractDeployLinkFromDescription(editing.description) ?? "";
@@ -74,7 +77,7 @@ export default function TeamDeliverableSubmitModal({
     setForm(emptyForm());
   }, [open, isEdit, editing]);
 
-  const busy = uploading || zipping;
+  const busy = uploading || preparingFolder;
 
   const update = <K extends keyof TeamDeliverableFormPayload>(key: K, value: TeamDeliverableFormPayload[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -82,7 +85,7 @@ export default function TeamDeliverableSubmitModal({
 
   const mergeFiles = (incoming: FileList | null) => {
     if (!incoming?.length) return;
-    setZipStats(null);
+    setFolderStats(null);
     const next = isFileEdit ? ([] as File[]) : [...form.files];
     for (const file of Array.from(incoming)) {
       if (!next.some((f) => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified)) {
@@ -94,26 +97,30 @@ export default function TeamDeliverableSubmitModal({
 
   const handleProjectFolderPick = async (incoming: FileList | null) => {
     if (!incoming?.length) return;
-    setZipping(true);
-    setZipStats(null);
+    setPreparingFolder(true);
+    setFolderProgress({ phase: "scanning", percent: 0 });
+    setFolderStats(null);
     try {
-      const { zipFile, stats } = await zipProjectFolderExcludingDeps(incoming);
-      setZipStats(stats);
+      const { zipFile, stats } = await zipProjectFolderExcludingDeps(incoming, {
+        onProgress: setFolderProgress,
+      });
+      setFolderStats(stats);
       update("files", [zipFile]);
       if (!form.title.trim()) {
         update("title", stats.zipFileName.replace(/\.zip$/i, ""));
       }
     } catch (error) {
       console.error(error);
-      alert(error instanceof Error ? error.message : "프로젝트 압축에 실패했습니다.");
+      alert(error instanceof Error ? error.message : "프로젝트 폴더를 압축하지 못했습니다.");
       update("files", []);
     } finally {
-      setZipping(false);
+      setPreparingFolder(false);
+      setFolderProgress(null);
     }
   };
 
   const removeFile = (index: number) => {
-    setZipStats(null);
+    setFolderStats(null);
     update(
       "files",
       form.files.filter((_, i) => i !== index)
@@ -137,7 +144,7 @@ export default function TeamDeliverableSubmitModal({
     }
 
     if (!linkUrl && form.files.length === 0) {
-      alert("배포 링크 또는 파일·프로젝트 폴더 ZIP 중 하나 이상을 추가해주세요.");
+      alert("배포 링크 또는 파일·프로젝트 폴더 중 하나 이상을 추가해주세요.");
       return;
     }
     await onSubmit({
@@ -149,6 +156,11 @@ export default function TeamDeliverableSubmitModal({
     });
   };
 
+  const folderLoadingMessage =
+    folderProgress?.phase === "packaging"
+      ? "프로젝트를 ZIP으로 묶는 중입니다…"
+      : "프로젝트 파일을 확인하는 중입니다…";
+
   return (
     <AppModal
       open={open}
@@ -157,7 +169,26 @@ export default function TeamDeliverableSubmitModal({
       ariaLabel={isEdit ? "산출물 수정" : "산출물 등록"}
       panelClassName="max-w-[560px] !p-0 flex max-h-[92vh] flex-col overflow-hidden"
     >
-      <div className="flex max-h-[92vh] w-full flex-col" data-testid="team-deliverable-modal">
+      <div className="relative flex max-h-[92vh] w-full flex-col" data-testid="team-deliverable-modal">
+        {preparingFolder && (
+          <div
+            className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-white/90 px-6 backdrop-blur-[2px]"
+            data-testid="team-deliverable-folder-loading-overlay"
+            role="status"
+            aria-live="polite"
+          >
+            <AiGeneratingIndicator
+              size="md"
+              message={folderLoadingMessage}
+              testId="team-deliverable-folder-loading"
+            />
+            {folderProgress != null && (
+              <p className="text-sm font-medium text-[var(--cc-primary)]">
+                {folderProgress.percent}%
+              </p>
+            )}
+          </div>
+        )}
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <h2 className="text-lg font-bold text-[#1e2939]">{isEdit ? "산출물 수정" : "산출물 등록"}</h2>
           <button
@@ -271,7 +302,7 @@ export default function TeamDeliverableSubmitModal({
                     data-testid="team-deliverable-project-folder-picker"
                     className="rounded-[8px] border-2 border-[#93c5fd] bg-[#eff6ff] px-3 py-2 text-xs font-bold text-[#155dfc] hover:bg-[#dbeafe] disabled:opacity-60"
                   >
-                    {zipping ? "압축 중…" : "프로젝트 폴더 → ZIP"}
+                    {preparingFolder ? "압축 중…" : "프로젝트 폴더 → ZIP"}
                   </button>
                 )}
               </div>
@@ -302,15 +333,10 @@ export default function TeamDeliverableSubmitModal({
                   }}
                 />
               )}
-              {zipping && (
-                <p className="text-xs text-[#155dfc]" data-testid="team-deliverable-zip-progress">
-                  node_modules·.git 제외 후 ZIP을 만드는 중입니다…
-                </p>
-              )}
-              {zipStats && !zipping && (
-                <p className="text-xs text-[#008236]" data-testid="team-deliverable-zip-stats">
-                  포함 {zipStats.includedCount}개 · 제외 {zipStats.skippedCount}개 · 압축{" "}
-                  {formatByteSize(zipStats.zipBytes)}
+              {folderStats && !preparingFolder && (
+                <p className="text-xs text-[#008236]" data-testid="team-deliverable-folder-stats">
+                  ZIP {formatByteSize(folderStats.zipBytes)} · 포함 {folderStats.includedCount}개 · 제외(node_modules 등){" "}
+                  {folderStats.skippedCount}개
                 </p>
               )}
               {form.files.length > 0 ? (
@@ -337,11 +363,10 @@ export default function TeamDeliverableSubmitModal({
                 </ul>
               ) : (
                 !isFileEdit &&
-                !zipping && (
+                !preparingFolder && (
                   <p className="text-[11px] text-[#64748b]" data-testid="team-deliverable-upload-guide">
-                    프로젝트 폴더 선택 시 <strong>node_modules</strong>·<strong>.git</strong> 은 빼고
-                    무압축 ZIP 1개로 올립니다(AI·동료가 소스를 읽기 쉽게). 개별 파일·기존 zip도 가능 · 최대
-                    500MB
+                    프로젝트 폴더 선택 시 <strong>node_modules</strong>·<strong>.git</strong> 을 제외하고 ZIP
+                    1개로 업로드합니다. 단일 zip·pdf 등도 가능 · 합계 최대 500MB
                   </p>
                 )
               )}
@@ -365,7 +390,7 @@ export default function TeamDeliverableSubmitModal({
             data-testid="team-deliverable-link-submit"
             className="rounded-[8px] bg-[#155dfc] px-5 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60"
           >
-            {uploading ? "저장 중..." : zipping ? "압축 중..." : isEdit ? "저장" : "등록하기"}
+            {uploading ? "저장 중..." : preparingFolder ? "준비 중..." : isEdit ? "저장" : "등록하기"}
           </button>
         </div>
       </div>

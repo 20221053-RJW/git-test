@@ -16,4 +16,8 @@ export type TeamProgressInsightResponse = {
   improvements: string[];
   generated_at: string;
   model: string;
+  /** 이전 AI 기억 문서를 참고했는지 */
+  used_memory?: boolean;
+  /** 이번 호출에서 ZIP/소스를 새로 읽은 산출물 수 */
+  new_deliverables_analyzed?: number;
 };

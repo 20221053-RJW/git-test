@@ -1,6 +1,6 @@
 # recommend-troubleshooting (Edge Function)
 
-팀 상세 **트러블슈팅 로그** 맨 위 「AI 추천」 카드용. `generate-report`와 동일 Secret을 사용합니다.
+팀 상세 **트러블슈팅 AI 추천** + **AI 통합 진행상황 요약**. `generate-report`와 동일 Secret.
 
 ## 배포
 
@@ -10,24 +10,43 @@ supabase functions deploy recommend-troubleshooting
 
 `supabase/config.toml`에 `[functions.recommend-troubleshooting] verify_jwt = false` 필요.
 
+## intent
+
+| intent | 용도 | 클라이언트 |
+|--------|------|------------|
+| (생략) `troubleshooting` | 다음 조사할 문제 제안 | `ai-troubleshooting.ts` |
+| `progress-insight` | 진행 요약·기억 저장 | `ai-team-progress.ts` |
+
+### progress-insight
+
+- 산출물·트러블슈팅·채팅 수집
+- **신규** 산출물만 ZIP/소스 추출 (JSZip, `node_modules`·`.git` 제외)
+- `.ts`/`.tsx` 우선 스캔
+- `ai_team_detail_ai_memory`에 마크다운 + `analyzed_deliverable_ids` 저장
+- Gemini 없으면 `heuristic-insight` (코드 신호 기반)
+
 ## Secret
 
 | Name | 설명 |
 |------|------|
-| `GEMINI_API_KEY` | Google AI API 키 (필수 — AI 추천) |
+| `GEMINI_API_KEY` | Google AI API 키 |
 | `GEMINI_MODEL` | 선택, 기본 `gemini-2.5-flash` |
 
-키가 없으면 **200** + `model: "draft-db-only"` (팀 DB 메타 기반 초안).
+키 없음: troubleshooting → `draft-db-only` 200 · progress-insight → `heuristic-insight` 200
 
-## 요청
-
-`POST` body:
+## 요청 (troubleshooting)
 
 ```json
 { "teamId": "team-...", "locale": "ko" }
 ```
 
-## 응답
+## 요청 (progress-insight)
+
+```json
+{ "teamId": "team-...", "locale": "ko", "intent": "progress-insight" }
+```
+
+## 응답 (troubleshooting)
 
 ```json
 {
@@ -39,10 +58,14 @@ supabase functions deploy recommend-troubleshooting
 }
 ```
 
+## 응답 (progress-insight)
+
+`summary`, `strengths`, `gaps`, `next_steps`, `architecture_risks`, `improvements`, `model`, `used_memory?`, `new_deliverables_analyzed?`
+
 ## 로컬
 
 ```bash
 supabase functions serve recommend-troubleshooting --env-file supabase/.env.local
 ```
 
-`supabase/.env.local` 예: `GEMINI_API_KEY=AIza...`
+인간용 전체 설명: `doc/for_human/11_ai_system_explained.md`

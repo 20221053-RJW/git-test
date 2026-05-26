@@ -1,12 +1,13 @@
 import React, { useCallback, useState, useRef, useEffect, useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { Search, BookOpen, Clock, MapPin, FlaskConical, User, Pencil, Shuffle } from "lucide-react";
+import { Search, BookOpen, Pencil, Shuffle } from "lucide-react";
 import { api } from "../api/supabase-api";
 import AppModal from "../components/layout/AppModal";
 import PageLoading from "../components/layout/PageLoading";
 import { useAuth } from "../contexts/AuthContext";
 import type { Course, ProfessorProfile } from "../types";
 import DirectChatModal from "../components/DirectChatModal";
+import UserAvatar from "../components/UserAvatar";
 import PageHeader from "../components/layout/PageHeader";
 import { useDebouncedRealtimeReload } from "../hooks/useDebouncedRealtimeReload";
 import {
@@ -518,6 +519,157 @@ function StudentProfileModal({
   );
 }
 
+/* ─────────── 교수 프로필 모달 ─────────── */
+
+function ProfessorProfileModal({
+  profile,
+  courseId,
+  isSelf,
+  isArchived,
+  onClose,
+}: {
+  profile: ProfessorProfile;
+  courseId?: string;
+  isSelf: boolean;
+  isArchived?: boolean;
+  onClose: () => void;
+}) {
+  const [showDirectChat, setShowDirectChat] = useState(false);
+  const bio =
+    profile.bio?.trim() ||
+    [profile.department, profile.office].filter(Boolean).join(" · ") ||
+    "소개가 아직 등록되지 않았습니다.";
+  const bioIsPlaceholder = !profile.bio?.trim();
+
+  return (
+    <AppModal
+      open
+      onClose={onClose}
+      testId="professor-profile-modal-overlay"
+      ariaLabel="교수 프로필"
+      panelClassName="!p-0 w-full max-w-[520px] overflow-y-auto rounded-[14px] shadow-2xl"
+    >
+      <div data-testid="professor-profile-modal">
+        <div className="sticky top-0 z-10 rounded-t-[14px] border-b border-[#c7d9f8] bg-[#f0f5ff] px-6 pb-4 pt-5">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <UserAvatar name={profile.name} imageUrl={profile.imageUrl} size="md" />
+              <div>
+                <p className="text-lg font-bold text-[#1e3a6e]">
+                  {profile.name}
+                  {isSelf && <span className="text-base font-normal text-[#4a6fa5]"> (나)</span>}
+                </p>
+                <span className="cc-badge-info mt-0.5 inline-block rounded-full px-2 py-0.5 text-xs font-bold">
+                  담당 교수
+                </span>
+                {profile.department && (
+                  <p className="mt-1 text-sm text-[#4a6fa5]">{profile.department}</p>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-lg font-bold text-gray-400 transition-colors hover:bg-white/60 hover:text-gray-700"
+              aria-label="닫기"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-5 px-6 py-5">
+          {(profile.office || profile.officeHours) && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {profile.office && (
+                <div className="rounded-[10px] border border-gray-200 px-4 py-3">
+                  <p className="text-xs font-semibold text-[#6a7282]">연구실</p>
+                  <p className="mt-1 text-sm text-[#101828]">{profile.office}</p>
+                </div>
+              )}
+              {profile.officeHours && (
+                <div className="rounded-[10px] border border-gray-200 px-4 py-3">
+                  <p className="text-xs font-semibold text-[#6a7282]">상담 시간</p>
+                  <p className="mt-1 text-sm text-[#101828]">{profile.officeHours}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {profile.researchAreas && profile.researchAreas.length > 0 && (
+            <div>
+              <p className="mb-2 text-base font-bold text-black">연구 분야</p>
+              <div className="flex flex-wrap gap-2">
+                {profile.researchAreas.map((area) => (
+                  <span
+                    key={area}
+                    className="rounded-full bg-[#dce9fb] px-3 py-1 text-xs font-medium text-[#2b5db5]"
+                  >
+                    {area}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <p className="mb-2 text-base font-bold text-black">소개</p>
+            <div
+              className={`rounded-[10px] border px-4 py-3 ${
+                bioIsPlaceholder
+                  ? "border-dashed border-gray-200 bg-gray-50"
+                  : "border-gray-200"
+              }`}
+            >
+              <p
+                className={`text-sm leading-relaxed ${
+                  bioIsPlaceholder ? "italic text-[#9ca3af]" : "text-[#364153]"
+                }`}
+                data-testid="professor-profile-modal-bio"
+              >
+                {bio}
+              </p>
+            </div>
+          </div>
+
+          {isSelf ? (
+            !isArchived ? (
+              <Link
+                to="/app/profile/professor"
+                onClick={onClose}
+                className="flex w-full items-center justify-center gap-2 rounded-[10px] bg-[#155dfc] py-3 text-sm font-bold text-white transition-colors hover:bg-blue-700"
+                data-testid="professor-profile-edit-link"
+              >
+                <Pencil className="h-4 w-4" />
+                내 정보 수정
+              </Link>
+            ) : null
+          ) : (
+            <button
+              type="button"
+              disabled={!courseId || isArchived}
+              onClick={() => courseId && setShowDirectChat(true)}
+              data-testid="professor-profile-direct-chat-open"
+              className="w-full rounded-[10px] bg-[#101828] py-3 text-sm font-bold text-white transition-colors hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              1:1 채팅하기
+            </button>
+          )}
+        </div>
+      </div>
+      {courseId && !isSelf && (
+        <DirectChatModal
+          open={showDirectChat}
+          courseId={courseId}
+          peerUserId={profile.id}
+          peerName={profile.name}
+          onClose={() => setShowDirectChat(false)}
+        />
+      )}
+    </AppModal>
+  );
+}
+
 interface EditForm {
   major: string;
   mbti: string;
@@ -783,6 +935,60 @@ function RandomTeamModal({
   );
 }
 
+/* ─────────── 교수 그리드 카드 (vision #163) ─────────── */
+
+function ProfessorNetworkCard({
+  profile,
+  onClick,
+}: {
+  profile: ProfessorProfile;
+  onClick?: () => void;
+}) {
+  const bio =
+    profile.bio?.trim() ||
+    [profile.department, profile.office].filter(Boolean).join(" · ") ||
+    "담당 교수";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full cursor-pointer flex-col gap-3 rounded-[14px] border-2 border-[#c7d9f8] bg-[#f0f5ff] p-6 text-left transition-all hover:border-[#9bb8eb] hover:shadow-md"
+      data-testid="students-network-professor-grid-card"
+    >
+      <div className="flex justify-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#dbe8fb] ring-2 ring-[#b8d0f5]">
+          <span className="text-xl font-bold text-[#2b5db5]">{profile.name.charAt(0)}</span>
+        </div>
+      </div>
+      <div className="text-center">
+        <p className="text-lg font-bold text-[#1e3a6e]">{profile.name}</p>
+        <span className="cc-badge-info mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-bold">
+          담당 교수
+        </span>
+        {profile.department && (
+          <p className="mt-1 text-xs text-[#4a6fa5]">{profile.department}</p>
+        )}
+      </div>
+      <div className="rounded-[10px] border border-[#c7d9f8] bg-white/80 px-4 py-3">
+        <p className="line-clamp-4 text-center text-xs leading-[1.6] text-[#364153]">{bio}</p>
+      </div>
+      {profile.researchAreas && profile.researchAreas.length > 0 && (
+        <div className="flex flex-wrap justify-center gap-1.5">
+          {profile.researchAreas.slice(0, 3).map((area) => (
+            <span
+              key={area}
+              className="rounded-full bg-[#dce9fb] px-2.5 py-0.5 text-[10px] text-[#2b5db5]"
+            >
+              {area}
+            </span>
+          ))}
+        </div>
+      )}
+    </button>
+  );
+}
+
 /* ─────────── 학생 카드 ─────────── */
 
 function StudentCard({
@@ -866,6 +1072,7 @@ export default function StudentsNetworkPage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [selectedProfessor, setSelectedProfessor] = useState<ProfessorProfile | null>(null);
   const [showMyProfileModal, setShowMyProfileModal] = useState(false);
   const [showRandomTeamModal, setShowRandomTeamModal] = useState(false);
   const [assignedStudentIds, setAssignedStudentIds] = useState<string[]>([]);
@@ -1002,7 +1209,11 @@ export default function StudentsNetworkPage() {
     );
   }
 
-  if (!isStudent && students.length === 0) {
+  if (
+    !isStudent &&
+    students.length === 0 &&
+    !(courseProfessor && (isProfessor || isAdmin))
+  ) {
     return (
       <div className="cc-page-main flex min-h-[12rem] w-full items-center justify-center py-8">
         <p className="font-medium text-[var(--cc-text-secondary)]">이 수업에 등록된 학생이 없습니다.</p>
@@ -1021,11 +1232,40 @@ export default function StudentsNetworkPage() {
     );
   });
 
-  const allDisplayStudents =
-    isStudent && displaySelfStudent
-      ? [displaySelfStudent, ...filteredOthers.map((s) => enrichStudentForDisplay(s))]
-      : filteredOthers.map((s) => enrichStudentForDisplay(s));
   const isArchived = course?.status === "archived";
+
+  type NetworkGridItem =
+    | { kind: "professor"; profile: ProfessorProfile }
+    | { kind: "student"; student: Student };
+
+  const studentGridEntries: NetworkGridItem[] = filteredOthers.map((s) => ({
+    kind: "student",
+    student: enrichStudentForDisplay(s),
+  }));
+
+  let networkGridItems: NetworkGridItem[];
+  if (!courseProfessor) {
+    networkGridItems =
+      isStudent && displaySelfStudent
+        ? [
+            { kind: "student", student: enrichStudentForDisplay(displaySelfStudent) },
+            ...studentGridEntries,
+          ]
+        : studentGridEntries;
+  } else {
+    const professorItem: NetworkGridItem = { kind: "professor", profile: courseProfessor };
+    if (isProfessor) {
+      networkGridItems = [professorItem, ...studentGridEntries];
+    } else if (isStudent && displaySelfStudent) {
+      networkGridItems = [
+        { kind: "student", student: enrichStudentForDisplay(displaySelfStudent) },
+        professorItem,
+        ...studentGridEntries,
+      ];
+    } else {
+      networkGridItems = [professorItem, ...studentGridEntries];
+    }
+  }
 
   return (
     <div className="cc-page-main w-full">
@@ -1041,75 +1281,11 @@ export default function StudentsNetworkPage() {
           </div>
         )}
 
-        {/* 담당 교수 프로필 (vision #141 — 학생·교수 모두 조회) */}
-        {courseProfessor && (
-          <div
-            className="mb-6 rounded-2xl border border-[#c7d9f8] bg-[#f0f5ff] p-6 shadow-sm"
-            data-testid="students-network-professor-card"
-          >
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-[#dbe8fb] ring-2 ring-[#b8d0f5]">
-                  <span className="text-xl font-bold text-[#2b5db5]">
-                    {courseProfessor.name.charAt(0)}
-                  </span>
-                </div>
-                <div>
-                  <div className="mb-1 flex items-center gap-2">
-                    <span className="text-lg font-bold text-[#1e3a6e]">{courseProfessor.name}</span>
-                    <span className="cc-badge-info rounded-full px-2 py-0.5 text-xs font-bold">
-                      담당 교수
-                    </span>
-                  </div>
-                  <p className="text-sm text-[#4a6fa5]">{courseProfessor.department}</p>
-                  {courseProfessor.bio && (
-                    <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-[#364153]">
-                      {courseProfessor.bio}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-x-8 gap-y-2 text-sm text-[#4a6fa5] sm:grid-cols-2">
-                {courseProfessor.office && (
-                  <div className="flex items-center gap-1.5">
-                    <MapPin className="h-3.5 w-3.5 flex-shrink-0 text-[#7a9fd4]" />
-                    <span>{courseProfessor.office}</span>
-                  </div>
-                )}
-                {courseProfessor.officeHours && (
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 flex-shrink-0 text-[#7a9fd4]" />
-                    <span>오피스아워: {courseProfessor.officeHours}</span>
-                  </div>
-                )}
-                {courseProfessor.researchAreas && courseProfessor.researchAreas.length > 0 && (
-                  <div className="col-span-2 flex items-start gap-1.5">
-                    <FlaskConical className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[#7a9fd4]" />
-                    <div className="flex flex-wrap gap-1.5">
-                      {courseProfessor.researchAreas.map((area) => (
-                        <span
-                          key={area}
-                          className="rounded-full bg-[#dce9fb] px-2.5 py-0.5 text-xs text-[#2b5db5]"
-                        >
-                          {area}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            {isProfessor && (
-              <div className="mt-4 flex items-center gap-2 border-t border-[#c7d9f8] pt-4 text-sm text-[#4a6fa5]">
-                <BookOpen className="h-4 w-4 text-[#7a9fd4]" />
-                <span>
-                  현재 수강자{" "}
-                  <span className="font-bold text-[#1e3a6e]">{students.length}명</span>이 등록되어
-                  있습니다.
-                </span>
-              </div>
-            )}
-          </div>
+        {isProfessor && courseProfessor && (
+          <p className="mb-4 flex items-center gap-2 text-sm text-[#4a6fa5]">
+            <BookOpen className="h-4 w-4 text-[#7a9fd4]" aria-hidden />
+            현재 수강자 <span className="font-bold text-[#1e3a6e]">{students.length}명</span>
+          </p>
         )}
 
         {/* 학생 본인 프로필 배너 */}
@@ -1204,21 +1380,34 @@ export default function StudentsNetworkPage() {
           </div>
         </div>
 
-        {/* 학생 그리드 */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {allDisplayStudents.map((student) => (
-            <StudentCard
-              key={student.id}
-              student={student}
-              studentExtras={studentExtras}
-              editForm={student.isSelf ? editForm : undefined}
-              onClick={() =>
-                student.isSelf
-                  ? setShowMyProfileModal(true)
-                  : setSelectedStudent(students.find((s) => s.id === student.id) ?? student)
-              }
-            />
-          ))}
+        {/* 수강자·교수 그리드 (vision #163) */}
+        <div
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          data-testid="students-network-grid"
+        >
+          {networkGridItems.map((item) =>
+            item.kind === "professor" ? (
+              <ProfessorNetworkCard
+                key={`professor-${item.profile.id}`}
+                profile={item.profile}
+                onClick={() => setSelectedProfessor(item.profile)}
+              />
+            ) : (
+              <StudentCard
+                key={item.student.id}
+                student={item.student}
+                studentExtras={studentExtras}
+                editForm={item.student.isSelf ? editForm : undefined}
+                onClick={() =>
+                  item.student.isSelf
+                    ? setShowMyProfileModal(true)
+                    : setSelectedStudent(
+                        students.find((s) => s.id === item.student.id) ?? item.student
+                      )
+                }
+              />
+            )
+          )}
         </div>
 
         {filteredOthers.length === 0 && searchQuery.trim() && (
@@ -1226,6 +1415,16 @@ export default function StudentsNetworkPage() {
             <p>"{searchQuery}"에 해당하는 수강자를 찾을 수 없습니다.</p>
           </div>
         )}
+
+      {selectedProfessor && (
+        <ProfessorProfileModal
+          profile={selectedProfessor}
+          courseId={courseId}
+          isSelf={Boolean(isProfessor && user?.id === selectedProfessor.id)}
+          isArchived={isArchived}
+          onClose={() => setSelectedProfessor(null)}
+        />
+      )}
 
       {selectedStudent && (
         <StudentProfileModal

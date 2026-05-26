@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { api } from "../api/supabase-api";
 import StudentQuickProfileModal from "../components/StudentQuickProfileModal";
 import PageHeader from "../components/layout/PageHeader";
 import PageLoading from "../components/layout/PageLoading";
 import { useAuth } from "../contexts/AuthContext";
+import { formatCoursePeriod } from "../utils/courseDates";
 import type { Course, CourseMaterial, StudentProfile, TeamMember } from "../types";
 
 export default function CourseDetailPage() {
@@ -55,22 +56,28 @@ export default function CourseDetailPage() {
     course && course.status === "active" && (isAdmin || (isProfessor && course.professorId === user?.id))
   );
 
-  useEffect(() => {
+  const loadCourseDetail = useCallback(async () => {
     if (!id) return;
-
-    void Promise.all([
-      api.courses.getById(id),
-      api.teamCards.getAll(id),
-      api.courses.listMaterials(id),
-    ]).then(([courseData, teamCards, materials]) => {
+    setLoading(true);
+    try {
+      const [courseData, teamCards, materials] = await Promise.all([
+        api.courses.getById(id),
+        api.teamCards.getAll(id),
+        api.courses.listMaterials(id),
+      ]);
       setCourse(courseData || null);
       const myTeam = teamCards.find((team) => team.members.some((member) => member.id === user?.id));
       setMyTeamId(myTeam?.id ?? null);
       setMyTeamMembers(myTeam?.members ?? []);
       setCourseMaterials(materials);
+    } finally {
       setLoading(false);
-    });
+    }
   }, [id, user?.id]);
+
+  useEffect(() => {
+    void loadCourseDetail();
+  }, [loadCourseDetail]);
 
   const handleUploadCourseMaterial = async (file: File) => {
     if (!id || !file) return;
@@ -193,8 +200,16 @@ export default function CourseDetailPage() {
             <p className="text-sm text-gray-600 mb-1">{"\uB2F4\uB2F9 \uAD50\uC218"}</p>
             <p className="font-bold text-gray-900">{course.professor}</p>
           </div>
+          {formatCoursePeriod(course.startDate, course.endDate) ? (
+            <div className="bg-gray-50 p-4 rounded-lg" data-testid="course-detail-period">
+              <p className="text-sm text-gray-600 mb-1">수업 기간</p>
+              <p className="font-bold text-gray-900">
+                {formatCoursePeriod(course.startDate, course.endDate)}
+              </p>
+            </div>
+          ) : null}
           <div className="bg-gray-50 p-4 rounded-lg">
-            <p className="text-sm text-gray-600 mb-1">{"\uAC15\uC758 \uC2DC\uAC04"}</p>
+            <p className="text-sm text-gray-600 mb-1">강의 시간</p>
             <p className="font-bold text-gray-900">{course.schedule}</p>
           </div>
           {course.room && (

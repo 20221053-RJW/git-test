@@ -35,8 +35,9 @@ AI에게 시킬 때: **「doc/starter.txt 읽고 이어서 해줘」**
 | vision 기능 요약 | `26_vision_features_status` |
 | 진행률 | `01_project_status` |
 | AI가 뭘 했나 | `25_ai_work_log` |
+| **AI 기능 전체 (구조·코드·3가지 기능)** | **`11_ai_system_explained`** |
 | Supabase SQL 5분 | `29_supabase_bundle_sql` |
-| AI 리포트 켜기 | `30_edge_ai_report` |
+| AI Secret·Edge 배포 | `30_edge_ai_report` |
 | 리포트 집계 확인 | **`37_verify_ai_report`** |
 | RLS 승인 (H-001) | **`31_rls_beta_decision`** · JWT **`33_firebase_supabase_jwt_setup`** |
 | **런칭 한 페이지** | **`36_launch_one_pager`** |

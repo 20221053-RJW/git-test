@@ -2,6 +2,10 @@ import JSZip from "jszip";
 
 /** 산출물 업로드 한도 (supabase-api TEAM_DELIVERABLE_MAX_BYTES 와 동일) */
 export const PROJECT_SOURCE_ZIP_MAX_BYTES = 500 * 1024 * 1024;
+export const PROJECT_FOLDER_MAX_BYTES = PROJECT_SOURCE_ZIP_MAX_BYTES;
+export const PROJECT_FOLDER_MAX_FILES = 2000;
+
+const SCAN_FILES_BATCH_SIZE = 40;
 
 /** 폴더 선택 시 경로에서 제외할 디렉터리 이름 (세그먼트 일치) */
 const EXCLUDED_DIR_NAMES = new Set(["node_modules", ".git"]);
@@ -13,6 +17,21 @@ export type ProjectSourceZipStats = {
   zipBytes: number;
   zipFileName: string;
 };
+
+export type ProjectSourceZipProgress =
+  | { phase: "scanning"; percent: number }
+  | { phase: "packaging"; percent: number };
+
+/** @deprecated zipProjectFolderExcludingDeps.stats 와 동일 */
+export type ProjectFolderCollectStats = {
+  includedCount: number;
+  skippedCount: number;
+  totalBytes: number;
+  rootName: string;
+};
+
+/** @deprecated */
+export type ProjectFolderCollectProgress = ProjectSourceZipProgress;
 
 function normalizePath(path: string): string {
   return path.replace(/\\/g, "/").replace(/^\/+/, "");
@@ -32,12 +51,22 @@ function defaultZipBaseName(files: File[]): string {
   return safe || "project-source";
 }
 
+function yieldToMainThread(): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
 /**
- * 폴더 선택(FileList, webkitRelativePath) → node_modules 등 제외 후 zip 1개 생성
+ * 폴더 선택(FileList, webkitRelativePath) → node_modules 등 제외 → ZIP 1개 생성 (STORE 무압축)
  */
 export async function zipProjectFolderExcludingDeps(
   fileList: FileList | File[],
-  options?: { zipBaseName?: string; maxBytes?: number }
+  options?: {
+    zipBaseName?: string;
+    maxBytes?: number;
+    onProgress?: (progress: ProjectSourceZipProgress) => void;
+  }
 ): Promise<{ zipFile: File; stats: ProjectSourceZipStats }> {
   const maxBytes = options?.maxBytes ?? PROJECT_SOURCE_ZIP_MAX_BYTES;
   const files = Array.from(fileList);
@@ -49,16 +78,27 @@ export async function zipProjectFolderExcludingDeps(
   let includedCount = 0;
   let skippedCount = 0;
   let uncompressedBytes = 0;
+  const total = files.length;
 
-  for (const file of files) {
+  for (let index = 0; index < files.length; index += 1) {
+    const file = files[index];
     const relativePath = normalizePath(file.webkitRelativePath || file.name);
     if (!relativePath || shouldExcludeProjectPath(relativePath)) {
       skippedCount += 1;
-      continue;
+    } else {
+      zip.file(relativePath, file, {
+        compression: "STORE",
+        compressionOptions: { level: 0 },
+      });
+      includedCount += 1;
+      uncompressedBytes += file.size;
     }
-    zip.file(relativePath, file);
-    includedCount += 1;
-    uncompressedBytes += file.size;
+
+    if (index % SCAN_FILES_BATCH_SIZE === 0 || index === total - 1) {
+      const percent = Math.round(((index + 1) / total) * 100);
+      options?.onProgress?.({ phase: "scanning", percent });
+      await yieldToMainThread();
+    }
   }
 
   if (includedCount === 0) {
@@ -67,14 +107,25 @@ export async function zipProjectFolderExcludingDeps(
     );
   }
 
-  const blob = await zip.generateAsync({
-    type: "blob",
-    compression: "STORE",
-  });
+  options?.onProgress?.({ phase: "packaging", percent: 0 });
+
+  const blob = await zip.generateAsync(
+    {
+      type: "blob",
+      compression: "STORE",
+      compressionOptions: { level: 0 },
+    },
+    (metadata) => {
+      options?.onProgress?.({
+        phase: "packaging",
+        percent: Math.round(metadata.percent),
+      });
+    }
+  );
 
   if (blob.size > maxBytes) {
     throw new Error(
-      `압축 파일이 ${(blob.size / (1024 * 1024)).toFixed(1)}MB입니다. 파일당 최대 ${(maxBytes / (1024 * 1024)).toFixed(0)}MB 이하로 줄여 주세요.`
+      `압축 파일이 ${(blob.size / (1024 * 1024)).toFixed(1)}MB입니다. 최대 ${(maxBytes / (1024 * 1024)).toFixed(0)}MB 이하로 줄여 주세요.`
     );
   }
 
@@ -85,6 +136,8 @@ export async function zipProjectFolderExcludingDeps(
     type: "application/zip",
     lastModified: Date.now(),
   });
+
+  options?.onProgress?.({ phase: "packaging", percent: 100 });
 
   return {
     zipFile,

@@ -54,6 +54,15 @@ import {
 import { recommendTroubleshootingFromEdge } from "./ai-troubleshooting";
 import { DEFAULT_PEER_REVIEW_GOOD_KEYWORDS } from "../constants/peerReview";
 import {
+  briefDeliverableDescriptionSummary,
+  deliverableHasDeployLink,
+  extractDeployLinkFromDescription,
+  isDeliverableArchiveFile,
+  resolveDeliverableDeployUrl,
+} from "../utils/deliverableLinks";
+
+export { extractDeployLinkFromDescription };
+import {
   getCachedAccessibleCourseIds,
   getCachedCourseStatus,
   getCachedCourseDmPeerIds,
@@ -422,6 +431,9 @@ async function getCourseStageNamesFromDb(courseId?: string): Promise<string[]> {
   const courseStages = await getCourseStagesFromDb(courseId);
   if (courseStages.length > 0) return courseStages.map((stage) => stage.name);
 
+  // 수업이 지정된 경우 글로벌 ai_team_stages 로 대체하지 않음 (vision #162)
+  if (courseId) return [];
+
   const { data, error } = await supabase
     .from("ai_team_stages")
     .select("name, position")
@@ -438,7 +450,7 @@ async function getCoursesFromDb(options: CourseQueryOptions = { status: "active"
 
   let query = supabase
     .from("ai_courses")
-    .select("id, name, code, instructor_user_id, schedule, room, students_count, max_students, semester, description, status, archived_at, archived_by")
+    .select("id, name, code, instructor_user_id, schedule, start_date, end_date, room, students_count, max_students, semester, description, status, archived_at, archived_by")
     .order("id", { ascending: true });
 
   query = query.in("id", accessibleCourseIds);
@@ -488,6 +500,8 @@ async function getCoursesFromDb(options: CourseQueryOptions = { status: "active"
       professor: professor?.name ?? "",
       professorId: course.instructor_user_id ?? "",
       schedule: course.schedule,
+      startDate: course.start_date ?? undefined,
+      endDate: course.end_date ?? undefined,
       room: course.room ?? undefined,
       students: studentCounts[course.id] ?? course.students_count,
       maxStudents: course.max_students ?? undefined,
@@ -515,13 +529,23 @@ async function createCourseInDb(input: CreateCourseInput): Promise<Course> {
 
   const courseId = createCourseId(input.code);
   const stageNames = input.stages.map((stage) => stage.trim()).filter(Boolean);
+  const startDate = input.startDate.trim();
+  const endDate = input.endDate.trim();
+  if (!startDate || !endDate) {
+    throw new Error("시작일과 종료일을 입력해주세요.");
+  }
+  if (endDate < startDate) {
+    throw new Error("종료일은 시작일 이후여야 합니다.");
+  }
 
   const { error: courseError } = await supabase.from("ai_courses").insert({
     id: courseId,
     name: input.name.trim(),
     code: input.code.trim(),
     instructor_user_id: currentUser.id,
-    schedule: input.schedule.trim(),
+    schedule: input.schedule.trim() || "미정",
+    start_date: startDate,
+    end_date: endDate,
     room: input.room?.trim() || null,
     students_count: 0,
     max_students: input.maxStudents ?? null,
@@ -538,11 +562,18 @@ async function createCourseInDb(input: CreateCourseInput): Promise<Course> {
         course_id: courseId,
         name: stage,
         position: index + 1,
+        is_required: true,
       }))
     );
 
-    if (stageError) throw stageError;
+    if (stageError) {
+      await supabase.from("ai_courses").delete().eq("id", courseId);
+      invalidateApiSessionCache();
+      throw stageError;
+    }
   }
+
+  invalidateApiSessionCache();
 
   const createdCourse = await getCourseByIdFromDb(courseId);
   if (!createdCourse) throw new Error("생성된 수업을 다시 불러오지 못했습니다.");
@@ -570,6 +601,17 @@ async function replaceCourseStagesInDb(courseId: string, stageNames: string[]): 
     .delete()
     .eq("course_id", courseId);
   if (deleteError) throw deleteError;
+
+  const { count: remainingCount, error: countError } = await supabase
+    .from("ai_course_stages")
+    .select("id", { count: "exact", head: true })
+    .eq("course_id", courseId);
+  if (countError) throw countError;
+  if ((remainingCount ?? 0) > 0) {
+    throw new Error(
+      "기존 스테이지를 삭제하지 못했습니다. 데이터베이스 DELETE 권한(RLS)을 확인해 주세요."
+    );
+  }
 
   const { error: insertError } = await supabase.from("ai_course_stages").insert(
     names.map((name, index) => ({
@@ -609,6 +651,18 @@ async function archiveCourseInDb(courseId: string): Promise<Course> {
   return archivedCourse;
 }
 
+async function deleteStorageObjectsBestEffort(bucket: string, paths: string[]): Promise<void> {
+  const objectPaths = paths.filter((path) => path && !path.startsWith("link://"));
+  for (let index = 0; index < objectPaths.length; index += 100) {
+    const chunk = objectPaths.slice(index, index + 100);
+    if (chunk.length === 0) continue;
+    const { error } = await supabase.storage.from(bucket).remove(chunk);
+    if (error) {
+      console.warn(`[deleteCourse] storage remove failed (${bucket}):`, error.message);
+    }
+  }
+}
+
 async function deleteCourseInDb(courseId: string): Promise<void> {
   const currentUser = await getCurrentAiUser();
   if (!currentUser) throw new Error("로그인이 필요합니다.");
@@ -622,14 +676,40 @@ async function deleteCourseInDb(courseId: string): Promise<void> {
     }
   }
 
-  const { data: teams, error: teamsError } = await supabase
-    .from("ai_teams")
-    .select("id")
-    .eq("course_id", courseId);
+  const [teamsResult, materialsResult] = await Promise.all([
+    supabase.from("ai_teams").select("id").eq("course_id", courseId),
+    supabase.from("ai_course_materials").select("storage_path").eq("course_id", courseId),
+  ]);
 
-  if (teamsError) throw teamsError;
+  if (teamsResult.error) throw teamsResult.error;
+  if (materialsResult.error && !isMissingRelationError(materialsResult.error)) {
+    throw materialsResult.error;
+  }
 
-  const teamIds = (teams ?? []).map((team) => team.id);
+  const teamIds = (teamsResult.data ?? []).map((team) => team.id);
+  const materialStoragePaths = (materialsResult.data ?? [])
+    .map((row) => row.storage_path as string | null)
+    .filter((path): path is string => Boolean(path));
+
+  let deliverableStoragePaths: string[] = [];
+  if (teamIds.length > 0) {
+    const { data: deliverables, error: deliverablesError } = await supabase
+      .from("ai_team_deliverables")
+      .select("storage_path")
+      .in("team_id", teamIds);
+
+    if (deliverablesError && !isMissingRelationError(deliverablesError)) throw deliverablesError;
+    deliverableStoragePaths = (deliverables ?? [])
+      .map((row) => row.storage_path as string | null)
+      .filter((path): path is string => Boolean(path));
+  }
+
+  // ai_projects.team_id → ai_teams (no CASCADE): 팀 삭제 전에 반드시 제거
+  const { error: projectsError } = await supabase.from("ai_projects").delete().eq("course_id", courseId);
+  if (projectsError) throw projectsError;
+
+  const { error: questionsError } = await supabase.from("ai_questions").delete().eq("course_id", courseId);
+  if (questionsError && !isMissingRelationError(questionsError)) throw questionsError;
 
   if (teamIds.length > 0) {
     const detailTables = [
@@ -640,6 +720,9 @@ async function deleteCourseInDb(courseId: string): Promise<void> {
       "ai_team_detail_professor_student_evals",
       "ai_team_detail_professor_project_evals",
       "ai_team_detail_troubleshooting_logs",
+      "ai_team_detail_config",
+      "ai_team_detail_peer_review_students",
+      "ai_team_detail_teammates",
       "ai_team_deliverables",
       "ai_team_activities",
       "ai_team_members",
@@ -657,8 +740,6 @@ async function deleteCourseInDb(courseId: string): Promise<void> {
   const courseScopedDeletes = [
     supabase.from("ai_direct_messages").delete().eq("course_id", courseId),
     supabase.from("ai_announcements").delete().eq("course_id", courseId),
-    supabase.from("ai_questions").delete().eq("course_id", courseId),
-    supabase.from("ai_projects").delete().eq("course_id", courseId),
     supabase.from("ai_course_stages").delete().eq("course_id", courseId),
     supabase.from("ai_course_materials").delete().eq("course_id", courseId),
     supabase.from("ai_course_memberships").delete().eq("course_id", courseId),
@@ -669,8 +750,20 @@ async function deleteCourseInDb(courseId: string): Promise<void> {
     if (error && !isMissingRelationError(error)) throw error;
   }
 
-  const { error: courseDeleteError } = await supabase.from("ai_courses").delete().eq("id", courseId);
+  await deleteStorageObjectsBestEffort("ai_course_materials", materialStoragePaths);
+  await deleteStorageObjectsBestEffort("ai_team_deliverables", deliverableStoragePaths);
+
+  const { data: deletedCourses, error: courseDeleteError } = await supabase
+    .from("ai_courses")
+    .delete()
+    .eq("id", courseId)
+    .select("id");
   if (courseDeleteError) throw courseDeleteError;
+  if (!deletedCourses?.length) {
+    throw new Error("수업 삭제가 완료되지 않았습니다. DB 권한 또는 외래키 제약을 확인해 주세요.");
+  }
+
+  invalidateApiSessionCache();
 }
 
 async function getTeamCardsFromDb(courseId?: string): Promise<TeamCard[]> {
@@ -841,7 +934,7 @@ async function getAnnouncementsFromDb(courseId?: string, limit?: number): Promis
 
   const { data, error } = await supabase
     .from("ai_announcements")
-    .select("id, title, description, d_day, sort_order, course_id")
+    .select("id, title, description, d_day, sort_order, course_id, author_user_id")
     .eq("course_id", selectedCourseId)
     .order("sort_order", { ascending: true });
 
@@ -852,6 +945,9 @@ async function getAnnouncementsFromDb(courseId?: string, limit?: number): Promis
     title: announcement.title,
     description: announcement.description,
     dDay: announcement.d_day,
+    sortOrder: announcement.sort_order as number,
+    courseId: announcement.course_id as string,
+    authorUserId: (announcement.author_user_id as string | null) ?? undefined,
   }));
 
   return typeof limit === "number" ? mapped.slice(0, limit) : mapped;
@@ -876,6 +972,9 @@ async function createAnnouncementInDb(
 
   if (countError) throw formatAnnouncementDbError(countError);
 
+  const currentUser = await getCurrentAiUser();
+  if (!currentUser) throw new Error("로그인이 필요합니다.");
+
   const nextOrder = (existing?.[0]?.sort_order ?? 0) + 1;
   const id = `ann-${courseId}-${Date.now()}`;
   const { error } = await supabase.from("ai_announcements").insert({
@@ -885,11 +984,20 @@ async function createAnnouncementInDb(
     description,
     d_day: Math.max(0, input.dDay),
     sort_order: nextOrder,
+    author_user_id: currentUser.id,
   });
 
   if (error) throw formatAnnouncementDbError(error);
 
-  return { id, title, description, dDay: Math.max(0, input.dDay) };
+  return {
+    id,
+    title,
+    description,
+    dDay: Math.max(0, input.dDay),
+    sortOrder: nextOrder,
+    courseId,
+    authorUserId: currentUser.id,
+  };
 }
 
 function mapAiUserToNetworkStudent(student: AiUser, isSelf: boolean): NetworkStudent {
@@ -1747,6 +1855,7 @@ export type DirectMessageThread = {
   lastMessage: string;
   lastTime: string;
   lastAt: string;
+  lastSenderUserId: string;
 };
 
 async function listDirectMessageThreadsFromDb(courseId: string): Promise<DirectMessageThread[]> {
@@ -1770,7 +1879,10 @@ async function listDirectMessageThreadsFromDb(courseId: string): Promise<DirectM
     throw error;
   }
 
-  const latestByPeer = new Map<string, { text: string; created_at: string }>();
+  const latestByPeer = new Map<
+    string,
+    { text: string; created_at: string; sender_user_id: string }
+  >();
   for (const row of data ?? []) {
     const senderId = row.sender_user_id as string;
     const recipientId = row.recipient_user_id as string;
@@ -1780,6 +1892,7 @@ async function listDirectMessageThreadsFromDb(courseId: string): Promise<DirectM
       latestByPeer.set(peerId, {
         text: row.text as string,
         created_at: row.created_at as string,
+        sender_user_id: senderId,
       });
     }
   }
@@ -1810,6 +1923,7 @@ async function listDirectMessageThreadsFromDb(courseId: string): Promise<DirectM
         lastMessage: latest.text,
         lastTime,
         lastAt: latest.created_at,
+        lastSenderUserId: latest.sender_user_id,
       };
     })
     .sort((a, b) => b.lastAt.localeCompare(a.lastAt));
@@ -2300,45 +2414,50 @@ export function buildTeamProgressInsight(
   const resolved = logs.filter((log) => log.status === "resolved");
   const inProgress = logs.filter((log) => log.status !== "resolved");
   const fileItems = deliverables.filter((d) => d.kind !== "link");
-  const linkItems = deliverables.filter((d) => d.kind === "link");
+  const linkOnlyItems = deliverables.filter((d) => d.kind === "link");
+  const withDeployLink = deliverables.filter((d) => deliverableHasDeployLink(d));
   const codeFiles = fileItems.filter((d) => CODE_EXT.has(getDeliverableExtension(d.fileName)));
-  const archives = fileItems.filter((d) =>
-    ["zip", "7z", "rar", "tar", "gz"].includes(getDeliverableExtension(d.fileName))
-  );
+  const archives = fileItems.filter((d) => isDeliverableArchiveFile(d.fileName, d.mimeType));
 
   const strengths: string[] = [];
   const gaps: string[] = [];
 
-  if (deliverables.length > 0) {
+  if (deliverables.length === 0) {
+    gaps.push("산출물이 없습니다. 중간 발표 자료·소스 ZIP·데모 링크를 먼저 공유하세요.");
+  } else if (archives.length > 0) {
     const latestName = deliverables[0]?.fileName ?? "";
+    const latestSub = deliverables[0]?.subtitle?.trim();
     strengths.push(
-      `산출물 ${deliverables.length}건 제출됨${latestName ? ` — 최근: ${latestName}` : ""}.`
+      `프로젝트 압축본「${latestName}」이 등록되어 ZIP 안 소스·문서를 AI가 분석할 수 있습니다${latestSub ? ` (${latestSub})` : ""}.`
     );
-  } else {
-    gaps.push("산출물이 없습니다. 중간 발표 자료·소스·데모 링크를 먼저 공유하세요.");
-  }
-
-  if (codeFiles.length > 0) {
+  } else if (codeFiles.length > 0) {
     strengths.push(
-      `소스·코드 형식 산출물 ${codeFiles.length}건(${codeFiles
+      `핵심 소스 파일(${codeFiles
         .slice(0, 2)
         .map((d) => d.fileName)
-        .join(", ")}${codeFiles.length > 2 ? " …" : ""})이 포함되어 있습니다.`
+        .join(", ")}${codeFiles.length > 2 ? " …" : ""})이 올라와 코드 리뷰가 가능합니다.`
     );
   } else if (fileItems.length > 0) {
-    gaps.push("업로드 파일 중 실행 가능한 소스 코드(.ts·.py 등) 비중이 낮습니다.");
+    gaps.push(
+      "업로드 파일명만으로는 소스 형식을 확인하기 어렵습니다. .ts·.tsx·.py 또는 프로젝트 ZIP을 올려 주세요."
+    );
   }
 
-  if (archives.length > 0) {
-    strengths.push(`프로젝트 압축본 ${archives.length}건으로 일괄 제출이 이루어졌습니다.`);
-  }
-
-  if (linkItems.length > 0) {
-    const latestLink = [...linkItems].sort(
+  if (withDeployLink.length > 0) {
+    const latestDeploy = [...withDeployLink].sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )[0];
+    const deployUrl = latestDeploy ? resolveDeliverableDeployUrl(latestDeploy) : null;
+    let host = "데모";
+    if (deployUrl) {
+      try {
+        host = new URL(deployUrl).hostname.replace(/^www\./, "");
+      } catch {
+        host = "데모";
+      }
+    }
     strengths.push(
-      `배포·데모 링크 ${linkItems.length}건 — 최신: ${latestLink?.fileName ?? "링크"}.`
+      `배포·데모 URL이 등록되어 있습니다${linkOnlyItems.length > 0 ? ` (링크 산출물 ${linkOnlyItems.length}건)` : ""} — 최신: ${host}.`
     );
   }
 
@@ -2366,15 +2485,9 @@ export function buildTeamProgressInsight(
     gaps.push("일부 산출물에 부제목·설명이 비어 있어 팀원이 맥락을 파악하기 어렵습니다.");
   }
 
-  const names = deliverables
-    .slice(0, 3)
-    .map((d) => d.fileName)
-    .join(", ");
-
-  const summaryParts = [
-    `팀 활동 요약: 산출물 ${deliverables.length}건${names ? ` (${names}${deliverables.length > 3 ? " …" : ""})` : ""},`,
-    `트러블슈팅 해결 ${resolved.length}건 · 진행 ${inProgress.length}건.`,
-  ];
+  const latest = deliverables[0];
+  const latestBriefDesc = briefDeliverableDescriptionSummary(latest?.description, 48);
+  const latestSub = latest?.subtitle?.trim() ?? "";
 
   const next_steps: string[] = [];
   const architecture_risks: string[] = [];
@@ -2383,19 +2496,46 @@ export function buildTeamProgressInsight(
   if (logs.length === 0) {
     next_steps.push("트러블슈팅 로그를 남기며 막힌 지점·해결 과정을 기록하세요.");
   }
-  if (codeFiles.length === 0 && fileItems.length > 0) {
-    next_steps.push("핵심 소스(.ts·.py) 또는 README를 산출물로 공유하세요.");
-    architecture_risks.push("코드 산출물이 없어 구조·의존성을 검토하기 어렵습니다.");
+  if (codeFiles.length === 0 && fileItems.length > 0 && archives.length === 0) {
+    next_steps.push("핵심 소스(.ts·.tsx·.py) 또는 README를 산출물 ZIP에 포함해 업로드하세요.");
+    architecture_risks.push("실행 가능한 소스가 드러나지 않아 아키텍처·품질 검토가 어렵습니다.");
   }
-  if (linkItems.length === 0 && deliverables.length > 0) {
-    improvements.push("배포·데모 URL을 링크 산출물로 등록하면 진행 상황 파악이 쉬워집니다.");
+  if (archives.length > 0 && codeFiles.length === 0) {
+    next_steps.push("ZIP에 src·package.json·README가 포함됐는지 확인하세요. (제목만 바꾼 ZIP은 확장자를 유지하세요.)");
+  }
+  if (withDeployLink.length === 0 && deliverables.length > 0) {
+    next_steps.push("배포·데모 URL을 링크 산출물 또는 설명란 배포 링크로 등록하세요.");
   }
   if (inProgress.length > 0) {
     next_steps.push(`진행 중 이슈 ${inProgress.length}건을 해결·회고까지 마무리하세요.`);
   }
   if (resolved.length > 0 && deliverables.length >= 2) {
-    improvements.push("해결된 이슈와 산출물을 README·발표 자료에 연결하면 팀 학습 기록이 강화됩니다.");
+    improvements.push("해결한 이슈를 README·발표 자료에 연결해 학습 기록을 남기세요.");
   }
+
+  const summaryParts: string[] = [];
+  if (latest) {
+    const kind =
+      archives.length > 0
+        ? "프로젝트 압축본"
+        : codeFiles.length > 0
+          ? "소스 파일"
+          : withDeployLink.some((d) => d.id === latest.id)
+            ? "배포 산출물"
+            : "산출물";
+    const titlePart = latestSub ? `「${latest.fileName}」(${latestSub})` : `「${latest.fileName}」`;
+    summaryParts.push(
+      `최근 ${kind} ${titlePart}이 등록되었습니다${latestBriefDesc ? ` — ${latestBriefDesc}` : ""}.`
+    );
+  } else {
+    summaryParts.push("아직 산출물이 없어 프로젝트 구현 상태를 확인하기 어렵습니다.");
+  }
+  if (inProgress.length > 0) {
+    summaryParts.push(`진행 중 이슈가 ${inProgress.length}건 남아 있습니다.`);
+  } else if (logs.length === 0) {
+    summaryParts.push("트러블슈팅 기록이 없어 협업·디버깅 과정이 보이지 않습니다.");
+  }
+  if (next_steps[0]) summaryParts.push(`우선 ${next_steps[0]}`);
 
   return {
     summary: summaryParts.join(" "),
@@ -3385,10 +3525,10 @@ const TEAM_DELIVERABLE_ALLOWED_EXT = new Set([
   "xlsx",
 ]);
 
-/** Storage object key — Supabase/S3 allows only ASCII [A-Za-z0-9._-] (no 한글·spaces). */
-function buildDeliverableStorageFileName(fileName: string, extension: string): string {
-  const base = fileName
-    .slice(0, fileName.length - (extension ? extension.length + 1 : 0))
+function sanitizeDeliverablePathSegment(segment: string): string {
+  const extension = getDeliverableExtension(segment);
+  const base = segment
+    .slice(0, segment.length - (extension ? extension.length + 1 : 0))
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-zA-Z0-9._-]/g, "_")
@@ -3397,6 +3537,45 @@ function buildDeliverableStorageFileName(fileName: string, extension: string): s
     .slice(0, 80);
   const safeBase = base || "file";
   return extension ? `${safeBase}.${extension}` : safeBase;
+}
+
+/** Storage object key — Supabase/S3 allows only ASCII [A-Za-z0-9._-] (no 한글·spaces). */
+function buildDeliverableStorageFileName(fileName: string, _extension: string): string {
+  return sanitizeDeliverablePathSegment(fileName);
+}
+
+function normalizeDeliverableRelativePath(file: File): string | null {
+  const raw = file.webkitRelativePath?.trim();
+  if (!raw) return null;
+  const normalized = raw.replace(/\\/g, "/").replace(/^\/+/, "");
+  return normalized || null;
+}
+
+/** 단일 파일 업로드 키 (ZIP·PDF 등). 폴더는 클라이언트에서 ZIP 1개로 묶어 업로드 */
+function buildDeliverableStorageObjectKey(
+  courseId: string,
+  teamId: string,
+  deliverableId: string,
+  file: File
+): string {
+  const relativePath = normalizeDeliverableRelativePath(file);
+  if (relativePath) {
+    const safePath = relativePath
+      .split("/")
+      .filter(Boolean)
+      .map((segment) => sanitizeDeliverablePathSegment(segment))
+      .join("/");
+    return `${courseId}/${teamId}/${deliverableId}/${safePath}`;
+  }
+  const extension = getDeliverableExtension(file.name);
+  const storageFileName = buildDeliverableStorageFileName(file.name, extension);
+  return `${courseId}/${teamId}/${deliverableId}_${storageFileName}`;
+}
+
+function resolveDeliverableUploadDisplayName(file: File, meta?: TeamDeliverableSubmitMeta): string {
+  const title = meta?.title?.trim();
+  if (title) return title;
+  return normalizeDeliverableRelativePath(file) || file.name;
 }
 
 function getDeliverableExtension(fileName: string): string {
@@ -3440,12 +3619,6 @@ function appendDeployLinkToDescription(
   const base = description?.trim() || "";
   if (base.includes(normalized)) return base || null;
   return base ? `${base}\n\n${line}` : line;
-}
-
-export function extractDeployLinkFromDescription(description?: string | null): string | null {
-  if (!description) return null;
-  const match = description.match(/🔗 배포 링크:\s*(https?:\/\/\S+)/i);
-  return match?.[1] ?? null;
 }
 
 function resolveDeliverableDisplayName(
@@ -3603,8 +3776,7 @@ async function uploadTeamDeliverableInDb(
   }
 
   const deliverableId = createDeliverableId(teamId);
-  const storageFileName = buildDeliverableStorageFileName(file.name, extension);
-  const storagePath = `${courseId}/${teamId}/${deliverableId}_${storageFileName}`;
+  const storagePath = buildDeliverableStorageObjectKey(courseId, teamId, deliverableId, file);
 
   const { error: uploadError } = await supabase.storage
     .from(TEAM_DELIVERABLES_BUCKET)
@@ -3620,7 +3792,7 @@ async function uploadTeamDeliverableInDb(
   const now = new Date().toISOString();
   const description = appendDeployLinkToDescription(meta?.description, meta?.linkUrl);
   const subtitle = meta?.subtitle?.trim() || null;
-  const displayName = resolveDeliverableDisplayName(file.name, meta);
+  const displayName = resolveDeliverableUploadDisplayName(file, meta);
 
   const { data, error } = await supabase
     .from("ai_team_deliverables")

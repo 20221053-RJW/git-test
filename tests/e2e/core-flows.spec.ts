@@ -138,7 +138,7 @@ test.describe("CampusConnect — 핵심 E2E (T-040)", () => {
     await expect(page.getByTestId("mypage-refresh-report")).toHaveCount(0);
   });
 
-  test("12. 교수 팀 제출 현황·프로젝트 평가", async ({ page }) => {
+  test("12. 교수 프로젝트 평가", async ({ page }) => {
     test.skip(!hasProfessorE2ECredentials, "E2E_PROFESSOR_EMAIL · E2E_PROFESSOR_PASSWORD 를 .env 에 설정하세요.");
 
     await loginProfessorViaLanding(page);
@@ -146,7 +146,7 @@ test.describe("CampusConnect — 핵심 E2E (T-040)", () => {
     await page.getByRole("link", { name: "팀", exact: true }).click();
     await page.getByRole("button", { name: "입장하기" }).first().click();
 
-    await expect(page.getByTestId("professor-team-submissions")).toBeVisible({
+    await expect(page.getByTestId("team-workspace-title")).toBeVisible({
       timeout: 15_000,
     });
 
