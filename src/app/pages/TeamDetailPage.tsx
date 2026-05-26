@@ -138,6 +138,22 @@ export default function TeamDetailPage() {
 
   useEffect(() => {
     if (!showChatModal || !selectedTeamId) return;
+    let isCancelled = false;
+
+    void api.teamDetail
+      .getChatMessages(selectedTeamId)
+      .then((messages) => {
+        if (!isCancelled) setChatMessages(messages);
+      })
+      .catch((err) => console.warn("채팅 새로고침 실패:", err));
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [showChatModal, selectedTeamId]);
+
+  useEffect(() => {
+    if (!selectedTeamId) return;
 
     const channel = supabase
       .channel(`team-chat-${selectedTeamId}`)
@@ -176,12 +192,16 @@ export default function TeamDetailPage() {
           });
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn("팀 채팅 Realtime:", status, err);
+        }
+      });
 
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [showChatModal, selectedTeamId, myName]);
+  }, [selectedTeamId, myName]);
 
   const [studentEvalInputs, setStudentEvalInputs] = useState<Record<string, string>>({});
   const [projectEval, setProjectEval] = useState({

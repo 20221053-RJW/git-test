@@ -1,7 +1,31 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "../api/supabase-api";
+import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../supabase";
 import type { ChatMessage } from "../types";
 import AppModal from "./layout/AppModal";
+
+function mapDirectMessageRow(
+  row: { id: string; sender_user_id: string; text: string; created_at: string },
+  currentUserId: string,
+  currentUserName: string,
+  peerName: string
+): ChatMessage {
+  const created = new Date(row.created_at);
+  const displayTime = `${created.getHours().toString().padStart(2, "0")}:${created
+    .getMinutes()
+    .toString()
+    .padStart(2, "0")}`;
+  const isMine = row.sender_user_id === currentUserId;
+  return {
+    id: row.id,
+    sender: isMine ? currentUserName : peerName,
+    text: row.text,
+    time: displayTime,
+    isMine,
+    isAnon: false,
+  };
+}
 
 type DirectChatModalProps = {
   open: boolean;
@@ -18,6 +42,7 @@ export default function DirectChatModal({
   peerName,
   onClose,
 }: DirectChatModalProps) {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
@@ -44,6 +69,53 @@ export default function DirectChatModal({
     if (!open) return;
     void reload();
   }, [open, courseId, peerUserId]);
+
+  useEffect(() => {
+    if (!open || !courseId || !peerUserId || !user?.id) return;
+
+    const currentUserId = user.id;
+    const currentUserName = user.name ?? "나";
+
+    const channel = supabase
+      .channel(`direct-chat-${courseId}-${currentUserId}-${peerUserId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "ai_direct_messages",
+          filter: `course_id=eq.${courseId}`,
+        },
+        (payload) => {
+          const row = payload.new as {
+            id: string;
+            sender_user_id: string;
+            recipient_user_id: string;
+            text: string;
+            created_at: string;
+          };
+          const inThread =
+            (row.sender_user_id === currentUserId && row.recipient_user_id === peerUserId) ||
+            (row.sender_user_id === peerUserId && row.recipient_user_id === currentUserId);
+          if (!inThread) return;
+
+          const mapped = mapDirectMessageRow(row, currentUserId, currentUserName, peerName);
+          setMessages((prev) => {
+            if (prev.some((msg) => msg.id === mapped.id)) return prev;
+            return [...prev, mapped];
+          });
+        }
+      )
+      .subscribe((status, err) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn("1:1 채팅 Realtime:", status, err);
+        }
+      });
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [open, courseId, peerUserId, peerName, user?.id, user?.name]);
 
   useEffect(() => {
     if (!open) return;
