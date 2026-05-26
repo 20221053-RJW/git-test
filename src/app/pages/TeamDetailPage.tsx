@@ -16,6 +16,10 @@ import TeamTroubleshootingSubmitModal, {
   type TroubleshootingFormPayload,
 } from "../components/TeamTroubleshootingSubmitModal";
 import { supabase } from "../supabase";
+import {
+  deliverableLinkLabel,
+  externalDeliverableHref,
+} from "../utils/deliverableLinks";
 import AppModal from "../components/layout/AppModal";
 import M3Button from "../components/layout/M3Button";
 import PageHeader from "../components/layout/PageHeader";
@@ -242,8 +246,7 @@ export default function TeamDetailPage() {
     log.status === "in-progress" && !isArchived && isStudent && isMyTeamMember;
 
   const canWriteTroubleshooting = !isArchived && isStudent && isMyTeamMember;
-  const canUploadDeliverable =
-    !isArchived && ((isStudent && isMyTeamMember) || isProfessor || isAdmin);
+  const canUploadDeliverable = !isArchived && isStudent && isMyTeamMember;
 
   const openMemberProfile = async (memberId: string) => {
     if (memberId === user?.id) return;
@@ -776,6 +779,17 @@ export default function TeamDetailPage() {
   }, [selectedTeamId]);
 
   useEffect(() => {
+    if (!selectedTeamId) return;
+    const refreshHeader = () => {
+      void api.teams.getWorkspaceHeader(selectedTeamId).then((header) => {
+        if (header) setTeamHeader(header);
+      });
+    };
+    window.addEventListener("focus", refreshHeader);
+    return () => window.removeEventListener("focus", refreshHeader);
+  }, [selectedTeamId]);
+
+  useEffect(() => {
     if (!courseId) return;
 
     api.courses.getById(courseId).then((courseData) => {
@@ -1116,25 +1130,15 @@ export default function TeamDetailPage() {
 
             {latestLinkDeliverable && (
               <a
-                href={latestLinkDeliverable.publicUrl}
+                href={externalDeliverableHref(latestLinkDeliverable.publicUrl)}
                 target="_blank"
                 rel="noopener noreferrer"
                 data-testid="team-deliverable-latest-link-banner"
-                className="mb-4 flex flex-col gap-1 rounded-[10px] border border-[#93c5fd] bg-[#eff6ff] px-4 py-3 transition-colors hover:bg-[#dbeafe]"
+                className="mb-4 block rounded-[10px] border border-[#93c5fd] bg-[#eff6ff] px-4 py-2.5 text-sm font-medium text-[#155dfc] truncate transition-colors hover:bg-[#dbeafe] hover:underline"
                 onClick={(e) => e.stopPropagation()}
+                title={latestLinkDeliverable.publicUrl}
               >
-                <p className="text-[10px] font-black uppercase tracking-wide text-[#155dfc]">
-                  최신 링크 (산출물 게시판)
-                </p>
-                <p className="text-sm font-bold text-[#1e3a6e] truncate">
-                  {latestLinkDeliverable.fileName}
-                </p>
-                {latestLinkDeliverable.subtitle ? (
-                  <p className="text-xs text-[#64748b] line-clamp-1">
-                    {latestLinkDeliverable.subtitle}
-                  </p>
-                ) : null}
-                <p className="text-xs font-medium text-[#155dfc]">새 탭에서 열기 →</p>
+                {deliverableLinkLabel(latestLinkDeliverable)}
               </a>
             )}
 
@@ -1149,8 +1153,9 @@ export default function TeamDetailPage() {
                   const isLinkItem = item.kind === "link";
                   const canModifyDeliverable =
                     !isArchived &&
-                    (isProfessor ||
-                      isAdmin ||
+                    ((isAdmin &&
+                      Boolean(user?.id) &&
+                      String(user.id) === String(item.uploaderId)) ||
                       (canUploadDeliverable &&
                         Boolean(user?.id) &&
                         String(user.id) === String(item.uploaderId)));
@@ -1191,7 +1196,11 @@ export default function TeamDetailPage() {
                       </div>
                       <div className="flex flex-wrap items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <a
-                          href={item.publicUrl}
+                          href={
+                            isLinkItem
+                              ? externalDeliverableHref(item.publicUrl)
+                              : item.publicUrl
+                          }
                           target="_blank"
                           rel="noopener noreferrer"
                           download={isLinkItem ? undefined : item.fileName}

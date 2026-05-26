@@ -8,6 +8,7 @@ import {
   latestActivityFingerprint,
   markTeamActivitiesSeen,
 } from "../utils/teamActivitySeen";
+import { useDebouncedRealtimeReload } from "../hooks/useDebouncedRealtimeReload";
 
 import type { Activity, Announcement, Course, TeamCard } from "../types";
 
@@ -324,6 +325,35 @@ export default function TeamsPage() {
   }, [reloadTeams]);
 
   useEffect(() => {
+    if (!courseId) return;
+    const onFocus = () => {
+      void reloadTeams();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [courseId, reloadTeams]);
+
+  const realtimeTables = React.useMemo(
+    () =>
+      courseId
+        ? [
+            { table: "ai_teams", filter: `course_id=eq.${courseId}` },
+            { table: "ai_team_members" },
+            { table: "ai_team_activities" },
+            { table: "ai_announcements", filter: `course_id=eq.${courseId}` },
+          ]
+        : [],
+    [courseId]
+  );
+
+  useDebouncedRealtimeReload(
+    `teams-course-live-${courseId ?? "none"}`,
+    Boolean(courseId),
+    reloadTeams,
+    realtimeTables
+  );
+
+  useEffect(() => {
     if (!showCreateModal || !courseId) return;
 
     let cancelled = false;
@@ -555,7 +585,7 @@ export default function TeamsPage() {
 
         {/* 데스크탑(xl) 5열 — 카드가 세로로 과도하게 길어지지 않도록 (vision #20) */}
         <div
-          className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5"
+          className="grid w-full min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5"
           data-testid="teams-card-grid"
         >
           {teams.map((team) => {

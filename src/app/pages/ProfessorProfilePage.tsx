@@ -12,6 +12,7 @@ export default function ProfessorProfilePage() {
   const [office, setOffice] = useState("");
   const [officeHours, setOfficeHours] = useState("");
   const [researchInput, setResearchInput] = useState("");
+  const [bio, setBio] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -27,6 +28,7 @@ export default function ProfessorProfilePage() {
         setOffice(data.office);
         setOfficeHours(data.officeHours);
         setResearchInput((data.researchAreas ?? []).join(", "));
+        setBio(data.bio ?? "");
       }
       setLoading(false);
     });
@@ -78,6 +80,7 @@ export default function ProfessorProfilePage() {
                 department,
                 office,
                 officeHours,
+                bio,
                 researchAreas: researchInput
                   .split(",")
                   .map((item) => item.trim())
@@ -119,6 +122,17 @@ export default function ProfessorProfilePage() {
               value={officeHours}
               onChange={(e) => setOfficeHours(e.target.value)}
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+            />
+          </label>
+          <label className="block text-sm font-bold text-gray-700">
+            소개 · 강의 철학
+            <textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              rows={4}
+              data-testid="professor-profile-bio"
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              placeholder="연구·강의·지도 경험 등을 자유롭게 작성하세요."
             />
           </label>
           <label className="block text-sm font-bold text-gray-700">

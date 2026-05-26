@@ -339,8 +339,9 @@ export default function TeamDeliverableSubmitModal({
                 !isFileEdit &&
                 !zipping && (
                   <p className="text-[11px] text-[#64748b]" data-testid="team-deliverable-upload-guide">
-                    프로젝트 폴더 선택 시 <strong>node_modules</strong>·<strong>.git</strong> 은 빼고 ZIP 1개로
-                    올립니다. 개별 파일·기존 zip도 가능 · 최대 500MB
+                    프로젝트 폴더 선택 시 <strong>node_modules</strong>·<strong>.git</strong> 은 빼고
+                    무압축 ZIP 1개로 올립니다(AI·동료가 소스를 읽기 쉽게). 개별 파일·기존 zip도 가능 · 최대
+                    500MB
                   </p>
                 )
               )}

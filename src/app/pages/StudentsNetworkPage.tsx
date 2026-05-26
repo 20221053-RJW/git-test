@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useCallback, useState, useRef, useEffect, useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Search, BookOpen, Clock, MapPin, FlaskConical, User, Pencil, Shuffle } from "lucide-react";
 import { api } from "../api/supabase-api";
@@ -7,6 +7,7 @@ import PageLoading from "../components/layout/PageLoading";
 import { useAuth } from "../contexts/AuthContext";
 import type { Course, ProfessorProfile } from "../types";
 import DirectChatModal from "../components/DirectChatModal";
+import { useDebouncedRealtimeReload } from "../hooks/useDebouncedRealtimeReload";
 import {
   NETWORK_BIO_PLACEHOLDER,
   NETWORK_BIO_PLACEHOLDER_OTHER,
@@ -528,8 +529,6 @@ interface EditForm {
 /* ─────────── 랜덤 팀 생성 ─────────── */
 
 const TEAM_KEYWORDS = [
-  { id: "size4", label: "4명", group: "size" },
-  { id: "size3", label: "3명", group: "size" },
   { id: "even", label: "비 작성자 균등 배분", group: "rule" },
   { id: "career", label: "상반된 진로 분야", group: "rule" },
   { id: "mbti", label: "상반된 성격", group: "rule" },
@@ -578,7 +577,7 @@ function RandomTeamModal({
   canSave: boolean;
   onClose: () => void;
 }) {
-  const [activeKeywords, setActiveKeywords] = useState<string[]>(["size4", "even", "career", "mbti"]);
+  const [activeKeywords, setActiveKeywords] = useState<string[]>(["even", "career", "mbti"]);
   const [teamSize, setTeamSize] = useState(4);
   const [teams, setTeams] = useState<Student[][]>([]);
   const [customInput, setCustomInput] = useState("");
@@ -589,8 +588,7 @@ function RandomTeamModal({
   const unassignedStudents = allStudents.filter((s) => !assignedStudentIds.includes(s.id));
 
   const generate = (kws: string[], sizeOverride?: number) => {
-    const sizeFromKeyword = kws.includes("size3") ? 3 : 4;
-    const size = Math.min(8, Math.max(2, sizeOverride ?? teamSize ?? sizeFromKeyword));
+    const size = Math.min(8, Math.max(2, sizeOverride ?? teamSize ?? 4));
     let pool = [...unassignedStudents];
 
     if (kws.includes("career")) {
@@ -616,15 +614,10 @@ function RandomTeamModal({
     generate(activeKeywords, teamSize);
   }, []);
 
-  const toggleKeyword = (id: string, group: string) => {
-    setActiveKeywords((prev) => {
-      if (group === "size") {
-        const already = prev.includes(id);
-        const withoutSize = prev.filter((k) => !["size4", "size3"].includes(k));
-        return already ? withoutSize : [...withoutSize, id];
-      }
-      return prev.includes(id) ? prev.filter((k) => k !== id) : [...prev, id];
-    });
+  const toggleKeyword = (id: string) => {
+    setActiveKeywords((prev) =>
+      prev.includes(id) ? prev.filter((k) => k !== id) : [...prev, id]
+    );
   };
 
   const addCustomKeyword = () => {
@@ -683,7 +676,7 @@ function RandomTeamModal({
             {TEAM_KEYWORDS.map((kw) => (
               <button
                 key={kw.id}
-                onClick={() => toggleKeyword(kw.id, kw.group)}
+                onClick={() => toggleKeyword(kw.id)}
                 className={`px-4 py-1.5 rounded-[8px] text-sm font-medium transition-all ${activeKeywords.includes(kw.id)
                   ? "bg-[#155dfc] text-white"
                   : "bg-[#f3f4f6] text-[#4a5565] hover:bg-gray-200"
@@ -891,6 +884,7 @@ export default function StudentsNetworkPage() {
 
   const { isProfessor, isStudent, isAdmin, user } = useAuth();
   const professor = isProfessor ? (user as ProfessorProfile) : null;
+  const [courseProfessor, setCourseProfessor] = useState<ProfessorProfile | null>(null);
 
   const selfStudent = useMemo(() => {
     const fromList = students.find((s) => s.isSelf);
@@ -923,16 +917,15 @@ export default function StudentsNetworkPage() {
     (s) => !s.isSelf && s.id !== currentStudentId,
   );
 
-  useEffect(() => {
+  const reloadNetwork = useCallback(() => {
     setLoading(true);
-    Promise.all([
+    return Promise.all([
       api.studentNetwork.getStudents(courseId),
       api.studentNetwork.getExtras(),
       api.studentNetwork.getEditForm(),
       courseId ? api.courses.getById(courseId) : Promise.resolve(undefined),
     ])
       .then(([studentData, extraData, formData, courseData]) => {
-        // vision 추가요청 #13: /courses/:courseId/students 에서는 DB가 비어 있어도 데모 목록으로 대체하지 않음
         const useCourseScope = Boolean(courseId);
         const list =
           useCourseScope || studentData.length > 0 ? studentData : fallbackStudents;
@@ -954,6 +947,37 @@ export default function StudentsNetworkPage() {
       })
       .finally(() => setLoading(false));
   }, [courseId]);
+
+  useEffect(() => {
+    void reloadNetwork();
+  }, [reloadNetwork]);
+
+  const networkRealtimeTables = useMemo(
+    () =>
+      courseId ? [{ table: "ai_course_memberships", filter: `course_id=eq.${courseId}` }] : [],
+    [courseId]
+  );
+
+  useDebouncedRealtimeReload(
+    `students-network-live-${courseId ?? "none"}`,
+    Boolean(courseId),
+    reloadNetwork,
+    networkRealtimeTables
+  );
+
+  useEffect(() => {
+    if (!course?.professorId) {
+      setCourseProfessor(null);
+      return;
+    }
+    if (isProfessor && professor?.id === course.professorId) {
+      setCourseProfessor(professor);
+      return;
+    }
+    void api.professors.getById(course.professorId).then((data) => {
+      setCourseProfessor(data ?? null);
+    });
+  }, [course?.professorId, isProfessor, professor]);
 
   useEffect(() => {
     if (!courseId || !(isProfessor || isAdmin)) {
@@ -1012,51 +1036,74 @@ export default function StudentsNetworkPage() {
           </div>
         )}
 
-        {/* 교수 프로필 배너 */}
-        {isProfessor && professor && (
-          <div className="bg-[#f0f5ff] border border-[#c7d9f8] rounded-2xl shadow-sm p-6 mb-6">
+        {/* 담당 교수 프로필 (vision #141 — 학생·교수 모두 조회) */}
+        {courseProfessor && (
+          <div
+            className="mb-6 rounded-2xl border border-[#c7d9f8] bg-[#f0f5ff] p-6 shadow-sm"
+            data-testid="students-network-professor-card"
+          >
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-[#dbe8fb] flex items-center justify-center flex-shrink-0 ring-2 ring-[#b8d0f5]">
-                  <span className="text-xl font-bold text-[#2b5db5]">{professor.name.charAt(0)}</span>
+                <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-[#dbe8fb] ring-2 ring-[#b8d0f5]">
+                  <span className="text-xl font-bold text-[#2b5db5]">
+                    {courseProfessor.name.charAt(0)}
+                  </span>
                 </div>
                 <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-lg font-bold text-[#1e3a6e]">{professor.name}</span>
-                    <span className="cc-badge-info rounded-full px-2 py-0.5 text-xs font-bold">교수</span>
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className="text-lg font-bold text-[#1e3a6e]">{courseProfessor.name}</span>
+                    <span className="cc-badge-info rounded-full px-2 py-0.5 text-xs font-bold">
+                      담당 교수
+                    </span>
                   </div>
-                  <p className="text-[#4a6fa5] text-sm">{professor.department}</p>
+                  <p className="text-sm text-[#4a6fa5]">{courseProfessor.department}</p>
+                  {courseProfessor.bio && (
+                    <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-[#364153]">
+                      {courseProfessor.bio}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-x-8 gap-y-2 text-sm text-[#4a6fa5] sm:grid-cols-2">
-                {professor.office && (
+                {courseProfessor.office && (
                   <div className="flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-[#7a9fd4] flex-shrink-0" />
-                    <span>{professor.office}</span>
+                    <MapPin className="h-3.5 w-3.5 flex-shrink-0 text-[#7a9fd4]" />
+                    <span>{courseProfessor.office}</span>
                   </div>
                 )}
-                {professor.officeHours && (
+                {courseProfessor.officeHours && (
                   <div className="flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-[#7a9fd4] flex-shrink-0" />
-                    <span>오피스아워: {professor.officeHours}</span>
+                    <Clock className="h-3.5 w-3.5 flex-shrink-0 text-[#7a9fd4]" />
+                    <span>오피스아워: {courseProfessor.officeHours}</span>
                   </div>
                 )}
-                {professor.researchAreas && professor.researchAreas.length > 0 && (
-                  <div className="flex items-start gap-1.5 col-span-2">
-                    <FlaskConical className="w-3.5 h-3.5 text-[#7a9fd4] flex-shrink-0 mt-0.5" />
+                {courseProfessor.researchAreas && courseProfessor.researchAreas.length > 0 && (
+                  <div className="col-span-2 flex items-start gap-1.5">
+                    <FlaskConical className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[#7a9fd4]" />
                     <div className="flex flex-wrap gap-1.5">
-                      {professor.researchAreas.map((area) => (
-                        <span key={area} className="bg-[#dce9fb] text-[#2b5db5] text-xs px-2.5 py-0.5 rounded-full">{area}</span>
+                      {courseProfessor.researchAreas.map((area) => (
+                        <span
+                          key={area}
+                          className="rounded-full bg-[#dce9fb] px-2.5 py-0.5 text-xs text-[#2b5db5]"
+                        >
+                          {area}
+                        </span>
                       ))}
                     </div>
                   </div>
                 )}
               </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-[#c7d9f8] flex items-center gap-2 text-[#4a6fa5] text-sm">
-              <BookOpen className="w-4 h-4 text-[#7a9fd4]" />
-              <span>현재 수강자 <span className="text-[#1e3a6e] font-bold">{students.length}명</span>이 등록되어 있습니다.</span>
-            </div>
+            {isProfessor && (
+              <div className="mt-4 flex items-center gap-2 border-t border-[#c7d9f8] pt-4 text-sm text-[#4a6fa5]">
+                <BookOpen className="h-4 w-4 text-[#7a9fd4]" />
+                <span>
+                  현재 수강자{" "}
+                  <span className="font-bold text-[#1e3a6e]">{students.length}명</span>이 등록되어
+                  있습니다.
+                </span>
+              </div>
+            )}
           </div>
         )}
 
@@ -1105,15 +1152,24 @@ export default function StudentsNetworkPage() {
                 </div>
               </div>
               {!isArchived && (
-                <div className="flex flex-shrink-0 flex-wrap gap-2">
+                <div className="flex flex-shrink-0 flex-col gap-2 sm:items-end">
                   <Link
                     to="/app/mypage/profile"
-                    className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50"
+                    className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50"
                     data-testid="students-network-edit-profile-link"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                     내 정보 수정
                   </Link>
+                  {courseId && (
+                    <Link
+                      to={`/app/courses/${courseId}/messages`}
+                      className="flex items-center justify-center rounded-lg bg-[#101828] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-gray-900"
+                      data-testid="students-network-chat-list-link"
+                    >
+                      챗리스트
+                    </Link>
+                  )}
                 </div>
               )}
             </div>

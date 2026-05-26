@@ -30,6 +30,7 @@ export interface ProfessorProfile extends BaseProfile {
   office: string;
   officeHours: string;
   researchAreas?: string[];
+  bio?: string;
 }
 
 // 과목 관련 타입

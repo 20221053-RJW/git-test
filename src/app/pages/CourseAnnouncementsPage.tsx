@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { api } from "../api/supabase-api";
-import AppModal from "../components/layout/AppModal";
 import PageLoading from "../components/layout/PageLoading";
 import { useAuth } from "../contexts/AuthContext";
 import type { Announcement, Course } from "../types";
@@ -13,7 +12,6 @@ export default function CourseAnnouncementsPage() {
 
   const [course, setCourse] = useState<Course | null>(null);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [selected, setSelected] = useState<Announcement | null>(null);
   const [loading, setLoading] = useState(true);
 
   const reload = async () => {
@@ -86,14 +84,12 @@ export default function CourseAnnouncementsPage() {
           <p className="text-sm text-gray-500">등록된 공지가 없습니다.</p>
         ) : (
           <ul className="flex flex-col gap-3">
-            {announcements.map((ann) => (
-              <li key={ann.id ?? ann.title}>
-                <button
-                  type="button"
-                  data-testid={`announcement-card-${ann.id ?? "row"}`}
-                  onClick={() => setSelected(ann)}
-                  className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition-colors hover:border-[#93c5fd] hover:bg-[#eff6ff]"
-                >
+            {announcements.map((ann) => {
+              const detailPath = ann.id
+                ? `/app/courses/${courseId}/announcements/${ann.id}`
+                : null;
+              const card = (
+                <>
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <p className="font-bold text-gray-900">{ann.title}</p>
                     <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-bold text-red-600">
@@ -103,40 +99,30 @@ export default function CourseAnnouncementsPage() {
                   {ann.description ? (
                     <p className="mt-2 line-clamp-2 text-sm text-gray-600">{ann.description}</p>
                   ) : null}
-                </button>
-              </li>
-            ))}
+                </>
+              );
+
+              return (
+                <li key={ann.id ?? ann.title}>
+                  {detailPath ? (
+                    <Link
+                      to={detailPath}
+                      data-testid={`announcement-card-${ann.id ?? "row"}`}
+                      className="block w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition-colors hover:border-[#93c5fd] hover:bg-[#eff6ff]"
+                    >
+                      {card}
+                    </Link>
+                  ) : (
+                    <div className="w-full rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm">
+                      {card}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
-
-      <AppModal
-        open={Boolean(selected)}
-        onClose={() => setSelected(null)}
-        ariaLabel="공지 상세"
-        testId="announcement-detail-modal"
-      >
-        {selected && (
-          <div className="space-y-4 p-1">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <h2 className="text-xl font-bold text-gray-900">{selected.title}</h2>
-              <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-bold text-red-600">
-                D-{selected.dDay}
-              </span>
-            </div>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
-              {selected.description?.trim() || "내용이 없습니다."}
-            </p>
-            <button
-              type="button"
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50"
-              onClick={() => setSelected(null)}
-            >
-              닫기
-            </button>
-          </div>
-        )}
-      </AppModal>
     </div>
   );
 }

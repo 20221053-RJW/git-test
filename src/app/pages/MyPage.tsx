@@ -20,7 +20,7 @@ import {
   GeminiShimmerPanel,
   GeminiShimmerText,
 } from "../components/AiGeneratingIndicator";
-import type { AiReportContext, AiReportGenerateResponse } from "../types/ai-report";
+import type { AiReportContext, AiReportGenerateResponse, AiReportTeamSnapshot } from "../types/ai-report";
 
 const REPORT_PAGES = [
   { id: 1, title: "역량 및 활동 요약", prevLabel: null, nextLabel: "주요 팀플 상세" },
@@ -58,6 +58,7 @@ export default function MyPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedReportTeam, setSelectedReportTeam] = useState<AiReportTeamSnapshot | null>(null);
   const [reportPage, setReportPage] = useState(1);
   const [aiReportLoading, setAiReportLoading] = useState(false);
   const [aiReportMessage, setAiReportMessage] = useState<string | null>(null);
@@ -830,9 +831,11 @@ export default function MyPage() {
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                   {reportContext && reportContext.teams.length > 0
                     ? reportContext.teams.map((team, index) => (
-                        <div
+                        <button
+                          type="button"
                           key={team.teamId}
-                          className="rounded-xl border border-[#dbe7ff] bg-white p-4 text-left shadow-sm"
+                          onClick={() => setSelectedReportTeam(team)}
+                          className="cc-hover-elevate w-full rounded-xl border border-[#dbe7ff] bg-white p-4 text-left shadow-sm hover:border-[#93c5fd]"
                           data-testid={index === 0 ? "mypage-team-card-db" : undefined}
                         >
                           <div className="mb-3 flex items-start justify-between gap-3">
@@ -916,7 +919,7 @@ export default function MyPage() {
                               </GeminiShimmerPanel>
                             )}
                           </div>
-                        </div>
+                        </button>
                       ))
                     : projects.length > 0
                       ? projects.map((project, index) => (
@@ -1134,6 +1137,81 @@ export default function MyPage() {
           </section>
         )}
         </div>
+
+      {selectedReportTeam ? (
+        <AppModal
+          open
+          onClose={() => setSelectedReportTeam(null)}
+          testId="mypage-report-team-detail-modal-overlay"
+          ariaLabel="팀플 상세"
+          panelClassName="!p-0 w-[min(720px,95vw)] max-w-none overflow-y-auto rounded-[14px]"
+        >
+          <div className="space-y-4 p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-black text-[#101828]">{selectedReportTeam.projectTitle}</h2>
+                <p className="mt-1 text-sm text-[#64748b]">
+                  {selectedReportTeam.courseName} · 팀명 {selectedReportTeam.teamName} ·{" "}
+                  {selectedReportTeam.memberRole}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedReportTeam(null)}
+                className="text-sm font-bold text-gray-500 hover:text-gray-800"
+                aria-label="닫기"
+              >
+                닫기
+              </button>
+            </div>
+            <p className="text-sm text-[#475569]">
+              진행률 {selectedReportTeam.progress}% · 트러블슈팅 {selectedReportTeam.troubleshootingCount}건 ·
+              산출물 {selectedReportTeam.deliverableCount}건
+            </p>
+            {selectedReportTeam.deliverableFileNames.length > 0 && (
+              <p className="text-sm text-[#475569]">
+                산출물: {selectedReportTeam.deliverableFileNames.join(", ")}
+              </p>
+            )}
+            {selectedReportTeam.sampleProblems.length > 0 && (
+              <p className="text-sm text-[#475569]">
+                주요 이슈: {selectedReportTeam.sampleProblems.join(" / ")}
+              </p>
+            )}
+            {selectedReportTeam.peerReviewsReceived.length > 0 && (
+              <div>
+                <p className="mb-2 text-sm font-bold text-[#101828]">받은 동료평가</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedReportTeam.peerReviewsReceived.map((review) => (
+                    <span
+                      key={review.text}
+                      className="rounded-full bg-[#eff6ff] px-3 py-1 text-xs font-bold text-[#155dfc]"
+                    >
+                      {review.text} {review.count}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {selectedReportTeam.professorFeedbackSnippet && (
+              <div className="rounded-xl border border-[#e5e7eb] bg-[#f8fafc] p-4">
+                <p className="mb-1 text-sm font-bold text-[#101828]">교수 평가</p>
+                <p className="text-sm leading-relaxed text-[#475569]">
+                  {selectedReportTeam.professorFeedbackSnippet}
+                </p>
+              </div>
+            )}
+            {teamDetailBodies[selectedReportTeam.teamId] && (
+              <div className="rounded-xl border border-[#dbe7ff] bg-[#eff6ff] p-4">
+                <p className="mb-1 text-xs font-bold text-[#155dfc]">AI 요약</p>
+                <p className="text-sm leading-relaxed text-[#334155]">
+                  {teamDetailBodies[selectedReportTeam.teamId]}
+                </p>
+              </div>
+            )}
+          </div>
+        </AppModal>
+      ) : null}
 
       {selectedProject ? (
       <AppModal

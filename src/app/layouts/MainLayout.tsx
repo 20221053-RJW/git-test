@@ -420,10 +420,10 @@ export default function MainLayout() {
       >
         {showCourseSideNavigation ? (
           <div
-            className={`flex w-full flex-col gap-4 py-4 sm:gap-6 sm:py-6 lg:flex-row lg:items-start ${appShellClass}`}
+            className={`flex w-full min-w-0 flex-col gap-4 overflow-x-clip py-4 sm:gap-6 sm:py-6 lg:flex-row lg:items-start ${appShellClass}`}
           >
             <CourseSideNavigation />
-            <div className="cc-page-main cc-page-main--with-side-nav">
+            <div className="cc-page-main cc-page-main--with-side-nav min-w-0 overflow-x-clip">
               <Outlet />
             </div>
           </div>

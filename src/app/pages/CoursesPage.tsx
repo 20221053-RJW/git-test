@@ -1,4 +1,4 @@
-import React, { FormEvent, useEffect, useState } from "react";
+import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { api } from "../api/supabase-api";
 import AppModal from "../components/layout/AppModal";
@@ -7,6 +7,7 @@ import PageHeader from "../components/layout/PageHeader";
 import PageLoading from "../components/layout/PageLoading";
 import CourseListCard from "../components/courses/CourseListCard";
 import { useAuth } from "../contexts/AuthContext";
+import { useDebouncedRealtimeReload } from "../hooks/useDebouncedRealtimeReload";
 import type { Course, CourseStatus, CreateCourseInput } from "../types";
 
 const defaultStageNames = ["아이디어 기획", "서비스 디자인", "프론트 개발", "백엔드 개발", "발표 및 배포"];
@@ -47,7 +48,7 @@ export default function CoursesPage() {
     setShowCreateModal(true);
   };
 
-  const loadCourses = async (status: CourseStatus) => {
+  const loadCourses = useCallback(async (status: CourseStatus) => {
     setLoading(true);
     setErrorMessage("");
 
@@ -59,11 +60,23 @@ export default function CoursesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadCourses(statusFilter);
-  }, [statusFilter]);
+    void loadCourses(statusFilter);
+  }, [statusFilter, loadCourses]);
+
+  const courseListRealtimeTables = useMemo(
+    () => [{ table: "ai_courses" }, { table: "ai_course_memberships" }],
+    []
+  );
+
+  useDebouncedRealtimeReload(
+    "courses-list-live",
+    isAuthenticated,
+    () => loadCourses(statusFilter),
+    courseListRealtimeTables
+  );
 
   const updateForm = <K extends keyof CreateCourseInput>(key: K, value: CreateCourseInput[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));

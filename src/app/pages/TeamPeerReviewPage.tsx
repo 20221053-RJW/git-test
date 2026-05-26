@@ -1,10 +1,17 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 import { api } from "../api/supabase-api";
+import { MAX_PEER_REVIEW_CUSTOM_KEYWORDS } from "../constants/peerReview";
 import { useAuth } from "../contexts/AuthContext";
 import type { Course, PeerReviewTeammate } from "../types";
 
-type PeerReviewDraft = { good: string[]; bad: string[]; comment: string; submitted: boolean };
+type PeerReviewDraft = {
+  good: string[];
+  bad: string[];
+  comment: string;
+  contributionRating: number | null;
+  submitted: boolean;
+};
 
 export default function TeamPeerReviewPage() {
   const { courseId = "", teamId = "" } = useParams<{ courseId: string; teamId: string }>();
@@ -15,6 +22,7 @@ export default function TeamPeerReviewPage() {
   const [goodKeywords, setGoodKeywords] = useState<string[]>([]);
   const [badKeywords, setBadKeywords] = useState<string[]>([]);
   const [peerReviews, setPeerReviews] = useState<Record<string, PeerReviewDraft>>({});
+  const [customKeywordByMember, setCustomKeywordByMember] = useState<Record<string, string>>({});
   const [submittingPeerReviewId, setSubmittingPeerReviewId] = useState<string | null>(null);
 
   const myName = user?.name ?? "";
@@ -39,12 +47,25 @@ export default function TeamPeerReviewPage() {
             .filter((member) => member.name !== myName)
             .map((member) => [
               member.id,
-              myPeerReviews[member.id] ?? { good: [], bad: [], comment: "", submitted: false },
+              myPeerReviews[member.id] ?? {
+                good: [],
+                bad: [],
+                comment: "",
+                contributionRating: null,
+                submitted: false,
+              },
             ])
         )
       );
     });
   }, [courseId, myName, teamId]);
+
+  const allGoodOptions = useMemo(() => {
+    const custom = Object.values(peerReviews).flatMap((r) =>
+      r.good.filter((kw) => !goodKeywords.includes(kw))
+    );
+    return [...new Set([...goodKeywords, ...custom])];
+  }, [goodKeywords, peerReviews]);
 
   const toggleKeyword = (memberId: string, type: "good" | "bad", keyword: string) => {
     setPeerReviews((prev) => {
@@ -61,6 +82,25 @@ export default function TeamPeerReviewPage() {
     });
   };
 
+  const addCustomKeyword = (memberId: string) => {
+    const raw = customKeywordByMember[memberId]?.trim() ?? "";
+    if (!raw) return;
+    setPeerReviews((prev) => {
+      const review = prev[memberId];
+      if (!review) return prev;
+      if (review.good.includes(raw)) return prev;
+      if (review.good.length >= goodKeywords.length + MAX_PEER_REVIEW_CUSTOM_KEYWORDS) {
+        alert(`커스텀 키워드는 최대 ${MAX_PEER_REVIEW_CUSTOM_KEYWORDS}개까지 추가할 수 있습니다.`);
+        return prev;
+      }
+      return {
+        ...prev,
+        [memberId]: { ...review, good: [...review.good, raw] },
+      };
+    });
+    setCustomKeywordByMember((prev) => ({ ...prev, [memberId]: "" }));
+  };
+
   const handleSubmitPeerReview = async (memberId: string) => {
     if (!teamId || submittingPeerReviewId || !isEvaluationOpen) return;
     const review = peerReviews[memberId];
@@ -72,6 +112,7 @@ export default function TeamPeerReviewPage() {
         goodKeywords: review.good,
         badKeywords: review.bad,
         comment: review.comment,
+        contributionRating: review.contributionRating,
       });
       setPeerReviews((prev) => ({
         ...prev,
@@ -133,102 +174,153 @@ export default function TeamPeerReviewPage() {
             {myName}
             <span className="ml-1 text-sm text-[#6a7282]">(본인)</span>
           </span>
-          <span className="text-base font-medium text-black">
-            기여도 :{" "}
-            <span className="font-bold text-[#155dfc]">{teammates.find((m) => m.name === myName)?.contribution ?? 0}%</span>
-          </span>
         </div>
 
-        {teammates.filter((member) => member.name !== myName).map((member) => {
-          const review = peerReviews[member.id];
-          if (!review) return null;
-          return (
-            <div key={member.id} className="space-y-3 rounded-[10px] border border-gray-200 bg-white p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-base font-medium text-black">{member.name}</span>
-                <span className="text-base font-medium text-black">
-                  기여도 : <span className="font-bold text-[#155dfc]">{member.contribution}%</span>
-                </span>
-              </div>
-
-              <div className="rounded-[10px] bg-[#eff6ff] p-4">
-                <p className="mb-2 text-sm font-medium text-black">좋아요</p>
-                <div className="mb-4 flex flex-wrap gap-1.5">
-                  {goodKeywords.map((kw) => {
-                    const selected = review.good.includes(kw);
-                    return (
-                      <button
-                        key={kw}
-                        type="button"
-                        onClick={() => toggleKeyword(member.id, "good", kw)}
-                        className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                          selected
-                            ? "border-[#155dfc] bg-[#155dfc] text-white"
-                            : "border-gray-300 bg-white text-[#364153] hover:border-[#155dfc]"
-                        }`}
-                      >
-                        {kw}
-                      </button>
-                    );
-                  })}
+        {teammates
+          .filter((member) => member.name !== myName)
+          .map((member) => {
+            const review = peerReviews[member.id];
+            if (!review) return null;
+            const memberGoodOptions = [
+              ...allGoodOptions,
+              ...review.good.filter((kw) => !allGoodOptions.includes(kw)),
+            ];
+            return (
+              <div key={member.id} className="space-y-3 rounded-[10px] border border-gray-200 bg-white p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-base font-medium text-black">{member.name}</span>
+                  <label className="flex items-center gap-2 text-sm text-black">
+                    기여도
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={review.contributionRating ?? ""}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const next = raw === "" ? null : Number(raw);
+                        setPeerReviews((prev) => ({
+                          ...prev,
+                          [member.id]: { ...prev[member.id], contributionRating: next },
+                        }));
+                      }}
+                      data-testid={`peer-review-contribution-${member.id}`}
+                      className="w-16 rounded border border-gray-300 px-2 py-1 text-center text-sm"
+                    />
+                    %
+                  </label>
                 </div>
-                <p className="mb-2 text-sm font-medium text-black">아쉬워요</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {badKeywords.map((kw) => {
-                    const selected = review.bad.includes(kw);
-                    return (
-                      <button
-                        key={kw}
-                        type="button"
-                        onClick={() => toggleKeyword(member.id, "bad", kw)}
-                        className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                          selected
-                            ? "border-[#155dfc] bg-[#155dfc] text-white"
-                            : "border-gray-300 bg-white text-[#364153] hover:border-[#155dfc]"
-                        }`}
-                      >
-                        {kw}
-                      </button>
-                    );
-                  })}
+
+                <div className="rounded-[10px] bg-[#eff6ff] p-4">
+                  <p className="mb-2 text-sm font-medium text-black">강점 키워드</p>
+                  <div className="mb-4 flex flex-wrap gap-1.5">
+                    {memberGoodOptions.map((kw) => {
+                      const selected = review.good.includes(kw);
+                      return (
+                        <button
+                          key={kw}
+                          type="button"
+                          onClick={() => toggleKeyword(member.id, "good", kw)}
+                          className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                            selected
+                              ? "border-[#155dfc] bg-[#155dfc] text-white"
+                              : "border-gray-300 bg-white text-[#364153] hover:border-[#155dfc]"
+                          }`}
+                        >
+                          {kw}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mb-4 flex gap-2">
+                    <input
+                      type="text"
+                      value={customKeywordByMember[member.id] ?? ""}
+                      onChange={(e) =>
+                        setCustomKeywordByMember((prev) => ({
+                          ...prev,
+                          [member.id]: e.target.value,
+                        }))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addCustomKeyword(member.id);
+                        }
+                      }}
+                      placeholder="커스텀 키워드 입력"
+                      className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+                      data-testid={`peer-review-custom-input-${member.id}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => addCustomKeyword(member.id)}
+                      className="rounded-lg border border-[#155dfc] px-3 py-1.5 text-xs font-bold text-[#155dfc]"
+                    >
+                      추가
+                    </button>
+                  </div>
+                  {badKeywords.length > 0 && (
+                    <>
+                      <p className="mb-2 text-sm font-medium text-black">보완 키워드 (선택)</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {badKeywords.map((kw) => {
+                          const selected = review.bad.includes(kw);
+                          return (
+                            <button
+                              key={kw}
+                              type="button"
+                              onClick={() => toggleKeyword(member.id, "bad", kw)}
+                              className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                                selected
+                                  ? "border-[#155dfc] bg-[#155dfc] text-white"
+                                  : "border-gray-300 bg-white text-[#364153] hover:border-[#155dfc]"
+                              }`}
+                            >
+                              {kw}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="rounded-[10px] border border-gray-200 px-4 py-3">
+                  <input
+                    type="text"
+                    value={review.comment}
+                    onChange={(e) =>
+                      setPeerReviews((prev) => ({
+                        ...prev,
+                        [member.id]: { ...prev[member.id], comment: e.target.value },
+                      }))
+                    }
+                    placeholder="한줄 코멘트를 작성하세요"
+                    className="w-full bg-transparent text-sm text-[#364153] outline-none"
+                  />
+                </div>
+
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    data-testid={`peer-review-submit-${member.id}`}
+                    onClick={() => void handleSubmitPeerReview(member.id)}
+                    disabled={submittingPeerReviewId === member.id || !isEvaluationOpen}
+                    className={`rounded-full px-8 py-2 text-sm font-bold text-white transition-colors disabled:opacity-60 ${
+                      review.submitted ? "bg-green-500" : "bg-[#155dfc] hover:bg-blue-700"
+                    }`}
+                  >
+                    {submittingPeerReviewId === member.id
+                      ? "저장 중…"
+                      : review.submitted
+                        ? "✓ 등록됨"
+                        : "등록 완료"}
+                  </button>
                 </div>
               </div>
-
-              <div className="rounded-[10px] border border-gray-200 px-4 py-3">
-                <input
-                  type="text"
-                  value={review.comment}
-                  onChange={(e) =>
-                    setPeerReviews((prev) => ({
-                      ...prev,
-                      [member.id]: { ...prev[member.id], comment: e.target.value },
-                    }))
-                  }
-                  placeholder="한줄 코멘트를 작성하세요"
-                  className="w-full bg-transparent text-sm text-[#364153] outline-none"
-                />
-              </div>
-
-              <div className="flex justify-center">
-                <button
-                  type="button"
-                  data-testid={`peer-review-submit-${member.id}`}
-                  onClick={() => void handleSubmitPeerReview(member.id)}
-                  disabled={submittingPeerReviewId === member.id || !isEvaluationOpen}
-                  className={`rounded-full px-8 py-2 text-sm font-bold text-white transition-colors disabled:opacity-60 ${
-                    review.submitted ? "bg-green-500" : "bg-[#155dfc] hover:bg-blue-700"
-                  }`}
-                >
-                  {submittingPeerReviewId === member.id
-                    ? "저장 중…"
-                    : review.submitted
-                      ? "✓ 등록됨"
-                      : "등록 완료"}
-                </button>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
       </div>
     </div>
   );

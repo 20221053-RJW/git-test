@@ -218,18 +218,34 @@ export default function CourseDetailPage() {
               <p className="text-gray-700">
                 {course.description || "\uAC15\uC758 \uAC1C\uC694\uAC00 \uC544\uC9C1 \uB4F1\uB85D\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4."}
               </p>
-              {course.stages && course.stages.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="mb-3 font-bold text-gray-900">팀플 스테이지</h3>
+              <div className="mt-6">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-bold text-gray-900">팀플 스테이지</h3>
+                  {canManageMaterials && course.status === "active" && id && (
+                    <Link
+                      to={`/app/courses/${id}/stages/edit`}
+                      className="text-sm font-bold text-[#155dfc] hover:underline"
+                      data-testid="course-stages-edit-link"
+                    >
+                      스테이지 수정
+                    </Link>
+                  )}
+                </div>
+                {course.stages && course.stages.length > 0 ? (
                   <ol className="space-y-2">
                     {course.stages.map((stage) => (
-                      <li key={stage.id} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                      <li
+                        key={stage.id}
+                        className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700"
+                      >
                         {stage.position}. {stage.name}
                       </li>
                     ))}
                   </ol>
-                </div>
-              )}
+                ) : (
+                  <p className="text-sm text-gray-500">등록된 스테이지가 없습니다.</p>
+                )}
+              </div>
 
               <div className="mt-8" data-testid="course-materials-section">
                 <h3 className="mb-3 font-bold text-gray-900">강의계획서 · 강의 자료</h3>

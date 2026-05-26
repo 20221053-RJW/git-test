@@ -52,6 +52,7 @@ import {
   mapReportContextToMyPageProjects,
 } from "./ai-report";
 import { recommendTroubleshootingFromEdge } from "./ai-troubleshooting";
+import { DEFAULT_PEER_REVIEW_GOOD_KEYWORDS } from "../constants/peerReview";
 
 // Supabase-backed API facade for app pages.
 // Reads ai_* tables and maps rows to UI types in ../types.
@@ -119,6 +120,7 @@ function toProfessorProfile(user: AiUser): ProfessorProfile {
     office: user.office ?? "",
     officeHours: user.office_hours ?? "",
     researchAreas: asArray<string>(user.research_areas),
+    bio: user.bio ?? undefined,
     imageUrl: resolveUserImageUrl(user),
   };
 }
@@ -470,6 +472,41 @@ async function createCourseInDb(input: CreateCourseInput): Promise<Course> {
   return createdCourse;
 }
 
+async function replaceCourseStagesInDb(courseId: string, stageNames: string[]): Promise<CourseStage[]> {
+  const currentUser = await getCurrentAiUser();
+  if (!currentUser) throw new Error("로그인이 필요합니다.");
+
+  const course = await getCourseByIdFromDb(courseId);
+  if (!course) throw new Error("수업을 찾을 수 없습니다.");
+  if (course.status !== "active") {
+    throw new Error("진행 중인 수업에서만 스테이지를 수정할 수 있습니다.");
+  }
+  if (currentUser.role !== "admin" && (currentUser.role !== "professor" || course.professorId !== currentUser.id)) {
+    throw new Error("담당 교수만 스테이지를 수정할 수 있습니다.");
+  }
+
+  const names = stageNames.map((name) => name.trim()).filter(Boolean);
+  if (names.length === 0) throw new Error("스테이지를 1개 이상 입력해 주세요.");
+
+  const { error: deleteError } = await supabase
+    .from("ai_course_stages")
+    .delete()
+    .eq("course_id", courseId);
+  if (deleteError) throw deleteError;
+
+  const { error: insertError } = await supabase.from("ai_course_stages").insert(
+    names.map((name, index) => ({
+      course_id: courseId,
+      name,
+      position: index + 1,
+      is_required: true,
+    }))
+  );
+  if (insertError) throw insertError;
+
+  return getCourseStagesFromDb(courseId);
+}
+
 async function archiveCourseInDb(courseId: string): Promise<Course> {
   const currentUser = await getCurrentAiUser();
   const course = await getCourseByIdFromDb(courseId);
@@ -541,10 +578,12 @@ async function deleteCourseInDb(courseId: string): Promise<void> {
   }
 
   const courseScopedDeletes = [
+    supabase.from("ai_direct_messages").delete().eq("course_id", courseId),
     supabase.from("ai_announcements").delete().eq("course_id", courseId),
     supabase.from("ai_questions").delete().eq("course_id", courseId),
     supabase.from("ai_projects").delete().eq("course_id", courseId),
     supabase.from("ai_course_stages").delete().eq("course_id", courseId),
+    supabase.from("ai_course_materials").delete().eq("course_id", courseId),
     supabase.from("ai_course_memberships").delete().eq("course_id", courseId),
   ];
 
@@ -1048,6 +1087,7 @@ export type CoursePeerReviewOverviewRow = {
   goodKeywords: string[];
   badKeywords: string[];
   comment?: string;
+  contributionRating?: number | null;
 };
 
 async function getMyPageArchivedCoursesFromDb(): Promise<MyPageArchivedCourse[]> {
@@ -1144,7 +1184,9 @@ async function getCoursePeerReviewsOverviewFromDb(
 
   const { data: reviews, error: reviewError } = await supabase
     .from("ai_team_detail_peer_reviews")
-    .select("team_id, reviewer_user_id, teammate_id, good_keywords, bad_keywords, comment")
+    .select(
+      "team_id, reviewer_user_id, teammate_id, good_keywords, bad_keywords, comment, contribution_rating"
+    )
     .in("team_id", teamIds)
     .order("created_at", { ascending: false });
   if (reviewError) {
@@ -1178,6 +1220,8 @@ async function getCoursePeerReviewsOverviewFromDb(
     goodKeywords: asArray<string>(row.good_keywords),
     badKeywords: asArray<string>(row.bad_keywords),
     comment: (row.comment as string) ?? undefined,
+    contributionRating:
+      row.contribution_rating != null ? Number(row.contribution_rating) : null,
   }));
 }
 
@@ -1613,6 +1657,80 @@ async function sendTeamDetailChatMessageInDb(
 function createDirectMessageId(courseId: string): string {
   const slug = courseId.replace(/[^a-z0-9]+/gi, "-").slice(0, 12);
   return `dm-${slug}-${Date.now()}`;
+}
+
+export type DirectMessageThread = {
+  peerUserId: string;
+  peerName: string;
+  lastMessage: string;
+  lastTime: string;
+  lastAt: string;
+};
+
+async function listDirectMessageThreadsFromDb(courseId: string): Promise<DirectMessageThread[]> {
+  const currentUser = await getCurrentAiUser();
+  if (!currentUser) throw new Error("로그인이 필요합니다.");
+  if (!courseId) throw new Error("수업 정보가 없습니다.");
+
+  await assertActiveCourseMembership(courseId);
+
+  const { data, error } = await supabase
+    .from("ai_direct_messages")
+    .select("sender_user_id, recipient_user_id, text, created_at")
+    .eq("course_id", courseId)
+    .or(
+      `sender_user_id.eq.${currentUser.id},recipient_user_id.eq.${currentUser.id}`
+    )
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    if (isMissingRelationError(error)) return [];
+    throw error;
+  }
+
+  const latestByPeer = new Map<string, { text: string; created_at: string }>();
+  for (const row of data ?? []) {
+    const senderId = row.sender_user_id as string;
+    const recipientId = row.recipient_user_id as string;
+    const peerId = senderId === currentUser.id ? recipientId : senderId;
+    if (!peerId || peerId === currentUser.id) continue;
+    if (!latestByPeer.has(peerId)) {
+      latestByPeer.set(peerId, {
+        text: row.text as string,
+        created_at: row.created_at as string,
+      });
+    }
+  }
+
+  if (latestByPeer.size === 0) return [];
+
+  const peerIds = [...latestByPeer.keys()];
+  const { data: users, error: usersError } = await supabase
+    .from("ai_users")
+    .select("id, name")
+    .in("id", peerIds);
+
+  if (usersError) throw usersError;
+
+  const nameById = new Map((users ?? []).map((u) => [u.id as string, u.name as string]));
+
+  return peerIds
+    .map((peerUserId) => {
+      const latest = latestByPeer.get(peerUserId)!;
+      const created = new Date(latest.created_at);
+      const lastTime = `${created.getMonth() + 1}/${created.getDate()} ${created
+        .getHours()
+        .toString()
+        .padStart(2, "0")}:${created.getMinutes().toString().padStart(2, "0")}`;
+      return {
+        peerUserId,
+        peerName: nameById.get(peerUserId) ?? "수강생",
+        lastMessage: latest.text,
+        lastTime,
+        lastAt: latest.created_at,
+      };
+    })
+    .sort((a, b) => b.lastAt.localeCompare(a.lastAt));
 }
 
 async function getDirectMessagesFromDb(
@@ -2473,6 +2591,7 @@ export type PeerReviewDraft = {
   good: string[];
   bad: string[];
   comment: string;
+  contributionRating: number | null;
   submitted: boolean;
 };
 
@@ -2499,7 +2618,7 @@ async function getMyPeerReviewsFromDb(
 
   const { data, error } = await supabase
     .from("ai_team_detail_peer_reviews")
-    .select("id, team_id, teammate_id, good_keywords, bad_keywords, comment")
+    .select("id, team_id, teammate_id, good_keywords, bad_keywords, comment, contribution_rating")
     .eq("team_id", teamId)
     .eq("reviewer_user_id", currentUser.id);
 
@@ -2513,11 +2632,18 @@ async function getMyPeerReviewsFromDb(
     const good = asArray<string>(row.good_keywords);
     const bad = asArray<string>(row.bad_keywords);
     const comment = row.comment?.trim() ?? "";
+    const contributionRating =
+      row.contribution_rating != null ? Number(row.contribution_rating) : null;
     result[row.teammate_id] = {
       good,
       bad,
       comment,
-      submitted: good.length > 0 || bad.length > 0 || comment.length > 0,
+      contributionRating,
+      submitted:
+        good.length > 0 ||
+        bad.length > 0 ||
+        comment.length > 0 ||
+        contributionRating != null,
     };
   }
   return result;
@@ -2526,7 +2652,12 @@ async function getMyPeerReviewsFromDb(
 async function submitPeerReviewInDb(
   teamId: string,
   teammateId: string,
-  input: { goodKeywords: string[]; badKeywords: string[]; comment?: string }
+  input: {
+    goodKeywords: string[];
+    badKeywords: string[];
+    comment?: string;
+    contributionRating?: number | null;
+  }
 ): Promise<void> {
   const currentUser = await getCurrentAiUser();
   if (!currentUser) throw new Error("로그인이 필요합니다.");
@@ -2535,8 +2666,22 @@ async function submitPeerReviewInDb(
   const goodKeywords = input.goodKeywords.filter(Boolean);
   const badKeywords = input.badKeywords.filter(Boolean);
   const comment = input.comment?.trim() ?? "";
-  if (goodKeywords.length === 0 && badKeywords.length === 0 && !comment) {
-    throw new Error("키워드 또는 코멘트를 입력해주세요.");
+  const contributionRating =
+    input.contributionRating != null ? Math.round(Number(input.contributionRating)) : null;
+  if (
+    contributionRating != null &&
+    (contributionRating < 0 || contributionRating > 100 || Number.isNaN(contributionRating))
+  ) {
+    throw new Error("기여도는 0~100 사이로 입력해 주세요.");
+  }
+
+  if (
+    goodKeywords.length === 0 &&
+    badKeywords.length === 0 &&
+    !comment &&
+    contributionRating == null
+  ) {
+    throw new Error("키워드, 기여도, 또는 코멘트를 입력해주세요.");
   }
 
   const { courseId } = await assertTeamDeliverableAccess(teamId);
@@ -2552,6 +2697,7 @@ async function submitPeerReviewInDb(
       good_keywords: goodKeywords,
       bad_keywords: badKeywords,
       comment: comment || null,
+      contribution_rating: contributionRating,
       updated_at: now,
     },
     { onConflict: "team_id,reviewer_user_id,teammate_id" }
@@ -2658,10 +2804,13 @@ async function getTeamDetailPeerReviewStudentsFromDb(teamId?: string): Promise<P
 
 async function getTeamDetailReviewKeywordsFromDb(teamId?: string) {
   const config = await getTeamDetailConfigFromDb(teamId);
+  const configuredGood = asArray<string>(config.good_keywords);
+  const configuredBad = asArray<string>(config.bad_keywords);
 
   return {
-    good: asArray<string>(config.good_keywords),
-    bad: asArray<string>(config.bad_keywords),
+    good:
+      configuredGood.length > 0 ? configuredGood : [...DEFAULT_PEER_REVIEW_GOOD_KEYWORDS],
+    bad: configuredBad,
   };
 }
 
@@ -2864,6 +3013,7 @@ async function saveProfessorProfileInDb(input: {
   office: string;
   officeHours: string;
   researchAreas: string[];
+  bio?: string;
 }): Promise<ProfessorProfile> {
   const currentUser = await getCurrentAiUser();
   if (!currentUser) throw new Error("로그인이 필요합니다.");
@@ -2881,6 +3031,7 @@ async function saveProfessorProfileInDb(input: {
       office: input.office.trim(),
       office_hours: input.officeHours.trim(),
       research_areas: input.researchAreas.filter(Boolean),
+      bio: input.bio?.trim() || null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", currentUser.id);
@@ -3297,6 +3448,9 @@ async function assertTeamDeliverableAccess(teamId: string): Promise<{ courseId: 
 async function assertStudentOwnTeamWrite(teamId: string): Promise<{ courseId: string }> {
   const currentUser = await getCurrentAiUser();
   if (!currentUser) throw new Error("로그인이 필요합니다.");
+  if (currentUser.role === "professor") {
+    throw new Error("교수는 팀 산출물을 등록·수정할 수 없습니다.");
+  }
   if (currentUser.role !== "student") {
     return assertTeamDeliverableAccess(teamId);
   }
@@ -4636,9 +4790,7 @@ async function updateTeamProfileInDb(
   if (!myRow) throw new Error("이 팀의 멤버가 아닙니다.");
   if (myRow.role !== "leader") throw new Error("팀장만 팀명·프로젝트명을 수정할 수 있습니다.");
 
-  const patch: { name?: string; project_title?: string; updated_at: string } = {
-    updated_at: new Date().toISOString(),
-  };
+  const patch: { name?: string; project_title?: string } = {};
   if (input.name !== undefined) {
     const name = input.name.trim();
     if (!name) throw new Error("팀 이름을 입력해주세요.");
@@ -4919,10 +5071,12 @@ export const api = {
   directMessages: {
     getThread: getDirectMessagesFromDb,
     send: sendDirectMessageInDb,
+    listThreads: listDirectMessageThreadsFromDb,
   },
   teamStages: {
     getAll: getTeamStagesFromDb,
     getByCourse: getCourseStagesFromDb,
+    replace: replaceCourseStagesInDb,
   },
   announcements: {
     getAll: getAnnouncementsFromDb,

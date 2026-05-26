@@ -15,6 +15,7 @@ import QnADetailPage from "./pages/QnADetailPage";
 import TeamsPage from "./pages/TeamsPage";
 import CourseAnnouncementsPage from "./pages/CourseAnnouncementsPage";
 import CourseAnnouncementComposePage from "./pages/CourseAnnouncementComposePage";
+import CourseAnnouncementDetailPage from "./pages/CourseAnnouncementDetailPage";
 import TeamDetailPage from "./pages/TeamDetailPage";
 import TeamPeerReviewPage from "./pages/TeamPeerReviewPage";
 import TeamRetrospectivePage from "./pages/TeamRetrospectivePage";
@@ -27,6 +28,8 @@ import MyPageProfilePage from "./pages/MyPageProfilePage";
 import MyPageArchivedCoursesPage from "./pages/MyPageArchivedCoursesPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import StudentsNetworkPage from "./pages/StudentsNetworkPage";
+import CourseDirectMessagesPage from "./pages/CourseDirectMessagesPage";
+import CourseStagesEditPage from "./pages/CourseStagesEditPage";
 import SignInPage from "./pages/SignInPage";
 
 export const router = createBrowserRouter([
@@ -58,6 +61,14 @@ export const router = createBrowserRouter([
             Component: StudentsNetworkPage,
           },
           {
+            path: "courses/:courseId/messages",
+            Component: CourseDirectMessagesPage,
+          },
+          {
+            path: "courses/:courseId/stages/edit",
+            Component: CourseStagesEditPage,
+          },
+          {
             path: "courses/:courseId/my-team/manage",
             Component: CourseTeamManagePage,
           },
@@ -72,6 +83,10 @@ export const router = createBrowserRouter([
           {
             path: "courses/:courseId/announcements/compose",
             Component: CourseAnnouncementComposePage,
+          },
+          {
+            path: "courses/:courseId/announcements/:announcementId",
+            Component: CourseAnnouncementDetailPage,
           },
           {
             path: "courses/:courseId/peer-reviews",

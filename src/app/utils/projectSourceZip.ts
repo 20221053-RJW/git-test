@@ -69,8 +69,7 @@ export async function zipProjectFolderExcludingDeps(
 
   const blob = await zip.generateAsync({
     type: "blob",
-    compression: "DEFLATE",
-    compressionOptions: { level: 6 },
+    compression: "STORE",
   });
 
   if (blob.size > maxBytes) {

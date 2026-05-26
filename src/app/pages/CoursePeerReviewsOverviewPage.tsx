@@ -128,6 +128,11 @@ export default function CoursePeerReviewsOverviewPage() {
                     <span className="font-bold">보완:</span> {row.badKeywords.join(", ")}
                   </p>
                 )}
+                {row.contributionRating != null && (
+                  <p className="mt-2 text-xs font-bold text-[#155dfc]">
+                    평가한 기여도: {row.contributionRating}%
+                  </p>
+                )}
                 {row.comment && (
                   <p className="mt-2 text-xs leading-5 text-gray-700">{row.comment}</p>
                 )}
