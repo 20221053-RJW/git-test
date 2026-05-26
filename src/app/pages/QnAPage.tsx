@@ -138,13 +138,14 @@ export default function QnAPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="cc-app-shell w-full py-4 sm:py-6">
+      <div className="cc-page-main w-full">
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-black tracking-tight text-gray-900 sm:text-3xl">Q&A 게시판</h1>
+        <h1 className="m3-headline-medium text-[var(--cc-on-surface)]">Q&A 게시판</h1>
         <button
           type="button"
           onClick={() => setShowCreate((open) => !open)}
-          className="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700 sm:w-auto"
+          className="m3-btn m3-btn--filled w-full sm:w-auto"
         >
           {showCreate ? "닫기" : "+ 질문하기"}
         </button>
@@ -351,6 +352,7 @@ export default function QnAPage() {
             );
           })
         )}
+      </div>
       </div>
     </div>
   );

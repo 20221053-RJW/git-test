@@ -144,6 +144,10 @@ export default function TeamDetailPage() {
     if (!showChatModal || !selectedTeamId) return;
     let isCancelled = false;
 
+    void api.teamDetail.warmChatSendContext(selectedTeamId).catch((err) => {
+      console.warn("팀 채팅 준비 실패:", err);
+    });
+
     void api.teamDetail
       .getChatMessages(selectedTeamId)
       .then((messages) => {

@@ -50,7 +50,7 @@ export default function CourseDirectMessagesPage() {
         <div>
           <Link
             to={courseId ? `/app/courses/${courseId}/students` : "/app/courses"}
-            className="text-sm font-bold text-[#155dfc] hover:underline"
+            className="cc-link text-sm font-bold"
           >
             ← 수강자들
           </Link>
@@ -121,7 +121,7 @@ export default function CourseDirectMessagesPage() {
           <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
             <button
               type="button"
-              className="text-sm font-bold text-[#155dfc]"
+              className="cc-link text-sm font-bold"
               onClick={() => setSearchParams({})}
             >
               ← 목록

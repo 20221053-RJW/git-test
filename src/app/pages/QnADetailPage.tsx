@@ -106,7 +106,8 @@ export default function QnADetailPage() {
     }
   };
 
-  const pageClass = "mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 lg:px-8";
+  const pageShellClass = "cc-app-shell w-full py-4 sm:py-6";
+  const pageMainClass = "cc-page-main w-full";
 
   if (loading) {
     return <PageLoading message="질문을 불러오는 중…" testId="qna-detail-loading" />;
@@ -114,11 +115,13 @@ export default function QnADetailPage() {
 
   if (!question || !questionId) {
     return (
-      <div className={pageClass}>
+      <div className={pageShellClass}>
+        <div className={pageMainClass}>
         <p className="text-gray-600">질문을 찾을 수 없습니다.</p>
-        <Link to="/app/qna" className="mt-4 inline-block text-blue-600 hover:underline">
+        <Link to="/app/qna" className="cc-link mt-4 inline-block">
           목록으로
         </Link>
+        </div>
       </div>
     );
   }
@@ -126,8 +129,9 @@ export default function QnADetailPage() {
   const isQuestionOwner = user?.id === question.authorId;
 
   return (
-    <div className={pageClass}>
-      <Link to="/app/qna" className="mb-4 inline-block text-sm text-blue-600 hover:underline">
+    <div className={pageShellClass}>
+      <div className={pageMainClass}>
+      <Link to="/app/qna" className="cc-link mb-4 inline-block text-sm">
         ← Q&A 목록
       </Link>
 
@@ -249,6 +253,7 @@ export default function QnADetailPage() {
           {submitting ? "등록 중..." : "답변 등록"}
         </button>
       </form>
+      </div>
     </div>
   );
 }

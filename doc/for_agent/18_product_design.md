@@ -79,9 +79,9 @@
 - [x] `cc-course-code` · 수강자들 UX (C-47~48)
 - [x] `PageLoading` · `cc-main-viewport` (C-36)
 - [x] 교수 평가 모달 반응형 패딩 (`32` §1 · `260522-46`)
-- [ ] 반응형 P1 잔여 — MyPage·QnA 이중 `max-w-*` (`32` §2)
-- [ ] `TeamDetailPage`·`StudentsNetwork` 등 hex `#155dfc` 잔여 통일
-- [ ] CourseDetail·StudentsNetwork PageHeader 적용
+- [o] 반응형 P1 — QnA·타학생프로필 shell 정렬 (`260526-4` · `32` §2)
+- [ ] `TeamDetailPage`·`MyPage` 등 hex `#155dfc` 잔여 통일
+- [o] CourseDetail·StudentsNetwork PageHeader 적용 (`260526-4`)
 - [ ] 포커스 링 전역 `ring-[var(--cc-primary)]`
 - [ ] 인간: 로고·최종 브랜드 색 확정 (`12` §디자인 결정 필요)
 

@@ -30,14 +30,17 @@ export default function OtherStudentProfilePage() {
 
   if (!profile) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
-        <p className="text-gray-600">{"\uD559\uC0DD \uD504\uB85C\uD544\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."}</p>
+      <div className="cc-app-shell w-full py-4 sm:py-6">
+        <div className="cc-page-main w-full">
+          <p className="text-[var(--cc-on-surface-variant)]">{"\uD559\uC0DD \uD504\uB85C\uD544\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."}</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+    <div className="cc-app-shell w-full py-4 sm:py-6">
+      <div className="cc-page-main w-full">
       <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-8">
         <div className="mb-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
           <UserAvatar name={profile.name} imageUrl={profile.imageUrl} size="lg" />
@@ -73,6 +76,7 @@ export default function OtherStudentProfilePage() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

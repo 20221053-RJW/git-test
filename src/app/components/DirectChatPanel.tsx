@@ -104,7 +104,7 @@ export default function DirectChatPanel({
           type="button"
           disabled={sending || !draft.trim()}
           onClick={() => void send()}
-          className="rounded-lg bg-[#155dfc] px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+          className="m3-btn m3-btn--filled px-4 py-2 text-sm disabled:opacity-50"
           data-testid="direct-chat-send"
         >
           {sending ? "전송…" : "전송"}

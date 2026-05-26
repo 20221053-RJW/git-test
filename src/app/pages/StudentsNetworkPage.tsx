@@ -7,6 +7,7 @@ import PageLoading from "../components/layout/PageLoading";
 import { useAuth } from "../contexts/AuthContext";
 import type { Course, ProfessorProfile } from "../types";
 import DirectChatModal from "../components/DirectChatModal";
+import PageHeader from "../components/layout/PageHeader";
 import { useDebouncedRealtimeReload } from "../hooks/useDebouncedRealtimeReload";
 import {
   NETWORK_BIO_PLACEHOLDER,
@@ -1028,7 +1029,11 @@ export default function StudentsNetworkPage() {
 
   return (
     <div className="cc-page-main w-full">
-        <h2 className="m3-headline-medium cc-text-primary mb-6">수강자들 네트워크</h2>
+        <PageHeader
+          title="수강자들 네트워크"
+          subtitle={course?.name}
+          subtitleTestId="students-network-course-name"
+        />
 
         {isArchived && (
           <div className="mb-6 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-600 shadow-sm">

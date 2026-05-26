@@ -53,6 +53,26 @@ import {
 } from "./ai-report";
 import { recommendTroubleshootingFromEdge } from "./ai-troubleshooting";
 import { DEFAULT_PEER_REVIEW_GOOD_KEYWORDS } from "../constants/peerReview";
+import {
+  getCachedAccessibleCourseIds,
+  getCachedCourseStatus,
+  getCachedCourseDmPeerIds,
+  getCachedTeamCourseId,
+  invalidateApiSessionCache as clearApiSessionCache,
+  isDirectChatWarm,
+  isTeamChatWarm,
+  markDirectChatWarm,
+  markTeamChatWarm,
+  setCachedAccessibleCourseIds,
+  setCachedCourseStatus,
+  setCachedCourseDmPeerIds,
+  setCachedTeamCourseId,
+} from "./api-session-cache";
+
+export function invalidateApiSessionCache(): void {
+  clearApiSessionCache();
+  cachedCurrentAiUser = null;
+}
 
 // Supabase-backed API facade for app pages.
 // Reads ai_* tables and maps rows to UI types in ../types.
@@ -125,9 +145,18 @@ function toProfessorProfile(user: AiUser): ProfessorProfile {
   };
 }
 
+let cachedCurrentAiUser: { firebaseUid: string; user: AiUser } | null = null;
+
 async function getCurrentAiUser(): Promise<AiUser | null> {
   const firebaseUid = auth.currentUser?.uid;
-  if (!firebaseUid) return null;
+  if (!firebaseUid) {
+    cachedCurrentAiUser = null;
+    return null;
+  }
+
+  if (cachedCurrentAiUser?.firebaseUid === firebaseUid) {
+    return cachedCurrentAiUser.user;
+  }
 
   const { data, error } = await supabase
     .from("ai_users")
@@ -136,49 +165,97 @@ async function getCurrentAiUser(): Promise<AiUser | null> {
     .maybeSingle();
 
   if (error) throw error;
-  return data as AiUser | null;
+  const user = (data as AiUser | null) ?? null;
+  cachedCurrentAiUser = user ? { firebaseUid, user } : null;
+  return user;
+}
+
+async function getCourseStatusFromDb(courseId: string): Promise<CourseStatus | null> {
+  const cached = getCachedCourseStatus(courseId);
+  if (cached) return cached as CourseStatus;
+
+  const { data, error } = await supabase
+    .from("ai_courses")
+    .select("status")
+    .eq("id", courseId)
+    .maybeSingle();
+
+  if (error) throw error;
+  const status = (data?.status as CourseStatus | undefined) ?? null;
+  if (status) setCachedCourseStatus(courseId, status);
+  return status;
+}
+
+/** 1:1 DM 허용 peer: 수업 멤버십(전 역할) + 담당 교수 */
+async function getCourseDirectMessagePeerIdsFromDb(courseId: string): Promise<Set<string>> {
+  const cached = getCachedCourseDmPeerIds(courseId);
+  if (cached) return cached;
+
+  const [membershipResult, courseResult] = await Promise.all([
+    supabase.from("ai_course_memberships").select("user_id").eq("course_id", courseId),
+    supabase.from("ai_courses").select("instructor_user_id").eq("id", courseId).maybeSingle(),
+  ]);
+
+  if (membershipResult.error) throw membershipResult.error;
+  if (courseResult.error) throw courseResult.error;
+
+  const ids = new Set((membershipResult.data ?? []).map((row) => row.user_id as string));
+  const instructorId = courseResult.data?.instructor_user_id as string | undefined;
+  if (instructorId) ids.add(instructorId);
+
+  setCachedCourseDmPeerIds(courseId, ids);
+  return ids;
 }
 
 async function getAccessibleCourseIds(): Promise<string[]> {
+  const firebaseUid = auth.currentUser?.uid;
+  if (!firebaseUid) return [];
+
+  const cachedIds = getCachedAccessibleCourseIds(firebaseUid);
+  if (cachedIds) return cachedIds;
+
   const currentUser = await getCurrentAiUser();
   if (!currentUser) return [];
+
+  let result: string[];
 
   if (currentUser.role === "admin") {
     const { data, error } = await supabase.from("ai_courses").select("id");
     if (error) throw error;
-    return (data ?? []).map((course) => course.id);
-  }
-
-  if (currentUser.role === "professor") {
+    result = (data ?? []).map((course) => course.id);
+  } else if (currentUser.role === "professor") {
     const { data, error } = await supabase
       .from("ai_courses")
       .select("id")
       .eq("instructor_user_id", currentUser.id);
 
     if (error) throw error;
-    return (data ?? []).map((course) => course.id);
+    result = (data ?? []).map((course) => course.id);
+  } else {
+    const [teachingResult, membershipResult] = await Promise.all([
+      supabase
+        .from("ai_courses")
+        .select("id")
+        .eq("instructor_user_id", currentUser.id),
+      supabase
+        .from("ai_course_memberships")
+        .select("course_id")
+        .eq("user_id", currentUser.id),
+    ]);
+
+    if (teachingResult.error) throw teachingResult.error;
+    if (membershipResult.error) throw membershipResult.error;
+
+    result = Array.from(
+      new Set([
+        ...(teachingResult.data ?? []).map((course) => course.id),
+        ...(membershipResult.data ?? []).map((membership) => membership.course_id),
+      ])
+    );
   }
 
-  const [teachingResult, membershipResult] = await Promise.all([
-    supabase
-      .from("ai_courses")
-      .select("id")
-      .eq("instructor_user_id", currentUser.id),
-    supabase
-      .from("ai_course_memberships")
-      .select("course_id")
-      .eq("user_id", currentUser.id),
-  ]);
-
-  if (teachingResult.error) throw teachingResult.error;
-  if (membershipResult.error) throw membershipResult.error;
-
-  return Array.from(
-    new Set([
-      ...(teachingResult.data ?? []).map((course) => course.id),
-      ...(membershipResult.data ?? []).map((membership) => membership.course_id),
-    ])
-  );
+  setCachedAccessibleCourseIds(firebaseUid, result);
+  return result;
 }
 
 async function getPrimaryCourseId(): Promise<string | null> {
@@ -1600,6 +1677,20 @@ async function getTeamDetailChatMessagesFromDb(teamId?: string): Promise<ChatMes
   );
 }
 
+async function warmTeamChatSendContextInDb(teamId: string): Promise<void> {
+  if (!teamId) throw new Error("팀 정보가 없습니다.");
+  const currentUser = await getCurrentAiUser();
+  if (!currentUser) throw new Error("로그인이 필요합니다.");
+
+  const { courseId } = await assertTeamDeliverableAccess(teamId);
+  const status = await getCourseStatusFromDb(courseId);
+  if (status === "archived") {
+    throw new Error("종료된 수업에서는 채팅을 새로 작성할 수 없습니다.");
+  }
+
+  markTeamChatWarm(teamId);
+}
+
 async function sendTeamDetailChatMessageInDb(
   teamId: string,
   input: { text: string; isAnon: boolean }
@@ -1611,22 +1702,13 @@ async function sendTeamDetailChatMessageInDb(
   const text = input.text.trim();
   if (!text) throw new Error("메시지를 입력해주세요.");
 
-  const { courseId } = await assertTeamDeliverableAccess(teamId);
-  const course = await getCourseByIdFromDb(courseId);
-  if (course?.status === "archived") {
-    throw new Error("종료된 수업에서는 채팅을 새로 작성할 수 없습니다.");
+  if (!isTeamChatWarm(teamId)) {
+    const { courseId } = await assertTeamDeliverableAccess(teamId);
+    const status = await getCourseStatusFromDb(courseId);
+    if (status === "archived") {
+      throw new Error("종료된 수업에서는 채팅을 새로 작성할 수 없습니다.");
+    }
   }
-
-  const { data: lastMessage, error: sortError } = await supabase
-    .from("ai_team_detail_chat_messages")
-    .select("sort_order")
-    .eq("team_id", teamId)
-    .order("sort_order", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (sortError) throw sortError;
-  const nextSortOrder = (lastMessage?.sort_order ?? 0) + 1;
 
   const now = new Date();
   const displayTime = `${now.getHours().toString().padStart(2, "0")}:${now
@@ -1644,7 +1726,7 @@ async function sendTeamDetailChatMessageInDb(
       display_time: displayTime,
       is_mine: true,
       is_anon: input.isAnon,
-      sort_order: nextSortOrder,
+      sort_order: now.getTime(),
     })
     .select("id, sender, text, display_time, is_mine, is_anon")
     .single();
@@ -1779,6 +1861,21 @@ async function getDirectMessagesFromDb(
   });
 }
 
+async function warmDirectChatSendContextInDb(courseId: string, peerUserId: string): Promise<void> {
+  const currentUser = await getCurrentAiUser();
+  if (!currentUser) throw new Error("로그인이 필요합니다.");
+  if (!courseId || !peerUserId) throw new Error("대화 상대 정보가 없습니다.");
+  if (peerUserId === currentUser.id) throw new Error("본인과는 채팅할 수 없습니다.");
+
+  await assertActiveCourseMembership(courseId);
+  const allowedIds = await getCourseDirectMessagePeerIdsFromDb(courseId);
+  if (!allowedIds.has(peerUserId)) {
+    throw new Error("같은 수업 구성원과만 1:1 채팅할 수 있습니다.");
+  }
+
+  markDirectChatWarm(courseId, peerUserId);
+}
+
 async function sendDirectMessageInDb(
   courseId: string,
   peerUserId: string,
@@ -1792,12 +1889,12 @@ async function sendDirectMessageInDb(
   const text = textInput.trim();
   if (!text) throw new Error("메시지를 입력해주세요.");
 
-  await assertActiveCourseMembership(courseId);
-
-  const courseStudents = await getCourseUsers(courseId, "student");
-  const allowedIds = new Set(courseStudents.map((user) => user.id));
-  if (!allowedIds.has(peerUserId)) {
-    throw new Error("같은 수업 수강생과만 1:1 채팅할 수 있습니다.");
+  if (!isDirectChatWarm(courseId, peerUserId)) {
+    await assertActiveCourseMembership(courseId);
+    const allowedIds = await getCourseDirectMessagePeerIdsFromDb(courseId);
+    if (!allowedIds.has(peerUserId)) {
+      throw new Error("같은 수업 구성원과만 1:1 채팅할 수 있습니다.");
+    }
   }
 
   const now = new Date();
@@ -3433,8 +3530,12 @@ function mapDeliverableRow(row: {
 }
 
 async function assertTeamDeliverableAccess(teamId: string): Promise<{ courseId: string }> {
-  const courseId = await getTeamCourseIdFromDb(teamId);
-  if (!courseId) throw new Error("팀 정보를 찾을 수 없습니다.");
+  let courseId = getCachedTeamCourseId(teamId);
+  if (!courseId) {
+    courseId = await getTeamCourseIdFromDb(teamId);
+    if (!courseId) throw new Error("팀 정보를 찾을 수 없습니다.");
+    setCachedTeamCourseId(teamId, courseId);
+  }
 
   const accessibleCourseIds = await getAccessibleCourseIds();
   if (!accessibleCourseIds.includes(courseId)) {
@@ -4487,18 +4588,18 @@ async function assertActiveCourseMembership(courseId: string) {
   const currentUser = await getCurrentAiUser();
   if (!currentUser) throw new Error("로그인이 필요합니다.");
 
-  const course = await getCourseByIdFromDb(courseId);
-  if (!course) throw new Error("수업을 찾을 수 없습니다.");
-  if (course.status !== "active") throw new Error("종료된 수업에서는 팀을 변경할 수 없습니다.");
+  const status = await getCourseStatusFromDb(courseId);
+  if (!status) throw new Error("수업을 찾을 수 없습니다.");
+  if (status !== "active") throw new Error("종료된 수업에서는 팀을 변경할 수 없습니다.");
 
-  if (currentUser.role === "admin") return { currentUser, course };
+  if (currentUser.role === "admin") return { currentUser };
 
   const accessible = await getAccessibleCourseIds();
   if (!accessible.includes(courseId)) {
     throw new Error("이 수업에 접근할 수 없습니다.");
   }
 
-  return { currentUser, course };
+  return { currentUser };
 }
 
 async function getAssignedStudentIdsInCourseFromDb(courseId: string): Promise<string[]> {
@@ -5071,6 +5172,7 @@ export const api = {
   directMessages: {
     getThread: getDirectMessagesFromDb,
     send: sendDirectMessageInDb,
+    warmSendContext: warmDirectChatSendContextInDb,
     listThreads: listDirectMessageThreadsFromDb,
   },
   teamStages: {
@@ -5123,6 +5225,7 @@ export const api = {
     getTeamSubmissionPeerReviews: getTeamSubmissionPeerReviewsFromDb,
     getChatMessages: getTeamDetailChatMessagesFromDb,
     sendChatMessage: sendTeamDetailChatMessageInDb,
+    warmChatSendContext: warmTeamChatSendContextInDb,
     getPeerReviewStudents: getTeamDetailPeerReviewStudentsFromDb,
     getMyPeerReviews: getMyPeerReviewsFromDb,
     submitPeerReview: submitPeerReviewInDb,

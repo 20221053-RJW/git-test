@@ -7,7 +7,7 @@ import {
   clearSupabaseAuthSession,
   syncFirebaseUserToSupabaseSession,
 } from "../supabase-firebase-auth";
-import { api } from "../api/supabase-api";
+import { api, invalidateApiSessionCache } from "../api/supabase-api";
 
 export type Signupinput = {
   name: string;
@@ -236,6 +236,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    invalidateApiSessionCache();
     void clearSupabaseAuthSession();
     signOut(auth);
     setUser(null);

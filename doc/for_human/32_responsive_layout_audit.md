@@ -34,7 +34,7 @@
 ### 2. 페이지 컨테이너 이중 적용 — **부분 완료 (C-260522-36)**
 
 - **완료:** `cc-page-main` · `CoursesPage`/`TeamsPage`/`StudentsNetworkPage` 등 shell 내부 이중 패딩 축소 · `Footer`→`cc-app-shell`
-- **잔여:** `MyPage`·`QnAPage`·`OtherStudentProfilePage` 등 일부 `max-w-*` 래퍼
+- **잔여:** `MyPage` 리포트 열 `210mm` (A4 의도) · **완료(260526-4):** `QnAPage`·`QnADetailPage`·`OtherStudentProfilePage` → `cc-app-shell`
 - **권장:** shell 안 페이지는 `cc-page-main`만 사용
 
 ### 3. 전역 `overflow-x: hidden` — **완화 (260525-9)**

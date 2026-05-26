@@ -57,6 +57,9 @@ export function useDirectChat(
   useEffect(() => {
     if (!enabled || !courseId || !peerUserId) return;
     void reload();
+    void api.directMessages.warmSendContext(courseId, peerUserId).catch((err) => {
+      console.warn("[direct-chat] warmSendContext:", err);
+    });
   }, [enabled, courseId, peerUserId, reload]);
 
   useEffect(() => {

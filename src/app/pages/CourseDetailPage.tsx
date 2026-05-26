@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { api } from "../api/supabase-api";
 import StudentQuickProfileModal from "../components/StudentQuickProfileModal";
+import PageHeader from "../components/layout/PageHeader";
 import PageLoading from "../components/layout/PageLoading";
 import { useAuth } from "../contexts/AuthContext";
 import type { Course, CourseMaterial, StudentProfile, TeamMember } from "../types";
@@ -132,7 +133,7 @@ export default function CourseDetailPage() {
     return (
       <div className="cc-page-main w-full py-4">
         <p className="text-gray-600">{"\uACFC\uBAA9\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4."}</p>
-        <Link to="/app/courses" className="text-blue-600 hover:underline mt-4 inline-block">
+        <Link to="/app/courses" className="cc-link mt-4 inline-block">
           {"\uBAA9\uB85D\uC73C\uB85C \uB3CC\uC544\uAC00\uAE30"}
         </Link>
       </div>
@@ -141,18 +142,17 @@ export default function CourseDetailPage() {
 
   return (
     <div className="cc-page-main w-full">
-      <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-8">
-        <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-2xl font-black text-gray-900 sm:text-3xl">{course.name}</h1>
-              <span className="cc-course-code cc-course-code--badge">
-                {course.code}
-              </span>
-            </div>
-            <p className="text-gray-600">{course.semester}</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+      <PageHeader
+        title={course.name}
+        subtitle={course.semester}
+        titleTestId="course-detail-title"
+        meta={
+          <span className="cc-course-code cc-course-code--badge mt-1 inline-flex">
+            {course.code}
+          </span>
+        }
+        actions={
+          <>
             {canArchiveCourse && (
               <button
                 type="button"
@@ -163,11 +163,14 @@ export default function CourseDetailPage() {
                 {archiving ? "종료 중..." : "수업 종료"}
               </button>
             )}
-            <Link to="/app/courses" className="px-3 py-2 text-sm text-blue-600 hover:underline">
+            <Link to="/app/courses" className="cc-link px-3 py-2 text-sm">
               {"\uBAA9\uB85D\uC73C\uB85C"}
             </Link>
-          </div>
-        </div>
+          </>
+        }
+      />
+
+      <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-8">
 
         {errorMessage && (
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
