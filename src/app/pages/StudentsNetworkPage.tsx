@@ -45,6 +45,8 @@ interface StudentExtra {
   keywords: { text: string; count: number }[];
 }
 
+type StudentSortOption = "name-asc" | "name-desc" | "major-asc" | "tag-count-desc";
+
 const fallbackStudentExtras: Record<string, StudentExtra> = {
   "1": {
     temperature: 38.2,
@@ -1071,6 +1073,7 @@ export default function StudentsNetworkPage() {
   const { courseId } = useParams<{ courseId?: string }>();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
+  const [studentSort, setStudentSort] = useState<StudentSortOption>("name-asc");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [selectedProfessor, setSelectedProfessor] = useState<ProfessorProfile | null>(null);
   const [showMyProfileModal, setShowMyProfileModal] = useState(false);
@@ -1195,6 +1198,39 @@ export default function StudentsNetworkPage() {
     void api.teams.getAssignedStudentIds(courseId).then(setAssignedStudentIds);
   }, [courseId, isProfessor, isAdmin]);
 
+  const filteredOthers = otherStudents.filter((s) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      s.name.toLowerCase().includes(q) ||
+      s.major.toLowerCase().includes(q) ||
+      s.bio.toLowerCase().includes(q) ||
+      s.tags.some((t) => t.toLowerCase().includes(q))
+    );
+  });
+
+  const sortedOthers = useMemo(() => {
+    const byLocale = (a: string, b: string) => a.localeCompare(b, "ko");
+    const majorLabel = (s: Student) => {
+      const raw = displayMajor(s.major);
+      return raw === NETWORK_MAJOR_PLACEHOLDER ? "zzzz" : raw;
+    };
+
+    return [...filteredOthers].sort((a, b) => {
+      switch (studentSort) {
+        case "name-desc":
+          return byLocale(b.name, a.name);
+        case "major-asc":
+          return byLocale(majorLabel(a), majorLabel(b)) || byLocale(a.name, b.name);
+        case "tag-count-desc":
+          return b.tags.length - a.tags.length || byLocale(a.name, b.name);
+        case "name-asc":
+        default:
+          return byLocale(a.name, b.name);
+      }
+    });
+  }, [filteredOthers, studentSort]);
+
   if (loading) {
     return <PageLoading message="수강자 정보를 불러오는 중…" testId="students-network-loading" />;
   }
@@ -1221,24 +1257,17 @@ export default function StudentsNetworkPage() {
     );
   }
 
-  const filteredOthers = otherStudents.filter((s) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      s.name.toLowerCase().includes(q) ||
-      s.major.toLowerCase().includes(q) ||
-      s.bio.toLowerCase().includes(q) ||
-      s.tags.some((t) => t.toLowerCase().includes(q))
-    );
-  });
-
   const isArchived = course?.status === "archived";
+
+  const isSelfCourseProfessor = Boolean(
+    isProfessor && courseProfessor && user?.id === courseProfessor.id
+  );
 
   type NetworkGridItem =
     | { kind: "professor"; profile: ProfessorProfile }
     | { kind: "student"; student: Student };
 
-  const studentGridEntries: NetworkGridItem[] = filteredOthers.map((s) => ({
+  const studentGridEntries: NetworkGridItem[] = sortedOthers.map((s) => ({
     kind: "student",
     student: enrichStudentForDisplay(s),
   }));
@@ -1357,6 +1386,84 @@ export default function StudentsNetworkPage() {
           </div>
         )}
 
+        {/* 교수 본인 프로필 배너 (학생 배너와 동일 레이아웃) */}
+        {isSelfCourseProfessor && courseProfessor && (
+          <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 flex-1 items-start gap-4">
+                <UserAvatar name={courseProfessor.name} imageUrl={courseProfessor.imageUrl} size="lg" />
+                <div className="flex min-w-0 flex-col gap-2">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-xl font-bold text-[#101828]">
+                      {courseProfessor.name} (나)
+                    </span>
+                    <span className="cc-badge-info inline-flex rounded-full px-2 py-0.5 text-xs font-bold">
+                      담당 교수
+                    </span>
+                  </div>
+                  <p
+                    className={`text-sm ${
+                      courseProfessor.department?.trim()
+                        ? "text-[#6a7282]"
+                        : "italic text-[#9ca3af]"
+                    }`}
+                  >
+                    {courseProfessor.department?.trim() || "학과/소속 미입력"}
+                  </p>
+                  <p
+                    className={`text-sm leading-relaxed ${
+                      courseProfessor.bio?.trim()
+                        ? "text-[#364153]"
+                        : "italic text-[#9ca3af]"
+                    }`}
+                  >
+                    {courseProfessor.bio?.trim() ||
+                      [courseProfessor.office, courseProfessor.officeHours]
+                        .filter(Boolean)
+                        .join(" · ") ||
+                      "소개가 아직 등록되지 않았습니다."}
+                  </p>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {courseProfessor.researchAreas && courseProfessor.researchAreas.length > 0 ? (
+                      courseProfessor.researchAreas.map((area) => (
+                        <span
+                          key={area}
+                          className="rounded-full bg-[#f3f4f6] px-3 py-1 text-xs text-[#4a5565]"
+                        >
+                          {area}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs italic text-[#9ca3af]">연구 분야 미입력</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {!isArchived && (
+                <div className="flex flex-shrink-0 flex-col gap-2 sm:items-end">
+                  <Link
+                    to="/app/profile/professor"
+                    className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50"
+                    data-testid="students-network-professor-edit-profile-link"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    내 정보 수정
+                  </Link>
+                  {courseId && (
+                    <Link
+                      to={`/app/courses/${courseId}/messages`}
+                      className="flex items-center justify-center rounded-lg bg-[#101828] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-gray-900"
+                      data-testid="students-network-professor-chat-list-link"
+                    >
+                      챗리스트
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* 검색 + 랜덤 팀 생성 */}
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           {!isArchived && (isProfessor || isAdmin) && (
@@ -1368,15 +1475,28 @@ export default function StudentsNetworkPage() {
               랜덤 팀 생성 +
             </button>
           )}
-          <div className="flex w-full items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 focus-within:ring-2 focus-within:ring-blue-500 sm:w-72">
-            <Search className="h-4 w-4 shrink-0 text-gray-400" />
-            <input
-              type="text"
-              placeholder="키워드를 입력하세요"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none"
-            />
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <div className="flex w-full items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 focus-within:ring-2 focus-within:ring-blue-500 sm:w-72">
+              <Search className="h-4 w-4 shrink-0 text-gray-400" />
+              <input
+                type="text"
+                placeholder="키워드를 입력하세요"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-transparent text-sm text-gray-700 placeholder-gray-400 focus:outline-none"
+              />
+            </div>
+            <select
+              value={studentSort}
+              onChange={(e) => setStudentSort(e.target.value as StudentSortOption)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 sm:w-48"
+              data-testid="students-network-sort-select"
+            >
+              <option value="name-asc">이름 오름차순</option>
+              <option value="name-desc">이름 내림차순</option>
+              <option value="major-asc">전공 오름차순</option>
+              <option value="tag-count-desc">태그 많은 순</option>
+            </select>
           </div>
         </div>
 

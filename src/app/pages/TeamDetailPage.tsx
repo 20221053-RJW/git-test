@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import {
   fetchTeamProgressInsightFromEdge,
   isClientMetadataFallbackInsight,
+  isShallowProgressInsight,
   normalizeProgressInsightForDisplay,
   shouldPreferEdgeProgressInsight,
 } from "../api/ai-team-progress";
@@ -21,6 +22,7 @@ import { supabase } from "../supabase";
 import {
   deliverableDeployLinkLabel,
   deliverableDeployUrl,
+  externalDeliverableHref,
   isDeliverableArchiveFile,
 } from "../utils/deliverableLinks";
 import AppModal from "../components/layout/AppModal";
@@ -323,28 +325,40 @@ export default function TeamDetailPage() {
       setInsightLoading(true);
       setProgressInsight(null);
 
-      const edge = await fetchTeamProgressInsightFromEdge(selectedTeamId, "ko");
-      if (cancelled) return;
+      try {
+        const edge = await fetchTeamProgressInsightFromEdge(selectedTeamId, "ko");
+        if (cancelled) return;
 
-      const fallback = normalizeProgressInsightForDisplay(
-        buildTeamProgressInsight(deliverables, troubleshootingLogs)
-      );
+        const fallback = normalizeProgressInsightForDisplay(
+          buildTeamProgressInsight(deliverables, troubleshootingLogs)
+        );
 
-      const hasArchiveDeliverable = deliverables.some(
-        (d) => d.kind !== "link" && isDeliverableArchiveFile(d.fileName, d.mimeType)
-      );
+        const hasArchiveDeliverable = deliverables.some(
+          (d) => d.kind !== "link" && isDeliverableArchiveFile(d.fileName, d.mimeType)
+        );
 
-      const preferEdge = shouldPreferEdgeProgressInsight(edge, hasArchiveDeliverable);
-      const fallbackIsGeneric = isClientMetadataFallbackInsight(fallback);
+        const preferEdge = shouldPreferEdgeProgressInsight(edge, hasArchiveDeliverable);
+        const fallbackIsGeneric = isClientMetadataFallbackInsight(fallback);
 
-      if (preferEdge && edge) {
-        setProgressInsight(edge);
-      } else if (edge && fallbackIsGeneric && !isShallowProgressInsight(edge)) {
-        setProgressInsight(edge);
-      } else {
-        setProgressInsight(fallback);
+        if (preferEdge && edge) {
+          setProgressInsight(edge);
+        } else if (edge && fallbackIsGeneric && !isShallowProgressInsight(edge)) {
+          setProgressInsight(edge);
+        } else {
+          setProgressInsight(fallback);
+        }
+      } catch (error) {
+        console.warn("팀 진행 인사이트 로드 실패:", error);
+        if (!cancelled) {
+          setProgressInsight(
+            normalizeProgressInsightForDisplay(
+              buildTeamProgressInsight(deliverables, troubleshootingLogs)
+            )
+          );
+        }
+      } finally {
+        if (!cancelled) setInsightLoading(false);
       }
-      setInsightLoading(false);
     };
 
     void run();
@@ -810,10 +824,14 @@ export default function TeamDetailPage() {
     void Promise.all([
       api.teamDetail.getProfessorStudentEvals(selectedTeamId),
       api.teamDetail.getProfessorProjectEval(selectedTeamId),
-    ]).then(([studentEvals, savedProjectEval]) => {
-      setStudentEvalInputs((prev) => ({ ...prev, ...studentEvals }));
-      setProjectEval(savedProjectEval);
-    });
+    ])
+      .then(([studentEvals, savedProjectEval]) => {
+        setStudentEvalInputs((prev) => ({ ...prev, ...studentEvals }));
+        setProjectEval(savedProjectEval);
+      })
+      .catch((error) => {
+        console.warn("교수 평가 초안 로드 실패:", error);
+      });
   }, [selectedTeamId, isProfessor, isAdmin]);
 
   const [aiRecommendation, setAiRecommendation] = useState<{

@@ -155,7 +155,7 @@ function Heading() {
 function Paragraph3() {
   return (
     <div className="h-[24px] relative shrink-0 w-full" data-name="Paragraph">
-      <p className="-translate-x-1/2 absolute font-['Inter:Regular','Noto_Sans_KR:Regular',sans-serif] font-normal leading-[24px] left-[224.06px] not-italic text-[#4a5565] text-[16px] text-center top-[-2px] whitespace-nowrap">웹개발 수업 협업 플랫폼</p>
+      <p className="-translate-x-1/2 absolute font-['Inter:Regular','Noto_Sans_KR:Regular',sans-serif] font-normal leading-[24px] left-[224.06px] not-italic text-[#4a5565] text-[16px] text-center top-[-2px] whitespace-nowrap">원할한 팀플을 위한 올인원 플랫폼</p>
     </div>
   );
 }

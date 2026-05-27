@@ -8,7 +8,7 @@ import type { Announcement, Course } from "../types";
 
 export default function CourseAnnouncementsPage() {
   const { courseId } = useParams<{ courseId: string }>();
-  const { isProfessor, isAdmin } = useAuth();
+  const { isProfessor, isAdmin, user } = useAuth();
   const canManage = isProfessor || isAdmin;
 
   const [course, setCourse] = useState<Course | null>(null);

@@ -147,7 +147,7 @@ export default function SignInPage() {
             <h1 className="text-3xl sm:text-4xl font-black text-gray-900 mb-1">
               CampusConnect
             </h1>
-            <p className="text-sm text-gray-600">웹개발 수업 협업 플랫폼</p>
+            <p className="text-sm text-gray-600">원할한 팀플을 위한 올인원 플랫폼</p>
           </div>
 
           <div className="bg-white rounded-xl shadow-2xl p-6 sm:p-8">
@@ -234,11 +234,10 @@ export default function SignInPage() {
                         key={skill}
                         type="button"
                         onClick={() => toggleSkill(skill)}
-                        className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-                          active
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${active
                             ? "border-blue-600 bg-blue-600 text-white"
                             : "border-gray-300 bg-white text-gray-700 hover:border-blue-400"
-                        }`}
+                          }`}
                       >
                         {skill}
                       </button>

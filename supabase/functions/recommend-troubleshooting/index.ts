@@ -102,7 +102,7 @@ type TeamContext = {
 };
 
 const DELIVERABLES_BUCKET = "ai_team_deliverables";
-const SOURCE_EXTS = /\.(ts|tsx|js|jsx|py|java|go|rs|sql|md|json|yaml|yml|html|css)$/i;
+const SOURCE_EXTS = /\.(ts|tsx|js|jsx|py|java|go|rs|sql|md|txt|json|yaml|yml|html|css)$/i;
 const MAX_SOURCE_BYTES = 120_000;
 const MAX_ZIP_BYTES = 80_000_000;
 const MAX_SNIPPET_CHARS = 3500;
@@ -133,10 +133,28 @@ function storagePathBasename(storagePath: string): string {
   return storagePath.split("/").filter(Boolean).pop() ?? "";
 }
 
+function resolveDeliverableObjectPath(row: DeliverableRow): string | null {
+  const raw = row.storage_path?.trim() ?? "";
+  if (raw) return raw;
+  const publicUrl = row.public_url?.trim() ?? "";
+  if (!publicUrl) return null;
+  try {
+    const url = new URL(publicUrl);
+    const marker = `/storage/v1/object/public/${DELIVERABLES_BUCKET}/`;
+    const idx = url.pathname.indexOf(marker);
+    if (idx < 0) return null;
+    const encoded = url.pathname.slice(idx + marker.length);
+    const decoded = decodeURIComponent(encoded).replace(/^\/+/, "");
+    return decoded || null;
+  } catch {
+    return null;
+  }
+}
+
 function deliverableRowIsZip(row: DeliverableRow): boolean {
   const name = String(row.file_name ?? "");
   const mime = row.mime_type ? String(row.mime_type) : null;
-  const storagePath = row.storage_path?.trim() ?? "";
+  const storagePath = resolveDeliverableObjectPath(row) ?? "";
   const innerPath = storagePath ? storageInnerRelativePath(storagePath) : null;
   return isZipDeliverable(name, mime, storagePath || null, innerPath);
 }
@@ -392,24 +410,84 @@ function truncateText(text: string, max: number): string {
   return t.length > max ? `${t.slice(0, max)}…` : t;
 }
 
+function compactInlineTroubleshootingExample(text: string, max = 18): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return "이슈 내용 미기재";
+  const firstClause = normalized.split(/[.!?。…,:;()\[\]{}]/)[0]?.trim() ?? normalized;
+  const short = firstClause || normalized;
+  return truncateText(short, max);
+}
+
+/**
+ * summary는 문장 중간 절단보다 완결 문장 우선.
+ * - max 이내 마지막 문장부호가 충분히 뒤에 있으면 그 지점에서 자름
+ * - 아니면 안전하게 ellipsis로 축약
+ */
+function truncateSummaryText(text: string, max: number): string {
+  const t = text.trim();
+  if (!t) return "";
+  if (t.length <= max) return t;
+
+  const window = t.slice(0, max + 1);
+  const sentenceEnds = [...window.matchAll(/[.!?。…]/g)];
+  const lastSentenceEnd = sentenceEnds.length > 0 ? sentenceEnds[sentenceEnds.length - 1] : null;
+  const sentenceEndIndex = lastSentenceEnd?.index ?? -1;
+  if (sentenceEndIndex >= Math.floor(max * 0.62)) {
+    return window.slice(0, sentenceEndIndex + 1).trim();
+  }
+
+  const softCutIndex = Math.max(
+    window.lastIndexOf(" "),
+    window.lastIndexOf("·"),
+    window.lastIndexOf(","),
+    window.lastIndexOf(")")
+  );
+  const cutIndex = softCutIndex >= Math.floor(max * 0.7) ? softCutIndex : max;
+  return `${window.slice(0, cutIndex).trimEnd()}…`;
+}
+
 function stripSentenceEnding(text: string): string {
   return text.replace(/[.!?。…]+\s*$/u, "").trim();
+}
+
+function normalizeDanglingKoreanEnding(text: string): string {
+  return text.replace(/해소되지\.(?=\s|$)/g, "해소되지 않았습니다.");
+}
+
+function normalizeLongTroubleshootingExample(text: string): string {
+  return text.replace(/\(예:\s*([^)]+)\)/g, (_match, rawExample: string) => {
+    const compact = compactInlineTroubleshootingExample(rawExample, 14);
+    return `(예: ${compact})`;
+  });
 }
 
 const STACK_TOPIC_RE =
   /react|typescript|vite|supabase|firebase|next\.?js|스택으로|기반으로|진입 파일/i;
 
+function normalizeInsightComparisonText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/^[\-•*]\s*/g, "")
+    .replace(/^△\s*/g, "")
+    .replace(/^보완:\s*/g, "")
+    .replace(/\(예:\s*[^)]+\)/g, "(예)")
+    .replace(/[.!?。…]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function isDuplicateInsightLine(line: string, summary: string): boolean {
-  const text = line.trim();
+  const text = normalizeInsightComparisonText(line);
+  const summaryNorm = normalizeInsightComparisonText(summary);
   if (!text || text.length < 8) return false;
-  if (summary.includes(text)) return true;
-  const probe = text.slice(0, Math.min(40, text.length));
-  if (probe.length >= 10 && summary.includes(probe)) return true;
-  if (STACK_TOPIC_RE.test(text) && STACK_TOPIC_RE.test(summary)) return true;
-  if (/스택으로 보이|기반으로 보이|업로드된 소스 기준/.test(text) && STACK_TOPIC_RE.test(summary)) {
+  if (summaryNorm.includes(text) || text.includes(summaryNorm)) return true;
+  const probe = text.slice(0, Math.min(24, text.length));
+  if (probe.length >= 10 && summaryNorm.includes(probe)) return true;
+  if (STACK_TOPIC_RE.test(text) && STACK_TOPIC_RE.test(summaryNorm)) return true;
+  if (/스택으로 보이|기반으로 보이|업로드된 소스 기준/.test(text) && STACK_TOPIC_RE.test(summaryNorm)) {
     return true;
   }
-  if (/배포·데모 URL|데모 URL/.test(text) && /배포|데모|URL/.test(summary)) return true;
+  if (/배포·데모 url|데모 url/.test(text) && /배포|데모|url/.test(summaryNorm)) return true;
   return false;
 }
 
@@ -430,7 +508,9 @@ function normalizeProgressInsightForDisplay(
       .replace(/\s{2,}/g, " ")
       .trim();
   }
-  const cappedSummary = summary.length > 240 ? `${summary.slice(0, 237)}…` : summary;
+  const cappedSummary = normalizeDanglingKoreanEnding(
+    normalizeLongTroubleshootingExample(truncateSummaryText(summary, 240))
+  );
 
   const filterAdvice = (items: string[], max: number) =>
     items
@@ -732,7 +812,7 @@ async function sampleDeliverableSourceSnippets(
 
   for (const row of rows) {
     if (snippets.length >= maxSnippets) break;
-    const path = row.storage_path?.trim() ?? "";
+    const path = resolveDeliverableObjectPath(row) ?? "";
     if (!path || path.startsWith("link://")) continue;
 
     const name = String(row.file_name ?? "");
@@ -754,7 +834,20 @@ async function sampleDeliverableSourceSnippets(
       continue;
     }
 
-    if (!SOURCE_EXTS.test(sourcePath)) continue;
+    if (!SOURCE_EXTS.test(sourcePath)) {
+      const mimeLower = (mime ?? "").toLowerCase();
+      const isDocHint =
+        /\.(pdf|docx?|pptx?)$/i.test(sourcePath) ||
+        /pdf|msword|officedocument|presentation|powerpoint/.test(mimeLower);
+      if (isDocHint) {
+        snippets.push({
+          file_name: innerPath ? `${name}::${innerPath}` : name,
+          excerpt: `(문서 파일은 자동 분석이 제한됩니다 — 가능하면 .md/.txt로 변환하거나 ZIP에 포함해 업로드해 주세요)`,
+        });
+        processedDeliverableIds.push(row.id);
+      }
+      continue;
+    }
 
     if (size > MAX_SOURCE_BYTES) {
       snippets.push({
@@ -1076,7 +1169,7 @@ function buildHeuristicProgressInsight(context: TeamContext): ProgressInsightRes
   if (!signals.hasTests && hasSource) gaps.push("테스트 코드가 보이지 않아 리팩터·통합 시 회귀 위험이 큽니다.");
   if (open.length > 0) {
     gaps.push(
-      `진행 중 트러블슈팅 ${open.length}건(예: ${truncateText(open[0].problem, 36)})이 남아 핵심 블로커가 해소되지 않았습니다.`
+      `진행 중 트러블슈팅 ${open.length}건(예: ${compactInlineTroubleshootingExample(open[0].problem)})이 남아 핵심 블로커가 해소되지 않았습니다.`
     );
   } else if (context.logs.length === 0) {
     gaps.push("트러블슈팅 로그가 없어 디버깅·의사결정 과정이 추적되지 않습니다.");
@@ -1164,12 +1257,12 @@ function buildHeuristicProgressInsight(context: TeamContext): ProgressInsightRes
 
   const topGap = gaps[0];
   if (topGap) {
-    const gapCore = stripSentenceEnding(truncateText(topGap.replace(/^\d+\.\s*/, ""), 72));
+    const gapCore = stripSentenceEnding(topGap.replace(/^\d+\.\s*/, ""));
     summaryParts.push(`보완: ${gapCore}.`);
   }
 
   return {
-    summary: truncateText(summaryParts.join(" "), 260),
+    summary: truncateSummaryText(summaryParts.join(" "), 260),
     strengths: strengths.slice(0, 2),
     gaps: gaps.slice(0, 3),
     next_steps: next_steps.slice(0, 3),

@@ -1,6 +1,6 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { api } from "../api/supabase-api";
+import { api, invalidateApiSessionCache } from "../api/supabase-api";
 import AppModal from "../components/layout/AppModal";
 import M3Button from "../components/layout/M3Button";
 import PageHeader from "../components/layout/PageHeader";
@@ -94,7 +94,10 @@ export default function CoursesPage() {
   useDebouncedRealtimeReload(
     "courses-list-live",
     isAuthenticated,
-    () => loadCourses(statusFilter),
+    () => {
+      invalidateApiSessionCache();
+      return loadCourses(statusFilter, { silent: true });
+    },
     courseListRealtimeTables
   );
 

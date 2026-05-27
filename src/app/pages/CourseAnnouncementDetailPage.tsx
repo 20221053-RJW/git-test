@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { api } from "../api/supabase-api";
 import PageLoading from "../components/layout/PageLoading";
 import { useAuth } from "../contexts/AuthContext";
@@ -11,7 +11,9 @@ export default function CourseAnnouncementDetailPage() {
     courseId: string;
     announcementId: string;
   }>();
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { user, isProfessor, isAdmin } = useAuth();
+  const canManage = isProfessor || isAdmin;
   const [course, setCourse] = useState<Course | null>(null);
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,6 +61,7 @@ export default function CourseAnnouncementDetailPage() {
   }, [courseId, announcementId]);
 
   const listPath = courseId ? `/app/courses/${courseId}/announcements` : "/app/courses";
+  const [deleting, setDeleting] = useState(false);
 
   if (!courseId) {
     return <p className="p-6 text-gray-600">수업을 선택해 주세요.</p>;
@@ -97,9 +100,35 @@ export default function CourseAnnouncementDetailPage() {
         <article className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <h1 className="text-2xl font-black text-gray-900">{announcement.title}</h1>
-            <span className="rounded-full bg-red-50 px-3 py-1 text-sm font-bold text-red-600">
-              D-{announcement.dDay}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-red-50 px-3 py-1 text-sm font-bold text-red-600">
+                D-{announcement.dDay}
+              </span>
+              {canManage && announcement.id && (
+                <button
+                  type="button"
+                  data-testid="announcement-delete-button"
+                  disabled={deleting}
+                  onClick={async () => {
+                    if (!courseId || !announcement.id) return;
+                    const ok = window.confirm("이 공지를 삭제할까요? 삭제 후 복구할 수 없습니다.");
+                    if (!ok) return;
+                    setDeleting(true);
+                    try {
+                      await api.announcements.delete(courseId, announcement.id);
+                      navigate(listPath);
+                    } catch (error) {
+                      alert(error instanceof Error ? error.message : "공지 삭제에 실패했습니다.");
+                    } finally {
+                      setDeleting(false);
+                    }
+                  }}
+                  className="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-bold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {deleting ? "삭제 중…" : "삭제"}
+                </button>
+              )}
+            </div>
           </div>
           <p
             className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700"

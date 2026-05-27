@@ -309,6 +309,7 @@ async function joinCourseByCodeInDb(courseCode: string): Promise<{ courseId: str
   });
 
   if (insertError) throw insertError;
+  invalidateApiSessionCache();
 
   return { courseId: course.id, courseName: course.name };
 }
@@ -1009,6 +1010,20 @@ async function createAnnouncementInDb(
     courseId,
     authorUserId: currentUser.id,
   };
+}
+
+async function deleteAnnouncementInDb(courseId: string, announcementId: string): Promise<void> {
+  await assertProfessorCanManageAnnouncements(courseId);
+  const targetId = announcementId.trim();
+  if (!targetId) throw new Error("삭제할 공지를 찾을 수 없습니다.");
+
+  const { error } = await supabase
+    .from("ai_announcements")
+    .delete()
+    .eq("course_id", courseId)
+    .eq("id", targetId);
+
+  if (error) throw formatAnnouncementDbError(error);
 }
 
 function mapAiUserToNetworkStudent(student: AiUser, isSelf: boolean): NetworkStudent {
@@ -1938,6 +1953,132 @@ async function listDirectMessageThreadsFromDb(courseId: string): Promise<DirectM
       };
     })
     .sort((a, b) => b.lastAt.localeCompare(a.lastAt));
+}
+
+/** 상단 마이페이지 인박스 — 수업 N회 반복 조회 없이 일괄 스냅샷 */
+export type NavInboxSnapshot = {
+  announcements: Array<{
+    courseId: string;
+    courseName: string;
+    id: string;
+    title: string;
+    sortOrder: number;
+    authorUserId?: string;
+  }>;
+  directMessages: Array<{
+    courseId: string;
+    courseName: string;
+    peerUserId: string;
+    peerName: string;
+    preview: string;
+    lastAt: string;
+    lastSenderUserId: string;
+  }>;
+};
+
+async function getNavInboxSnapshotFromDb(): Promise<NavInboxSnapshot> {
+  const currentUser = await getCurrentAiUser();
+  if (!currentUser) return { announcements: [], directMessages: [] };
+
+  const accessibleCourseIds = await getAccessibleCourseIds();
+  if (accessibleCourseIds.length === 0) return { announcements: [], directMessages: [] };
+
+  const [coursesResult, announcementsResult, messagesResult] = await Promise.all([
+    supabase
+      .from("ai_courses")
+      .select("id, name")
+      .in("id", accessibleCourseIds)
+      .eq("status", "active"),
+    supabase
+      .from("ai_announcements")
+      .select("id, title, sort_order, course_id, author_user_id")
+      .in("course_id", accessibleCourseIds),
+    supabase
+      .from("ai_direct_messages")
+      .select("course_id, sender_user_id, recipient_user_id, text, created_at")
+      .in("course_id", accessibleCourseIds)
+      .or(
+        `sender_user_id.eq.${currentUser.id},recipient_user_id.eq.${currentUser.id}`
+      )
+      .order("created_at", { ascending: false }),
+  ]);
+
+  if (coursesResult.error) throw coursesResult.error;
+  if (announcementsResult.error && !isMissingRelationError(announcementsResult.error)) {
+    throw announcementsResult.error;
+  }
+  if (messagesResult.error && !isMissingRelationError(messagesResult.error)) {
+    throw messagesResult.error;
+  }
+
+  const courseNameById = new Map(
+    (coursesResult.data ?? []).map((row) => [row.id as string, row.name as string])
+  );
+  const activeCourseIds = new Set(courseNameById.keys());
+
+  const announcements = (announcementsResult.data ?? [])
+    .filter((row) => activeCourseIds.has(row.course_id as string))
+    .map((row) => ({
+      courseId: row.course_id as string,
+      courseName: courseNameById.get(row.course_id as string) ?? "수업",
+      id: row.id as string,
+      title: row.title as string,
+      sortOrder: row.sort_order as number,
+      authorUserId: (row.author_user_id as string | null) ?? undefined,
+    }));
+
+  const latestByPeer = new Map<
+    string,
+    {
+      courseId: string;
+      peerUserId: string;
+      preview: string;
+      lastAt: string;
+      lastSenderUserId: string;
+    }
+  >();
+
+  for (const row of messagesResult.data ?? []) {
+    const courseId = row.course_id as string;
+    if (!activeCourseIds.has(courseId)) continue;
+    const senderId = row.sender_user_id as string;
+    const recipientId = row.recipient_user_id as string;
+    const peerId = senderId === currentUser.id ? recipientId : senderId;
+    if (!peerId || peerId === currentUser.id) continue;
+    const dedupeKey = `${courseId}:${peerId}`;
+    if (!latestByPeer.has(dedupeKey)) {
+      latestByPeer.set(dedupeKey, {
+        courseId,
+        peerUserId: peerId,
+        preview: row.text as string,
+        lastAt: row.created_at as string,
+        lastSenderUserId: senderId,
+      });
+    }
+  }
+
+  let directMessages: NavInboxSnapshot["directMessages"] = [];
+  if (latestByPeer.size > 0) {
+    const peerIds = [...new Set([...latestByPeer.values()].map((t) => t.peerUserId))];
+    const { data: users, error: usersError } = await supabase
+      .from("ai_users")
+      .select("id, name")
+      .in("id", peerIds);
+    if (usersError) throw usersError;
+
+    const nameById = new Map((users ?? []).map((u) => [u.id as string, u.name as string]));
+    directMessages = [...latestByPeer.values()].map((thread) => ({
+      courseId: thread.courseId,
+      courseName: courseNameById.get(thread.courseId) ?? "수업",
+      peerUserId: thread.peerUserId,
+      peerName: nameById.get(thread.peerUserId) ?? "수강생",
+      preview: thread.preview,
+      lastAt: thread.lastAt,
+      lastSenderUserId: thread.lastSenderUserId,
+    }));
+  }
+
+  return { announcements, directMessages };
 }
 
 async function getDirectMessagesFromDb(
@@ -5429,6 +5570,9 @@ export const api = {
     warmSendContext: warmDirectChatSendContextInDb,
     listThreads: listDirectMessageThreadsFromDb,
   },
+  navInbox: {
+    getSnapshot: getNavInboxSnapshotFromDb,
+  },
   teamStages: {
     getAll: getTeamStagesFromDb,
     getByCourse: getCourseStagesFromDb,
@@ -5437,6 +5581,7 @@ export const api = {
   announcements: {
     getAll: getAnnouncementsFromDb,
     create: createAnnouncementInDb,
+    delete: deleteAnnouncementInDb,
   },
   studentNetwork: {
     getStudents: getNetworkStudentsFromDb,
