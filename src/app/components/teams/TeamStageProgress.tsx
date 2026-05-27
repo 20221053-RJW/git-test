@@ -80,25 +80,19 @@ function TeamCardStageWindow({
             ? "border-transparent bg-gradient-to-r from-[#f1f5f9]/90 to-[#eef4ff]/50 opacity-70"
             : "border-transparent bg-gradient-to-r from-[#eef4ff]/50 to-[#f8fafc]/90 opacity-65";
 
-        const dotClass = isDone
-          ? "bg-[#155dfc] text-white"
-          : isCurrent
-            ? "bg-[#155dfc] ring-2 ring-[#bfdbfe] text-white"
-            : "bg-[#cbd5e1] text-[#64748b]";
+        const dotClass = isPrev
+          ? "bg-[#e2e8f0] text-[#64748b]"
+          : isNext
+            ? "bg-[#f1f5f9] text-[#94a3b8]"
+            : isDone
+              ? "bg-[#155dfc] text-white"
+              : "bg-[#155dfc] ring-2 ring-[#bfdbfe] text-white";
 
         const labelClass = isCurrent
           ? "text-[12px] font-bold text-[#153e99]"
           : isPrev
             ? "text-[11px] font-medium text-[#64748b]"
             : "text-[11px] font-medium text-[#94a3b8]";
-
-        const badgeClass = isCurrent
-          ? "bg-[#dce9ff] text-[#1d4dbc]"
-          : isPrev
-            ? "bg-[#f1f5f9] text-[#64748b]"
-            : "bg-[#f8fafc] text-[#94a3b8]";
-
-        const badgeText = isDone ? "완료" : isCurrent ? "진행중" : "다음";
 
         return (
           <div key={`${item.index}-${item.role}`}>
@@ -111,12 +105,14 @@ function TeamCardStageWindow({
                 className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold ${dotClass}`}
                 aria-hidden
               >
-                {isDone ? "✓" : item.index + 1}
+                {item.index + 1}
               </div>
               <p className={`min-w-0 flex-1 truncate ${labelClass}`}>{item.name}</p>
-              <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold ${badgeClass}`}>
-                {badgeText}
-              </span>
+              {isCurrent && (
+                <span className="shrink-0 rounded-full bg-[#dce9ff] px-1.5 py-0.5 text-[9px] font-bold text-[#1d4dbc]">
+                  진행중
+                </span>
+              )}
             </div>
             {i < windowItems.length - 1 && (
               <div
