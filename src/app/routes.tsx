@@ -31,6 +31,7 @@ import StudentsNetworkPage from "./pages/StudentsNetworkPage";
 import CourseDirectMessagesPage from "./pages/CourseDirectMessagesPage";
 import CourseStagesEditPage from "./pages/CourseStagesEditPage";
 import SignInPage from "./pages/SignInPage";
+import SyllabusSearchPage from "./pages/SyllabusSearchPage";
 
 export const router = createBrowserRouter([
   {
@@ -163,6 +164,10 @@ export const router = createBrowserRouter([
           {
             path: "mypage/archived-courses",
             Component: MyPageArchivedCoursesPage,
+          },
+          {
+            path: "syllabi",
+            Component: SyllabusSearchPage,
           },
           {
             path: "students",

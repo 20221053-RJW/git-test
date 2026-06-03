@@ -371,6 +371,22 @@ export interface CourseMaterial {
   createdAt: Date;
 }
 
+export interface CourseSyllabus {
+  id: string;
+  courseName: string;
+  courseCode?: string;
+  department?: string;
+  semester?: string;
+  grade?: string;
+  professor?: string;
+  fileName: string;
+  fileSize: number;
+  mimeType?: string;
+  publicUrl: string;
+  aiStatus: string;
+  createdAt: Date;
+}
+
 // 프로젝트 관련 타입
 export interface Project {
   id: string;

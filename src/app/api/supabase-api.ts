@@ -31,6 +31,7 @@ import type {
   TeamDeliverable,
   TeamDeliverableSubmitMeta,
   CourseMaterial,
+  CourseSyllabus,
   Project,
   Question,
   Answer,
@@ -1253,6 +1254,76 @@ async function saveStudentNetworkProfileInDb(input: StudentNetworkEditForm): Pro
     hobbies: input.hobbies.trim(),
     bio,
     portfolioFileName: input.portfolioFileName.trim(),
+  };
+}
+
+async function searchSyllabiFromDb(params: {
+  courseName?: string;
+  department?: string;
+  semester?: string;
+}): Promise<CourseSyllabus[]> {
+  let query = supabase
+    .from("ai_course_syllabi")
+    .select("id, course_name, course_code, department, semester, grade, professor, file_name, file_size, mime_type, public_url, ai_status, created_at")
+    .order("created_at", { ascending: false });
+
+  if (params.courseName?.trim()) {
+    query = query.ilike("course_name", `%${params.courseName.trim()}%`);
+  }
+  if (params.department?.trim()) {
+    query = query.ilike("department", `%${params.department.trim()}%`);
+  }
+  if (params.semester?.trim()) {
+    query = query.eq("semester", params.semester.trim());
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    if (isMissingRelationError(error)) return [];
+    throw error;
+  }
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    courseName: row.course_name,
+    courseCode: row.course_code ?? undefined,
+    department: row.department ?? undefined,
+    semester: row.semester ?? undefined,
+    grade: row.grade ?? undefined,
+    professor: row.professor ?? undefined,
+    fileName: row.file_name,
+    fileSize: Number(row.file_size ?? 0),
+    mimeType: row.mime_type ?? undefined,
+    publicUrl: row.public_url,
+    aiStatus: row.ai_status ?? "pending",
+    createdAt: asDate(row.created_at),
+  }));
+}
+
+async function getSyllabusByIdFromDb(id: string): Promise<CourseSyllabus | null> {
+  const { data, error } = await supabase
+    .from("ai_course_syllabi")
+    .select("id, course_name, course_code, department, semester, grade, professor, file_name, file_size, mime_type, public_url, ai_status, created_at")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  return {
+    id: data.id,
+    courseName: data.course_name,
+    courseCode: data.course_code ?? undefined,
+    department: data.department ?? undefined,
+    semester: data.semester ?? undefined,
+    grade: data.grade ?? undefined,
+    professor: data.professor ?? undefined,
+    fileName: data.file_name,
+    fileSize: Number(data.file_size ?? 0),
+    mimeType: data.mime_type ?? undefined,
+    publicUrl: data.public_url,
+    aiStatus: data.ai_status ?? "pending",
+    createdAt: asDate(data.created_at),
   };
 }
 
@@ -5646,6 +5717,10 @@ export const api = {
     deleteDeliverable: deleteTeamDeliverableInDb,
     updateDeliverable: updateTeamDeliverableInDb,
     recommendTroubleshootingAi: recommendTroubleshootingFromEdge,
+  },
+  syllabi: {
+    search: searchSyllabiFromDb,
+    getById: getSyllabusByIdFromDb,
   },
   projects: {
     getAll: getProjectsFromDb,
