@@ -2,11 +2,11 @@
   {
     "filePath": "/Users/mac/Desktop/CC/git-test/dist/syllabus.pdf",
     "fileName": "syllabus.pdf",
-    "courseName": "강의계획서",
-    "courseCode": "",
-    "department": "",
+    "courseName": "웹 프로그래밍",
+    "courseCode": "2150559701",
+    "department": "컴퓨터학부",
     "semester": "2026-1",
-    "grade": "",
-    "professor": ""
+    "grade": "2",
+    "professor": "성병기"
   }
 ]
