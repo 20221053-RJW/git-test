@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { api } from "../api/supabase-api";
 import type { CourseSyllabus } from "../types";
 import PageLoading from "../components/layout/PageLoading";
@@ -35,6 +35,11 @@ export default function SyllabusSearchPage() {
     },
     [courseName, department, semester]
   );
+
+  useEffect(() => {
+    void handleSearch();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="container mx-auto max-w-4xl px-4 py-8">
