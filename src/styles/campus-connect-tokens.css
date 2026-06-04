@@ -1,0 +1,153 @@
+/**
+ * CampusConnect 컬러 시스템
+ * 현대 SaaS 패턴: 시맨틱 토큰 + 60-30-10 (중립·표면·브랜드 액센트)
+ * @see doc/for_agent/18_product_design.md
+ */
+
+:root {
+  /* ── Primitive: Brand blue (단일 액센트) ── */
+  --cc-blue-50: #eff6ff;
+  --cc-blue-100: #dbeafe;
+  --cc-blue-200: #bfdbfe;
+  --cc-blue-600: #155dfc;
+  --cc-blue-700: #1249d4;
+  --cc-blue-800: #0f3db8;
+
+  /* ── Primitive: Slate neutrals ── */
+  --cc-slate-50: #f8fafc;
+  --cc-slate-100: #f1f5f9;
+  --cc-slate-200: #e2e8f0;
+  --cc-slate-300: #cbd5e1;
+  --cc-slate-500: #64748b;
+  --cc-slate-600: #475569;
+  --cc-slate-800: #1e293b;
+  --cc-slate-900: #0f172a;
+
+  /* ── Semantic: Interactive (CTA·링크·활성) ── */
+  --cc-primary: var(--cc-blue-600);
+  --cc-primary-hover: var(--cc-blue-700);
+  --cc-primary-active: var(--cc-blue-800);
+  --cc-on-primary: #ffffff;
+  --cc-primary-container: var(--cc-blue-100);
+  --cc-on-primary-container: #0c1e4a;
+  --cc-accent-subtle: var(--cc-blue-50);
+  --cc-link: var(--cc-blue-700);
+  --cc-link-hover: var(--cc-blue-800);
+
+  /* ── Semantic: Surfaces (tonal elevation) ── */
+  --cc-page: var(--cc-slate-50);
+  --cc-surface: #ffffff;
+  --cc-surface-raised: #ffffff;
+  --cc-surface-sunken: var(--cc-slate-100);
+  --cc-surface-overlay: #ffffff;
+
+  --cc-surface-container-lowest: var(--cc-surface);
+  --cc-surface-container-low: var(--cc-slate-50);
+  --cc-surface-container: var(--cc-slate-100);
+  --cc-surface-container-high: #e8eef4;
+  --cc-surface-muted: var(--cc-slate-50);
+  --cc-surface-elevated: var(--cc-surface);
+
+  /* ── Semantic: Text ── */
+  --cc-on-surface: var(--cc-slate-900);
+  --cc-on-surface-variant: var(--cc-slate-600);
+  --cc-text: var(--cc-on-surface);
+  --cc-text-secondary: var(--cc-on-surface-variant);
+  --cc-text-muted: var(--cc-slate-500);
+  --cc-text-disabled: #94a3b8;
+  --cc-text-inverse: #ffffff;
+
+  /* ── Semantic: Borders (얇고 낮은 대비) ── */
+  --cc-outline: var(--cc-slate-500);
+  --cc-outline-variant: var(--cc-slate-200);
+  --cc-border: var(--cc-outline-variant);
+  --cc-border-subtle: var(--cc-slate-100);
+  --cc-border-strong: var(--cc-slate-300);
+  --cc-primary-border: var(--cc-blue-200);
+  --cc-primary-muted: var(--cc-accent-subtle);
+
+  /* ── Semantic: Secondary (칩·네비 활성) ── */
+  --cc-secondary-container: #e8eef9;
+  --cc-on-secondary-container: #1a2744;
+
+  /* ── Semantic: Feedback ── */
+  --cc-success: #059669;
+  --cc-success-bg: #ecfdf5;
+  --cc-success-border: #a7f3d0;
+  --cc-warning: #d97706;
+  --cc-warning-bg: #fffbeb;
+  --cc-warning-border: #fde68a;
+  --cc-error: #dc2626;
+  --cc-error-bg: #fef2f2;
+  --cc-error-border: #fecaca;
+  --cc-info: #2563eb;
+  --cc-info-bg: var(--cc-blue-50);
+  --cc-info-border: var(--cc-blue-200);
+
+  /* ── Shell: Top bar & footer ── */
+  --cc-footer: #111827;
+  --cc-footer-border: #1f2937;
+  --cc-on-footer: #f8fafc;
+  --cc-on-footer-muted: #cbd5e1;
+  --cc-on-footer-subtle: #94a3b8;
+
+  /* 상단 네비 전용 타이포 */
+  --cc-font-sans: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", Roboto, system-ui, sans-serif;
+  --cc-nav-font: var(--cc-font-sans);
+  --cc-page-title-size: 1.625rem;
+  --cc-page-title-line: 1.35;
+  --cc-nav-title-size: 1.3125rem;
+  --cc-nav-logo-mark-size: 2.75rem;
+  --cc-nav-link-size: 0.9375rem;
+
+  /* 앱 셸(상단 네비 · 사이드+메인) 공통 가로 폭 */
+  --cc-app-shell-max-width: 80rem;
+
+  /* ── Marketing: Landing gradient stops ── */
+  --cc-landing-gradient: linear-gradient(
+    145deg,
+    var(--cc-accent-subtle) 0%,
+    var(--cc-secondary-container) 42%,
+    var(--cc-page) 100%
+  );
+
+  /* ── Shape & elevation (M3) ── */
+  --m3-shape-extra-small: 0.25rem;
+  --m3-shape-small: 0.5rem;
+  --m3-shape-medium: 0.75rem;
+  --m3-shape-large: 1rem;
+  --m3-shape-extra-large: 1.75rem;
+  --m3-shape-full: 9999px;
+
+  --cc-radius-sm: var(--m3-shape-small);
+  --cc-radius-md: var(--m3-shape-medium);
+  --cc-radius-lg: var(--m3-shape-large);
+  --cc-radius-xl: var(--m3-shape-extra-large);
+
+  --m3-elevation-0: none;
+  --m3-elevation-1: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.06);
+  --m3-elevation-2: 0 2px 8px rgb(15 23 42 / 0.06), 0 1px 2px rgb(15 23 42 / 0.04);
+  --m3-elevation-3: 0 8px 24px rgb(15 23 42 / 0.08);
+
+  --cc-shadow-sm: var(--m3-elevation-1);
+  --cc-shadow-md: var(--m3-elevation-2);
+
+  /* Typography scale */
+  --m3-headline-large-size: 2rem;
+  --m3-headline-large-line: 2.5rem;
+  --m3-headline-medium-size: 1.75rem;
+  --m3-headline-medium-line: 2.25rem;
+  --m3-title-large-size: 1.375rem;
+  --m3-title-large-line: 1.75rem;
+  --m3-title-medium-size: 1rem;
+  --m3-title-medium-line: 1.5rem;
+  --m3-body-large-size: 1rem;
+  --m3-body-large-line: 1.5rem;
+  --m3-body-medium-size: 0.875rem;
+  --m3-body-medium-line: 1.25rem;
+  --m3-label-large-size: 0.875rem;
+  --m3-label-large-line: 1.25rem;
+
+  --cc-nav-height: 4rem;
+  --cc-sticky-offset: calc(var(--cc-nav-height) + 1rem);
+}

@@ -1,0 +1,399 @@
+import React, { useEffect, useRef, useState } from "react";
+import { extractDeployLinkFromDescription } from "../api/supabase-api";
+import { AiGeneratingIndicator } from "./AiGeneratingIndicator";
+import AppModal from "./layout/AppModal";
+import type { TeamDeliverable } from "../types";
+import {
+  formatByteSize,
+  zipProjectFolderExcludingDeps,
+  type ProjectSourceZipProgress,
+  type ProjectSourceZipStats,
+} from "../utils/projectSourceZip";
+
+export type TeamDeliverableFormPayload = {
+  title: string;
+  subtitle: string;
+  description: string;
+  linkUrl: string;
+  files: File[];
+};
+
+type Props = {
+  open: boolean;
+  uploading: boolean;
+  mode?: "create" | "edit";
+  editing?: TeamDeliverable | null;
+  onClose: () => void;
+  onSubmit: (payload: TeamDeliverableFormPayload) => Promise<void>;
+};
+
+const FILE_ACCEPT =
+  ".pdf,.zip,.7z,.rar,.tar,.gz,.ppt,.pptx,.png,.jpg,.jpeg,.webp,.gif,.svg,.txt,.md,.json,.csv,.ts,.tsx,.js,.jsx,.py,.java,.c,.cpp,.go,.rs,.sql,.yaml,.yml,.doc,.docx,.xls,.xlsx";
+
+const emptyForm = (): TeamDeliverableFormPayload => ({
+  title: "",
+  subtitle: "",
+  description: "",
+  linkUrl: "",
+  files: [],
+});
+
+export default function TeamDeliverableSubmitModal({
+  open,
+  uploading,
+  mode = "create",
+  editing = null,
+  onClose,
+  onSubmit,
+}: Props) {
+  const isEdit = mode === "edit" && editing != null;
+  const isLinkEdit = isEdit && editing.kind === "link";
+  const isFileEdit = isEdit && editing.kind !== "link";
+
+  const [form, setForm] = useState<TeamDeliverableFormPayload>(emptyForm);
+  const [preparingFolder, setPreparingFolder] = useState(false);
+  const [folderProgress, setFolderProgress] = useState<ProjectSourceZipProgress | null>(null);
+  const [folderStats, setFolderStats] = useState<ProjectSourceZipStats | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const projectFolderInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setPreparingFolder(false);
+    setFolderProgress(null);
+    setFolderStats(null);
+    if (isEdit && editing) {
+      const embeddedLink =
+        editing.kind === "link" ? editing.publicUrl : extractDeployLinkFromDescription(editing.description) ?? "";
+      setForm({
+        title: editing.fileName,
+        subtitle: editing.subtitle ?? "",
+        description: editing.description ?? "",
+        linkUrl: embeddedLink,
+        files: [],
+      });
+      return;
+    }
+    setForm(emptyForm());
+  }, [open, isEdit, editing]);
+
+  const busy = uploading || preparingFolder;
+
+  const update = <K extends keyof TeamDeliverableFormPayload>(key: K, value: TeamDeliverableFormPayload[K]) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const mergeFiles = (incoming: FileList | null) => {
+    if (!incoming?.length) return;
+    setFolderStats(null);
+    const next = isFileEdit ? ([] as File[]) : [...form.files];
+    for (const file of Array.from(incoming)) {
+      if (!next.some((f) => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified)) {
+        next.push(file);
+      }
+    }
+    update("files", isFileEdit ? next.slice(0, 1) : next);
+  };
+
+  const handleProjectFolderPick = async (incoming: FileList | null) => {
+    if (!incoming?.length) return;
+    setPreparingFolder(true);
+    setFolderProgress({ phase: "scanning", percent: 0 });
+    setFolderStats(null);
+    try {
+      const { zipFile, stats } = await zipProjectFolderExcludingDeps(incoming, {
+        onProgress: setFolderProgress,
+      });
+      setFolderStats(stats);
+      update("files", [zipFile]);
+      if (!form.title.trim()) {
+        update("title", stats.zipFileName.replace(/\.zip$/i, ""));
+      }
+    } catch (error) {
+      console.error(error);
+      alert(error instanceof Error ? error.message : "프로젝트 폴더를 압축하지 못했습니다.");
+      update("files", []);
+    } finally {
+      setPreparingFolder(false);
+      setFolderProgress(null);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setFolderStats(null);
+    update(
+      "files",
+      form.files.filter((_, i) => i !== index)
+    );
+  };
+
+  const handleSubmit = async () => {
+    const linkUrl = form.linkUrl.trim();
+    if (isEdit) {
+      if (isLinkEdit && !linkUrl) {
+        alert("배포 링크를 입력해주세요.");
+        return;
+      }
+      await onSubmit({
+        title: form.title.trim(),
+        description: form.description.trim(),
+        linkUrl,
+        files: form.files,
+      });
+      return;
+    }
+
+    if (!linkUrl && form.files.length === 0) {
+      alert("배포 링크 또는 파일·프로젝트 폴더 중 하나 이상을 추가해주세요.");
+      return;
+    }
+    await onSubmit({
+      title: form.title.trim(),
+      subtitle: form.subtitle.trim(),
+      description: form.description.trim(),
+      linkUrl,
+      files: form.files,
+    });
+  };
+
+  const folderLoadingMessage =
+    folderProgress?.phase === "packaging"
+      ? "프로젝트를 ZIP으로 묶는 중입니다…"
+      : "프로젝트 파일을 확인하는 중입니다…";
+
+  return (
+    <AppModal
+      open={open}
+      onClose={onClose}
+      testId="team-deliverable-modal-overlay"
+      ariaLabel={isEdit ? "산출물 수정" : "산출물 등록"}
+      panelClassName="max-w-[560px] !p-0 flex max-h-[92vh] flex-col overflow-hidden"
+    >
+      <div className="relative flex max-h-[92vh] w-full flex-col" data-testid="team-deliverable-modal">
+        {preparingFolder && (
+          <div
+            className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-white/90 px-6 backdrop-blur-[2px]"
+            data-testid="team-deliverable-folder-loading-overlay"
+            role="status"
+            aria-live="polite"
+          >
+            <AiGeneratingIndicator
+              size="md"
+              message={folderLoadingMessage}
+              testId="team-deliverable-folder-loading"
+            />
+            {folderProgress != null && (
+              <p className="text-sm font-medium text-[var(--cc-primary)]">
+                {folderProgress.percent}%
+              </p>
+            )}
+          </div>
+        )}
+        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+          <h2 className="text-lg font-bold text-[#1e2939]">{isEdit ? "산출물 수정" : "산출물 등록"}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-xl text-gray-500 hover:bg-gray-100"
+            aria-label="닫기"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="space-y-4 overflow-y-auto px-6 py-5">
+          {uploading && (
+            <AiGeneratingIndicator
+              size="sm"
+              message="파일을 업로드하는 중입니다. 용량이 크면 시간이 걸릴 수 있습니다."
+              testId="team-deliverable-upload-loading"
+            />
+          )}
+
+          <div className="space-y-1.5">
+            <label className="cc-label" htmlFor="team-deliverable-modal-title">
+              제목
+            </label>
+            <input
+              id="team-deliverable-modal-title"
+              type="text"
+              value={form.title}
+              onChange={(e) => update("title", e.target.value)}
+              data-testid="team-deliverable-link-title-input"
+              placeholder="예: 중간 발표 자료, v1.0 배포"
+              className="w-full rounded-[8px] border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#155dfc] focus:ring-1 focus:ring-[#155dfc]"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="cc-label" htmlFor="team-deliverable-modal-subtitle">
+              부제목 <span className="font-normal text-[var(--cc-on-surface-variant)]">(목록에 작게 표시)</span>
+            </label>
+            <input
+              id="team-deliverable-modal-subtitle"
+              type="text"
+              value={form.subtitle}
+              onChange={(e) => update("subtitle", e.target.value)}
+              data-testid="team-deliverable-subtitle-input"
+              placeholder="예: v1.0 배포 · 중간 점검"
+              className="cc-input w-full text-sm"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-[#1e2939]" htmlFor="team-deliverable-modal-description">
+              메시지
+            </label>
+            <textarea
+              id="team-deliverable-modal-description"
+              value={form.description}
+              onChange={(e) => update("description", e.target.value)}
+              data-testid="team-deliverable-modal-description-input"
+              placeholder="팀원에게 전달할 설명을 적어주세요."
+              rows={3}
+              className="w-full resize-none rounded-[8px] border border-gray-300 px-3 py-2 text-sm outline-none focus:border-[#155dfc] focus:ring-1 focus:ring-[#155dfc]"
+            />
+          </div>
+
+          {(isLinkEdit || !isEdit) && (
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-[#1e2939]" htmlFor="team-deliverable-link-url-input">
+                배포 링크 {isLinkEdit && <span className="text-red-600">*</span>}
+              </label>
+              <input
+                id="team-deliverable-link-url-input"
+                type="text"
+                value={form.linkUrl}
+                onChange={(e) => update("linkUrl", e.target.value)}
+                data-testid="team-deliverable-link-url-input"
+                placeholder="https://example.com 또는 example.com/path"
+                className="w-full rounded-[8px] border border-[#bfdbfe] bg-[#f8fbff] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-300"
+              />
+            </div>
+          )}
+
+          {isFileEdit && (
+            <p className="rounded-[8px] border border-gray-200 bg-[#f9fafb] px-3 py-2 text-xs text-[#4a5565]">
+              현재 파일: {editing.fileName}
+              {editing.fileSize > 0 ? ` (${(editing.fileSize / 1024).toFixed(1)} KB)` : ""}
+            </p>
+          )}
+
+          {(!isEdit || isFileEdit) && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-[#1e2939]">
+                {isFileEdit ? "파일 교체 (선택)" : "파일 · 프로젝트 소스"}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={busy}
+                  className="rounded-[8px] border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-[#364153] hover:bg-gray-50 disabled:opacity-60"
+                >
+                  {isFileEdit ? "다른 파일로 교체" : "파일 선택"}
+                </button>
+                {!isFileEdit && (
+                  <button
+                    type="button"
+                    onClick={() => projectFolderInputRef.current?.click()}
+                    disabled={busy}
+                    data-testid="team-deliverable-project-folder-picker"
+                    className="rounded-[8px] border-2 border-[#93c5fd] bg-[#eff6ff] px-3 py-2 text-xs font-bold text-[#155dfc] hover:bg-[#dbeafe] disabled:opacity-60"
+                  >
+                    {preparingFolder ? "압축 중…" : "프로젝트 폴더 → ZIP"}
+                  </button>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple={!isFileEdit}
+                accept={FILE_ACCEPT}
+                className="hidden"
+                data-testid="team-deliverable-file-input"
+                onChange={(e) => {
+                  mergeFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              {!isFileEdit && (
+                <input
+                  ref={projectFolderInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  // @ts-expect-error webkitdirectory is supported in Chromium browsers
+                  webkitdirectory=""
+                  data-testid="team-deliverable-project-folder-input"
+                  onChange={(e) => {
+                    void handleProjectFolderPick(e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+              )}
+              {folderStats && !preparingFolder && (
+                <p className="text-xs text-[#008236]" data-testid="team-deliverable-folder-stats">
+                  ZIP {formatByteSize(folderStats.zipBytes)} · 포함 {folderStats.includedCount}개 · 제외(node_modules 등){" "}
+                  {folderStats.skippedCount}개
+                </p>
+              )}
+              {form.files.length > 0 ? (
+                <ul className="max-h-32 space-y-1 overflow-y-auto rounded-[8px] border border-gray-200 bg-[#f9fafb] p-2">
+                  {form.files.map((file, index) => (
+                    <li
+                      key={`${file.name}-${file.size}-${file.lastModified}`}
+                      className="flex items-center justify-between gap-2 text-xs text-[#364153]"
+                    >
+                      <span className="truncate">
+                        📄 {file.name}{" "}
+                        <span className="text-[#6a7282]">({formatByteSize(file.size)})</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeFile(index)}
+                        disabled={busy}
+                        className="shrink-0 text-red-600 hover:underline disabled:opacity-60"
+                      >
+                        제거
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                !isFileEdit &&
+                !preparingFolder && (
+                  <p className="text-[11px] text-[#64748b]" data-testid="team-deliverable-upload-guide">
+                    프로젝트 폴더 선택 시 <strong>node_modules</strong>·<strong>.git</strong> 을 제외하고 ZIP
+                    1개로 업로드합니다. 단일 zip·pdf 등도 가능 · 합계 최대 500MB
+                  </p>
+                )
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-gray-200 px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-[8px] border border-gray-300 px-4 py-2 text-sm font-medium text-[#364153] hover:bg-gray-50 disabled:opacity-60"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleSubmit()}
+            disabled={busy}
+            data-testid="team-deliverable-link-submit"
+            className="rounded-[8px] bg-[#155dfc] px-5 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-60"
+          >
+            {uploading ? "저장 중..." : preparingFolder ? "준비 중..." : isEdit ? "저장" : "등록하기"}
+          </button>
+        </div>
+      </div>
+    </AppModal>
+  );
+}
