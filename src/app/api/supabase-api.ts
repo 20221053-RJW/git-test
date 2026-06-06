@@ -3661,6 +3661,7 @@ async function createTroubleshootingLogInDb(
       id: createTroubleshootingLogId(teamId),
       team_id: teamId,
       author: currentUser.name,
+      author_user_id: currentUser.id,
       status,
       display_timestamp: displayTimestamp,
       problem,
@@ -3668,7 +3669,7 @@ async function createTroubleshootingLogInDb(
       solution: input.solution?.trim() || null,
       sort_order: sortOrder,
     })
-    .select("id, author, status, display_timestamp, problem, plan, solution, sort_order, team_id")
+    .select("id, author, author_user_id, status, display_timestamp, problem, plan, solution, sort_order, team_id")
     .single();
 
   if (error) throw error;
@@ -3686,7 +3687,7 @@ async function createTroubleshootingLogInDb(
 async function getTroubleshootingLogById(logId: string) {
   const { data, error } = await supabase
     .from("ai_team_detail_troubleshooting_logs")
-    .select("id, author, status, display_timestamp, problem, plan, solution, team_id")
+    .select("id, author, author_user_id, status, display_timestamp, problem, plan, solution, team_id")
     .eq("id", logId)
     .maybeSingle();
 
@@ -3700,7 +3701,9 @@ async function assertTroubleshootingLogAuthor(logId: string) {
   if (!currentUser) throw new Error("로그인이 필요합니다.");
 
   const existing = await getTroubleshootingLogById(logId);
-  if (existing.author !== currentUser.name) {
+  const authorId = existing.author_user_id as string | null;
+  const isAuthor = authorId ? authorId === currentUser.id : existing.author === currentUser.name;
+  if (!isAuthor) {
     throw new Error("본인이 작성한 기록만 수정할 수 있습니다.");
   }
   return { currentUser, existing };

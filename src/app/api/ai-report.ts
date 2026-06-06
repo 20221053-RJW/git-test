@@ -181,6 +181,7 @@ export async function gatherAiReportContext(userId: string): Promise<AiReportCon
       .from("ai_team_detail_troubleshooting_logs")
       .select("id, team_id, problem, plan, solution, status, sort_order")
       .in("team_id", teamIds)
+      .eq("author_user_id", userId)
       .order("sort_order", { ascending: true }),
     supabase
       .from("ai_team_deliverables")
