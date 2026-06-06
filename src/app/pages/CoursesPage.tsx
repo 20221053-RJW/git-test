@@ -237,6 +237,11 @@ export default function CoursesPage() {
                 </button>
               ))}
             </div>
+            <Link to="/app/syllabi">
+              <M3Button variant="outlined" type="button">
+                강의계획서 검색
+              </M3Button>
+            </Link>
             {canManageCourses ? (
               <M3Button variant="filled" type="button" onClick={openCreateModal} data-testid="course-create-open">
                 + 수업 생성
