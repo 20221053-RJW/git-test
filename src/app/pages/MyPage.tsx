@@ -67,6 +67,7 @@ export default function MyPage() {
   const [reportActivitySummary, setReportActivitySummary] = useState<string | null>(null);
   const [aiReport, setAiReport] = useState<AiReportGenerateResponse | null>(null);
   const { user, isProfessor, isAdmin, isLoading: authLoading } = useAuth();
+  console.log("전체 유저 데이터 확인:", user);
   const canViewStudentReport = user?.role === "student";
   const showProfessorDashboard =
     user?.role === "professor" || user?.role === "admin";
