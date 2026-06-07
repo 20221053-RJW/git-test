@@ -1050,7 +1050,7 @@ export default function MyPage() {
                   )}
                   {troubleshootingCases.map((caseItem, index) => (
                     <div
-                      key={"logId" in caseItem ? caseItem.logId : `${caseItem.title}-${index}`}
+                      key={((caseItem as any).logId ?? `${(caseItem as any).title}-${index}`)}
                       className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
                       data-testid={index === 0 && page3UsesDb ? "mypage-troubleshooting-case" : undefined}
                     >
@@ -1117,24 +1117,24 @@ export default function MyPage() {
               <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4">
                 <dt className="text-[10px] font-bold uppercase text-[#64748b]">소속</dt>
                 <dd className="mt-1 text-[15px] font-bold text-[#0f172a]">
-                  {user.department || "미입력"}
+                  {(user as any)?.department || "미입력"}
                 </dd>
               </div>
               <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4">
                 <dt className="text-[10px] font-bold uppercase text-[#64748b]">연구실</dt>
-                <dd className="mt-1 text-[15px] font-bold text-[#0f172a]">{user.office || "미입력"}</dd>
+                <dd className="mt-1 text-[15px] font-bold text-[#0f172a]">{((user as any)?.office) || "미입력"}</dd>
               </div>
               <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4">
                 <dt className="text-[10px] font-bold uppercase text-[#64748b]">상담 시간</dt>
                 <dd className="mt-1 text-[15px] font-bold text-[#0f172a]">
-                  {user.officeHours || "미입력"}
+                  {(user as any)?.officeHours || "미입력"}
                 </dd>
               </div>
-              <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4 sm:col-span-2">
+             <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4 sm:col-span-2">
                 <dt className="text-[10px] font-bold uppercase text-[#64748b]">연구 분야</dt>
                 <dd className="mt-2 flex flex-wrap gap-2">
-                  {(user.researchAreas?.length ?? 0) > 0 ? (
-                    user.researchAreas.map((area) => (
+                  {Array.isArray((user as any)?.researchAreas) && (user as any).researchAreas.length > 0 ? (
+                    ((user as any)?.researchAreas as string[]).map((area: string) => (
                       <span
                         key={area}
                         className="rounded-full bg-[#eff6ff] px-3 py-1 text-xs font-bold text-[#155dfc]"
@@ -1150,14 +1150,14 @@ export default function MyPage() {
               <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4 sm:col-span-2">
                 <dt className="text-[10px] font-bold uppercase text-[#64748b]">소개 · 강의 철학</dt>
                 <dd className="mt-2 text-[14px] leading-relaxed text-[#0f172a] whitespace-pre-wrap">
-                  {(user as any).bio || "등록된 소개가 없습니다."}
+                  {(user as any)?.bio || "등록된 소개가 없습니다."}
                 </dd>
               </div>
 
               <div className="rounded-lg border border-[#bfdbfe] bg-[#eff6ff] p-4 sm:col-span-2 shadow-sm">
                 <dt className="text-[10px] font-bold uppercase text-[#155dfc]">수업 스타일</dt>
                 <dd className="mt-2 text-[14px] leading-relaxed text-[#0f172a] whitespace-pre-wrap">
-                  {(user as any).teachingStyle || "충분한 피드백 데이터가 쌓이면 AI가 자동으로 분석하여 생성합니다."}
+                  {(user as any)?.teachingStyle || "충분한 피드백 데이터가 쌓이면 AI가 자동으로 분석하여 생성합니다."}
                 </dd>
               </div>
             </dl>

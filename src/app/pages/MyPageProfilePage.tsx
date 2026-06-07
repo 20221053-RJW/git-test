@@ -130,7 +130,7 @@ export default function MyPageProfilePage() {
               {profileImageUrl ? (
                 <img
                   src={profileImageUrl}
-                  alt={`${user.name} 프로필 사진`}
+                  alt={user?.name ? `${user.name} 프로필 사진` : "프로필 사진"}
                   className="h-full w-full object-cover"
                 />
               ) : (
