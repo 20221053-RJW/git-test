@@ -37,8 +37,6 @@ const emptyForm: CreateCourseInput = {
 };
 
 export default function CoursesPage() {
-  const navigate = useNavigate(); // 🌟 1. 강제 이동을 위한 함수 추가
-
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<CourseStatus>("active");
@@ -52,13 +50,6 @@ export default function CoursesPage() {
   const { isAuthenticated, isProfessor, isAdmin, isStudent, user } = useAuth();
   const [joinCode, setJoinCode] = useState("");
   const [joining, setJoining] = useState(false);
-
-  // 🌟 2. 방어막 코드 추가! (로그인 안 했으면 즉시 메인 화면으로 쫓아냄)
-  useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      navigate("/");
-    }
-  }, [loading, isAuthenticated, navigate]);
 
   const canManageCourses = isProfessor || isAdmin;
   const openCreateModal = () => {
@@ -213,20 +204,14 @@ export default function CoursesPage() {
     }
   };
 
-// 1순위: 로그인 안 했으면 로딩이고 뭐고 즉시 메인으로 쫓아냄!
+  // 🌟 1순위: 로그인 안 했으면 로딩이고 뭐고 즉시 메인으로 쫓아냄!
   if (!isAuthenticated) {
     return <Navigate to="/" replace />; 
   }
 
-  // 2순위: 로그인 한 사람만 로딩 화면을 볼 수 있음
+  // 🌟 2순위: 로그인 한 사람만 로딩 화면을 볼 수 있음
   if (loading) {
     return <PageLoading shell message="수업 목록을 불러오는 중…" testId="courses-page-loading" />;
-  }
-    return (
-      <div className="cc-app-shell py-4 sm:py-6">
-        <p className="cc-text-secondary">{"\uB85C\uADF8\uC778\uC774 \uD544\uC694\uD569\uB2C8\uB2E4"}</p>
-      </div>
-    );
   }
 
   return (
