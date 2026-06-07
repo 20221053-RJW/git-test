@@ -1,5 +1,5 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, Navigate } from "react-router";
 import { api, invalidateApiSessionCache } from "../api/supabase-api";
 import AppModal from "../components/layout/AppModal";
 import M3Button from "../components/layout/M3Button";
@@ -213,11 +213,15 @@ export default function CoursesPage() {
     }
   };
 
+// 1순위: 로그인 안 했으면 로딩이고 뭐고 즉시 메인으로 쫓아냄!
+  if (!isAuthenticated) {
+    return <Navigate to="/" replace />; 
+  }
+
+  // 2순위: 로그인 한 사람만 로딩 화면을 볼 수 있음
   if (loading) {
     return <PageLoading shell message="수업 목록을 불러오는 중…" testId="courses-page-loading" />;
   }
-
-  if (!isAuthenticated) {
     return (
       <div className="cc-app-shell py-4 sm:py-6">
         <p className="cc-text-secondary">{"\uB85C\uADF8\uC778\uC774 \uD544\uC694\uD569\uB2C8\uB2E4"}</p>
