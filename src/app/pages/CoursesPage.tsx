@@ -49,6 +49,8 @@ export default function CoursesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const { isAuthenticated, isProfessor, isAdmin, isStudent, user } = useAuth();
+  const [joinCode, setJoinCode] = useState("");
+  const [joining, setJoining] = useState(false);
 
   const canManageCourses = isProfessor || isAdmin;
   const openCreateModal = () => {
@@ -144,6 +146,23 @@ export default function CoursesPage() {
       alert(`수업 코드 '${code}' 를 복사했습니다.`);
     } catch {
       alert(`수업 코드: ${code}`);
+    }
+  };
+
+  const handleJoinCourse = async (event: FormEvent) => {
+    event.preventDefault();
+    setJoining(true);
+    setErrorMessage("");
+
+    try {
+      const result = await api.memberships.joinByCode(joinCode);
+      setJoinCode("");
+      await loadCourses(statusFilter);
+      alert(`'${result.courseName}' 수업에 등록되었습니다.`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "수업 등록에 실패했습니다.");
+    } finally {
+      setJoining(false);
     }
   };
 
@@ -261,7 +280,7 @@ const handleArchiveCourse = async (course: Course) => {
             </div>
             <Link to="/app/syllabi">
               <M3Button variant="outlined" type="button">
-                {isStudent ? "강의계획서로 수업 등록" : "강의계획서 검색"}
+                강의계획서 검색
               </M3Button>
             </Link>
             {canManageCourses ? (
@@ -279,21 +298,43 @@ const handleArchiveCourse = async (course: Course) => {
         </div>
       )}
 
-      {isStudent && statusFilter === "active" && (
-        <div
-          data-testid="courses-syllabus-register-banner"
-          className="cc-alert-info mb-6 rounded-2xl p-4 sm:p-5"
+      {isStudent && statusFilter === "active" && courses.length > 0 && (
+        <form
+          onSubmit={handleJoinCourse}
+          data-testid="courses-join-by-code-banner"
+          className="cc-alert-info cc-courses-join-row mb-6 rounded-2xl p-4 sm:p-5"
         >
-          <p className="cc-label font-bold">강의계획서로 수업 등록</p>
-          <p className="cc-text-secondary mt-1 text-sm">
-            강의계획서 사진이나 PDF를 올리면 수업 정보를 자동으로 읽어 등록합니다.
-          </p>
-          <Link to="/app/syllabi" className="mt-3 inline-block">
-            <M3Button type="button" variant="filled" data-testid="courses-syllabus-register-cta">
-              강의계획서 업로드
-            </M3Button>
-          </Link>
-        </div>
+          <div className="min-w-0 flex-1">
+            <label htmlFor="courses-join-code-banner" className="cc-label mb-1 block font-bold">
+              수업 코드로 등록
+            </label>
+            <p id="courses-join-code-hint" className="cc-text-secondary mb-2 text-xs">
+              교수에게 받은 코드를 입력하세요 (예: WEB-2026)
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <input
+                id="courses-join-code-banner"
+                type="text"
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value)}
+                placeholder="수업 코드"
+                aria-describedby="courses-join-code-hint"
+                className="cc-input min-h-[2.75rem] flex-1 px-3 py-2 text-sm"
+                data-testid="courses-join-code-input"
+                required
+              />
+              <M3Button
+                type="submit"
+                variant="filled"
+                disabled={joining}
+                className="cc-courses-join-submit inline-flex h-[2.75rem] shrink-0 items-center justify-center px-5"
+                data-testid="courses-join-submit"
+              >
+                {joining ? "등록 중..." : "수업 등록"}
+              </M3Button>
+            </div>
+          </div>
+        </form>
       )}
 
       {courses.length === 0 ? (
@@ -303,11 +344,36 @@ const handleArchiveCourse = async (course: Course) => {
         >
           <p className="cc-text-secondary">등록된 수업이 없습니다.</p>
           {isStudent && statusFilter === "active" && (
-            <Link to="/app/syllabi" className="mt-6 inline-block">
-              <M3Button type="button" variant="filled" data-testid="courses-syllabus-register-empty">
-                강의계획서로 수업 등록
-              </M3Button>
-            </Link>
+            <form
+              onSubmit={handleJoinCourse}
+              data-testid="courses-join-by-code-empty"
+              className="mx-auto mt-6 max-w-sm space-y-3 text-left"
+            >
+              <label htmlFor="courses-join-code-empty" className="cc-label block">
+                수업 코드로 등록하세요 (예: WEB-2026, DB-2026)
+              </label>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input
+                  id="courses-join-code-empty"
+                  type="text"
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value)}
+                  placeholder="수업 코드"
+                  className="cc-input min-h-[2.75rem] flex-1 px-3 py-2 text-sm"
+                  data-testid="courses-join-code-input"
+                  required
+                />
+                <M3Button
+                  type="submit"
+                  variant="filled"
+                  disabled={joining}
+                  className="cc-courses-join-submit inline-flex h-[2.75rem] shrink-0 items-center justify-center px-5 sm:w-auto"
+                  data-testid="courses-join-submit"
+                >
+                  {joining ? "등록 중..." : "수업 등록"}
+                </M3Button>
+              </div>
+            </form>
           )}
         </div>
       ) : (
