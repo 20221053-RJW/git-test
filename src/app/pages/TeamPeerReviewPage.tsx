@@ -101,6 +101,18 @@ export default function TeamPeerReviewPage() {
     setCustomKeywordByMember((prev) => ({ ...prev, [memberId]: "" }));
   };
 
+  const markPeerReviewSuccess = (memberId: string, savedDraft?: PeerReviewDraft) => {
+    setPeerReviews((prev) => ({
+      ...prev,
+      [memberId]: {
+        ...prev[memberId],
+        ...(savedDraft ?? {}),
+        submitted: true,
+      },
+    }));
+    alert("동료평가가 성공적으로 반영되었습니다.");
+  };
+
   const handleSubmitPeerReview = async (memberId: string) => {
     if (!teamId || submittingPeerReviewId || !isEvaluationOpen) return;
     const review = peerReviews[memberId];
@@ -114,12 +126,19 @@ export default function TeamPeerReviewPage() {
         comment: review.comment,
         contributionRating: review.contributionRating,
       });
-      setPeerReviews((prev) => ({
-        ...prev,
-        [memberId]: { ...prev[memberId], submitted: true },
-      }));
+      markPeerReviewSuccess(memberId);
     } catch (error) {
       console.error(error);
+      try {
+        const saved = await api.teamDetail.getMyPeerReviews(teamId);
+        const persisted = saved[memberId];
+        if (persisted?.submitted) {
+          markPeerReviewSuccess(memberId, persisted);
+          return;
+        }
+      } catch (verifyError) {
+        console.warn("동료평가 저장 확인 실패:", verifyError);
+      }
       alert(error instanceof Error ? error.message : "동료평가 저장에 실패했습니다.");
     } finally {
       setSubmittingPeerReviewId(null);

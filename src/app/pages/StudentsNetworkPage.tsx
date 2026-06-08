@@ -763,6 +763,24 @@ function ProfessorProfileModal({
             )}
           </div>
 
+          <div>
+            <p className="mb-2 text-base font-bold text-black">추구하는 학생들의 성장 방식</p>
+            {profile.studentGrowthApproach?.trim() ? (
+              <div className="rounded-[10px] border border-gray-200 px-4 py-3">
+                <p
+                  className="text-sm leading-relaxed text-[#364153]"
+                  data-testid="professor-profile-modal-student-growth-approach"
+                >
+                  {profile.studentGrowthApproach}
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-[10px] border border-dashed border-gray-200 bg-gray-50 px-4 py-3">
+                <p className="text-sm italic text-[#9ca3af]">등록된 성장 방식이 없습니다.</p>
+              </div>
+            )}
+          </div>
+
           {isSelf ? (
             !isArchived ? (
               <Link
@@ -1104,6 +1122,16 @@ function ProfessorNetworkCard({
       <div className="rounded-[10px] border border-[#c7d9f8] bg-white/80 px-4 py-3">
         <p className="line-clamp-4 text-center text-xs leading-[1.6] text-[#364153]">{bio}</p>
       </div>
+      {profile.studentGrowthApproach?.trim() && (
+        <div className="rounded-[10px] border border-[#c7d9f8] bg-white/80 px-4 py-3">
+          <p className="text-center text-[10px] font-semibold text-[#4a6fa5]">
+            추구하는 학생들의 성장 방식
+          </p>
+          <p className="mt-1 line-clamp-3 text-center text-xs leading-[1.6] text-[#364153]">
+            {profile.studentGrowthApproach}
+          </p>
+        </div>
+      )}
       {profile.researchAreas && profile.researchAreas.length > 0 && (
         <div className="flex flex-wrap justify-center gap-1.5">
           {profile.researchAreas.slice(0, 3).map((area) => (

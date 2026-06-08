@@ -197,6 +197,7 @@ test.describe("CampusConnect — 핵심 E2E (T-040)", () => {
     const alreadySubmitted = await submitBtn.getByText("✓ 등록됨").isVisible().catch(() => false);
     if (!alreadySubmitted) {
       await page.getByText("키워드 등록").first().locator("..").getByRole("button").first().click();
+      page.once("dialog", (dialog) => void dialog.accept());
       await submitBtn.click();
       await expect(submitBtn.getByText("✓ 등록됨")).toBeVisible({ timeout: 15_000 });
     }

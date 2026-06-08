@@ -32,6 +32,7 @@ export interface ProfessorProfile extends BaseProfile {
   researchAreas?: string[];
   bio?: string;
   teachingStyle?: string;
+  studentGrowthApproach?: string;
 }
 
 // 과목 관련 타입

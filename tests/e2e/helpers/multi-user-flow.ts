@@ -133,6 +133,7 @@ export async function submitPeerReviewsForAllTeammates(page: Page, courseId: str
     if (alreadySubmitted) continue;
     const block = submitBtn.locator("xpath=ancestor::div[contains(@class,'rounded-[10px]')][1]");
     await block.getByRole("button").first().click();
+    page.once("dialog", (dialog) => void dialog.accept());
     await submitBtn.click();
     await expect(submitBtn.getByText("✓ 등록됨")).toBeVisible({ timeout: 20_000 });
   }

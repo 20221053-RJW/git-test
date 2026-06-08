@@ -52,6 +52,8 @@ type AiUserRow = {
   office?: string | null;
   office_hours?: string | null;
   research_areas?: unknown;
+  teaching_style?: string | null;
+  student_growth_approach?: string | null;
 };
 
 function resolveImageUrl(userData: AiUserRow): string | undefined {
@@ -91,6 +93,9 @@ function toProfile(userData: AiUserRow): AdminProfile | StudentProfile | Profess
       office: userData.office ?? "",
       officeHours: userData.office_hours ?? "",
       researchAreas: asArray<string>(userData.research_areas),
+      bio: userData.bio ?? undefined,
+      teachingStyle: userData.teaching_style ?? undefined,
+      studentGrowthApproach: userData.student_growth_approach ?? undefined,
       imageUrl,
     };
   }

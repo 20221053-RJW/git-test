@@ -159,7 +159,7 @@ export default function CourseDetailPage() {
   };
 
   const handleArchiveCourse = async () => {
-    if (!course || !window.confirm(`'${course.name}' 수업을 종료할까요? (수강생들의 팀 프로젝트 경험치가 +1 증가합니다.)`)) return;
+    if (!course || !window.confirm(`'${course.name}' 수업을 종료할까요?`)) return;
 
     setArchiving(true);
     setErrorMessage("");
@@ -204,7 +204,7 @@ export default function CourseDetailPage() {
 
       // 4. 화면(상태) 업데이트 및 알림
       setCourse(archivedCourse);
-      alert("수업이 종료되었고 경험치가 성공적으로 반영되었습니다!");
+      alert("수업이 종료되었습니다. 프로젝트 평가를 할 수 있습니다.");
 
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "수업을 종료하지 못했습니다.");

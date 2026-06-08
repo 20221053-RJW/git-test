@@ -14,6 +14,7 @@ export default function ProfessorProfilePage() {
   const [researchInput, setResearchInput] = useState("");
   const [bio, setBio] = useState("");
   const [teachingStyle, setTeachingStyle] = useState("");
+  const [studentGrowthApproach, setStudentGrowthApproach] = useState("");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -31,6 +32,7 @@ export default function ProfessorProfilePage() {
         setResearchInput((data.researchAreas ?? []).join(", "));
         setBio(data.bio ?? "");
         setTeachingStyle(data.teachingStyle ?? "");
+        setStudentGrowthApproach(data.studentGrowthApproach ?? "");
       }
       setLoading(false);
     });
@@ -84,6 +86,7 @@ export default function ProfessorProfilePage() {
                 officeHours,
                 bio,
                 teachingStyle,
+                studentGrowthApproach,
                 researchAreas: researchInput
                   .split(",")
                   .map((item) => item.trim())
@@ -155,6 +158,17 @@ export default function ProfessorProfilePage() {
               data-testid="professor-profile-teaching-style"
               className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
               placeholder="나중에 AI가 자동으로 채웁니다 — 직접 입력도 가능합니다."
+            />
+          </label>
+          <label className="block text-sm font-bold text-gray-700">
+            추구하는 학생들의 성장 방식
+            <textarea
+              value={studentGrowthApproach}
+              onChange={(e) => setStudentGrowthApproach(e.target.value)}
+              rows={3}
+              data-testid="professor-profile-student-growth-approach"
+              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              placeholder="학생들이 어떻게 성장하기를 바라는지 작성해 주세요."
             />
           </label>
           <button
