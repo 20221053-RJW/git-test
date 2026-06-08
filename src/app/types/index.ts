@@ -397,6 +397,10 @@ export interface CourseSyllabus {
   publicUrl: string;
   aiStatus: string;
   createdAt: Date;
+  matchedCourseId?: string;
+  uploaderUserId?: string;
+  dedupKey?: string;
+  extractedFields?: import("./syllabus").SyllabusExtractedFields;
 }
 
 // 프로젝트 관련 타입

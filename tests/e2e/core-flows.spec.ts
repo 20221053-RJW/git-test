@@ -702,14 +702,14 @@ test.describe("CampusConnect — 핵심 E2E (T-040)", () => {
     }
   });
 
-  test("48. vision #55 빈 수업 목록 시 수업코드 등록 UI 이중 표시 없음", async ({ page }) => {
+  test("48. vision #55 빈 수업 목록 시 강의계획서 등록 CTA 이중 표시 없음", async ({ page }) => {
     await loginViaLanding(page);
     await page.goto("/app/courses");
     await expect(page).toHaveURL("/app/courses");
     const empty = page.getByTestId("courses-empty-state");
     test.skip(!(await empty.isVisible().catch(() => false)), "등록된 수업이 있어 빈 목록 시나리오 생략");
-    await expect(page.getByTestId("courses-join-by-code-banner")).toHaveCount(0);
-    await expect(page.getByTestId("courses-join-by-code-empty")).toBeVisible();
+    await expect(page.getByTestId("courses-syllabus-register-banner")).toHaveCount(0);
+    await expect(page.getByTestId("courses-syllabus-register-empty")).toBeVisible();
   });
 
   test("5. 로그아웃 → 랜딩", async ({ page }) => {

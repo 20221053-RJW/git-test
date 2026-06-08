@@ -54,6 +54,19 @@ import {
   mapReportContextToMyPageProjects,
 } from "./ai-report";
 import { recommendTroubleshootingFromEdge } from "./ai-troubleshooting";
+import { extractSyllabusFromEdge, parseSyllabusExtractedFields } from "./ai-syllabus";
+import type {
+  CreateOrJoinFromSyllabusResult,
+  SyllabusConfirmedFields,
+  SyllabusDedupPreview,
+} from "../types/syllabus";
+import {
+  computeSyllabusDedupKey,
+  DEFAULT_SYLLABUS_STAGE_NAMES,
+  syllabusCourseCodeFromFields,
+} from "../utils/syllabusDedup";
+import { resolveSyllabusMimeType, validateSyllabusFile } from "../utils/syllabusUpload";
+import { defaultNewCourseDates } from "../utils/courseDates";
 import { DEFAULT_PEER_REVIEW_GOOD_KEYWORDS } from "../constants/peerReview";
 import {
   briefDeliverableDescriptionSummary,
@@ -1292,6 +1305,303 @@ async function saveStudentNetworkProfileInDb(input: StudentNetworkEditForm): Pro
   };
 }
 
+const SYLLABI_BUCKET = "ai_syllabi";
+
+const SYLLABUS_SELECT_COLUMNS =
+  "id, course_name, course_code, department, semester, grade, professor, file_name, file_size, mime_type, public_url, ai_status, ai_data, uploader_user_id, matched_course_id, dedup_key, created_at";
+
+function mapSyllabusRow(row: Record<string, unknown>): CourseSyllabus {
+  const extractedFields = parseSyllabusExtractedFields(row.ai_data) ?? undefined;
+  return {
+    id: row.id as string,
+    courseName: (row.course_name as string) ?? "",
+    courseCode: (row.course_code as string | null) ?? undefined,
+    department: (row.department as string | null) ?? undefined,
+    semester: (row.semester as string | null) ?? undefined,
+    grade: (row.grade as string | null) ?? undefined,
+    professor: (row.professor as string | null) ?? undefined,
+    fileName: (row.file_name as string) ?? "",
+    fileSize: Number(row.file_size ?? 0),
+    mimeType: (row.mime_type as string | null) ?? undefined,
+    publicUrl: (row.public_url as string) ?? "",
+    aiStatus: (row.ai_status as string) ?? "pending",
+    createdAt: asDate(row.created_at as string | null | undefined),
+    matchedCourseId: (row.matched_course_id as string | null) ?? undefined,
+    uploaderUserId: (row.uploader_user_id as string | null) ?? undefined,
+    dedupKey: (row.dedup_key as string | null) ?? undefined,
+    extractedFields,
+  };
+}
+
+function sanitizeSyllabusStorageName(fileName: string): string {
+  const base = fileName.replace(/[^a-zA-Z0-9._-가-힣]/g, "_").slice(0, 120);
+  return base || "syllabus";
+}
+
+async function joinCourseByIdInDb(courseId: string): Promise<{ courseId: string; courseName: string }> {
+  const currentUser = await getCurrentAiUser();
+  if (!currentUser) throw new Error("로그인이 필요합니다.");
+
+  const { data: course, error: courseError } = await supabase
+    .from("ai_courses")
+    .select("id, name, status")
+    .eq("id", courseId)
+    .maybeSingle();
+
+  if (courseError) throw courseError;
+  if (!course) throw new Error("수업을 찾을 수 없습니다.");
+  if (course.status !== "active") throw new Error("종료되었거나 보관된 수업입니다.");
+
+  const { data: existing, error: existingError } = await supabase
+    .from("ai_course_memberships")
+    .select("id")
+    .eq("course_id", course.id)
+    .eq("user_id", currentUser.id)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+  if (existing) return { courseId: course.id, courseName: course.name };
+
+  const membershipRole = currentUser.role === "professor" ? "assistant" : "student";
+  const { error: insertError } = await supabase.from("ai_course_memberships").insert({
+    course_id: course.id,
+    user_id: currentUser.id,
+    role: membershipRole,
+    created_at: new Date().toISOString(),
+  });
+
+  if (insertError) throw insertError;
+  invalidateApiSessionCache();
+
+  return { courseId: course.id, courseName: course.name };
+}
+
+async function previewSyllabusDedupFromDb(fields: SyllabusConfirmedFields): Promise<SyllabusDedupPreview> {
+  const dedupKey = computeSyllabusDedupKey(fields);
+
+  const { data, error } = await supabase
+    .from("ai_courses")
+    .select("id, name")
+    .eq("syllabus_dedup_key", dedupKey)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (error) {
+    if (isMissingRelationError(error)) {
+      return { dedupKey };
+    }
+    throw error;
+  }
+
+  if (!data) return { dedupKey };
+
+  return {
+    dedupKey,
+    existingCourse: { id: data.id, name: data.name },
+  };
+}
+
+async function uploadSyllabusFileInDb(file: File): Promise<CourseSyllabus> {
+  const currentUser = await getCurrentAiUser();
+  if (!currentUser) throw new Error("로그인이 필요합니다.");
+  if (currentUser.role !== "student" && currentUser.role !== "admin") {
+    throw new Error("학생만 강의계획서를 업로드할 수 있습니다.");
+  }
+
+  const validationError = validateSyllabusFile(file);
+  if (validationError) throw new Error(validationError);
+
+  const mimeType = resolveSyllabusMimeType(file);
+  if (!mimeType) throw new Error("PDF, JPG, PNG, WebP만 업로드할 수 있습니다.");
+
+  const timestamp = Date.now();
+  const storagePath = `uploads/${currentUser.id}/${timestamp}-${sanitizeSyllabusStorageName(file.name)}`;
+
+  const { error: uploadError } = await supabase.storage.from(SYLLABI_BUCKET).upload(storagePath, file, {
+    cacheControl: "3600",
+    upsert: false,
+    contentType: mimeType,
+  });
+
+  if (uploadError) throw uploadError;
+
+  const { data: urlData } = supabase.storage.from(SYLLABI_BUCKET).getPublicUrl(storagePath);
+
+  const { data, error } = await supabase
+    .from("ai_course_syllabi")
+    .insert({
+      course_name: file.name.replace(/\.[^.]+$/, "") || "강의계획서",
+      file_name: file.name,
+      file_size: file.size,
+      mime_type: mimeType,
+      public_url: urlData.publicUrl,
+      storage_path: storagePath,
+      uploader_user_id: currentUser.id,
+      ai_status: "pending",
+    })
+    .select(SYLLABUS_SELECT_COLUMNS)
+    .single();
+
+  if (error) {
+    await supabase.storage.from(SYLLABI_BUCKET).remove([storagePath]);
+    throw error;
+  }
+
+  return mapSyllabusRow(data as Record<string, unknown>);
+}
+
+async function extractSyllabusInDb(syllabusId: string): Promise<CourseSyllabus> {
+  const currentUser = await getCurrentAiUser();
+  if (!currentUser) throw new Error("로그인이 필요합니다.");
+
+  const response = await extractSyllabusFromEdge(syllabusId);
+  const refreshed = await getSyllabusByIdFromDb(syllabusId);
+  if (!refreshed) throw new Error("분석 후 강의계획서를 다시 불러오지 못했습니다.");
+
+  if (response.aiStatus === "failed") {
+    throw new Error(response.error ?? "강의계획서 분석에 실패했습니다.");
+  }
+
+  return refreshed;
+}
+
+async function createOrJoinFromSyllabusInDb(
+  syllabusId: string,
+  fields: SyllabusConfirmedFields
+): Promise<CreateOrJoinFromSyllabusResult> {
+  const currentUser = await getCurrentAiUser();
+  if (!currentUser) throw new Error("로그인이 필요합니다.");
+  if (currentUser.role !== "student" && currentUser.role !== "admin") {
+    throw new Error("학생만 강의계획서로 수업을 등록할 수 있습니다.");
+  }
+
+  const courseName = fields.courseName.trim();
+  const semester = fields.semester.trim();
+  const professor = fields.professor.trim();
+  if (!courseName || !semester || !professor) {
+    throw new Error("과목명, 학기, 담당교수는 필수입니다.");
+  }
+
+  const syllabus = await getSyllabusByIdFromDb(syllabusId);
+  if (!syllabus) throw new Error("강의계획서를 찾을 수 없습니다.");
+
+  const dedupKey = computeSyllabusDedupKey(fields);
+  const stageNames = (fields.stages ?? DEFAULT_SYLLABUS_STAGE_NAMES)
+    .map((stage) => stage.trim())
+    .filter(Boolean);
+  const resolvedStages = stageNames.length > 0 ? stageNames : [...DEFAULT_SYLLABUS_STAGE_NAMES];
+
+  if (syllabus.matchedCourseId) {
+    const joined = await joinCourseByIdInDb(syllabus.matchedCourseId);
+    return { action: "joined", courseId: joined.courseId, courseName: joined.courseName };
+  }
+
+  const { data: existingCourse, error: existingError } = await supabase
+    .from("ai_courses")
+    .select("id, name")
+    .eq("syllabus_dedup_key", dedupKey)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (existingError && !isMissingRelationError(existingError)) throw existingError;
+
+  if (existingCourse) {
+    await supabase
+      .from("ai_course_syllabi")
+      .update({
+        matched_course_id: existingCourse.id,
+        dedup_key: dedupKey,
+        course_name: courseName,
+        course_code: fields.courseCode?.trim() || null,
+        department: fields.department?.trim() || null,
+        semester,
+        grade: fields.grade?.trim() || null,
+        professor,
+      })
+      .eq("id", syllabusId);
+
+    const joined = await joinCourseByIdInDb(existingCourse.id);
+    return { action: "joined", courseId: joined.courseId, courseName: joined.courseName };
+  }
+
+  const courseCode = syllabusCourseCodeFromFields(fields);
+  const courseId = createCourseId(courseCode);
+  const { startDate, endDate } = defaultNewCourseDates();
+
+  const { error: courseError } = await supabase.from("ai_courses").insert({
+    id: courseId,
+    name: courseName,
+    code: courseCode,
+    instructor_user_id: null,
+    initiated_by_user_id: currentUser.id,
+    syllabus_dedup_key: dedupKey,
+    schedule: fields.schedule?.trim() || "미정",
+    start_date: startDate,
+    end_date: endDate,
+    room: null,
+    students_count: 0,
+    max_students: null,
+    semester,
+    description: fields.department?.trim() ? `${fields.department.trim()} · ${professor}` : professor,
+    status: "active",
+  });
+
+  if (courseError) throw courseError;
+
+  const { error: stageError } = await supabase.from("ai_course_stages").insert(
+    resolvedStages.map((stage, index) => ({
+      course_id: courseId,
+      name: stage,
+      position: index + 1,
+      is_required: true,
+    }))
+  );
+
+  if (stageError) {
+    await supabase.from("ai_courses").delete().eq("id", courseId);
+    throw stageError;
+  }
+
+  const { error: membershipError } = await supabase.from("ai_course_memberships").insert({
+    course_id: courseId,
+    user_id: currentUser.id,
+    role: "student",
+    created_at: new Date().toISOString(),
+  });
+
+  if (membershipError) {
+    await supabase.from("ai_courses").delete().eq("id", courseId);
+    throw membershipError;
+  }
+
+  await supabase
+    .from("ai_course_syllabi")
+    .update({
+      matched_course_id: courseId,
+      dedup_key: dedupKey,
+      course_name: courseName,
+      course_code: fields.courseCode?.trim() || null,
+      department: fields.department?.trim() || null,
+      semester,
+      grade: fields.grade?.trim() || null,
+      professor,
+    })
+    .eq("id", syllabusId);
+
+  invalidateApiSessionCache();
+
+  return { action: "created", courseId, courseName };
+}
+
+async function joinCourseFromSyllabusInDb(syllabusId: string): Promise<{ courseId: string; courseName: string }> {
+  const syllabus = await getSyllabusByIdFromDb(syllabusId);
+  if (!syllabus) throw new Error("강의계획서를 찾을 수 없습니다.");
+  if (!syllabus.matchedCourseId) {
+    throw new Error("아직 등록된 수업이 없습니다. 강의계획서로 수업을 만들어 주세요.");
+  }
+  return joinCourseByIdInDb(syllabus.matchedCourseId);
+}
+
 async function searchSyllabiFromDb(params: {
   courseName?: string;
   department?: string;
@@ -1299,7 +1609,7 @@ async function searchSyllabiFromDb(params: {
 }): Promise<CourseSyllabus[]> {
   let query = supabase
     .from("ai_course_syllabi")
-    .select("id, course_name, course_code, department, semester, grade, professor, file_name, file_size, mime_type, public_url, ai_status, created_at")
+    .select(SYLLABUS_SELECT_COLUMNS)
     .order("created_at", { ascending: false });
 
   if (params.courseName?.trim()) {
@@ -1318,48 +1628,20 @@ async function searchSyllabiFromDb(params: {
     throw error;
   }
 
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    courseName: row.course_name,
-    courseCode: row.course_code ?? undefined,
-    department: row.department ?? undefined,
-    semester: row.semester ?? undefined,
-    grade: row.grade ?? undefined,
-    professor: row.professor ?? undefined,
-    fileName: row.file_name,
-    fileSize: Number(row.file_size ?? 0),
-    mimeType: row.mime_type ?? undefined,
-    publicUrl: row.public_url,
-    aiStatus: row.ai_status ?? "pending",
-    createdAt: asDate(row.created_at),
-  }));
+  return (data ?? []).map((row) => mapSyllabusRow(row as Record<string, unknown>));
 }
 
 async function getSyllabusByIdFromDb(id: string): Promise<CourseSyllabus | null> {
   const { data, error } = await supabase
     .from("ai_course_syllabi")
-    .select("id, course_name, course_code, department, semester, grade, professor, file_name, file_size, mime_type, public_url, ai_status, created_at")
+    .select(SYLLABUS_SELECT_COLUMNS)
     .eq("id", id)
     .maybeSingle();
 
   if (error) throw error;
   if (!data) return null;
 
-  return {
-    id: data.id,
-    courseName: data.course_name,
-    courseCode: data.course_code ?? undefined,
-    department: data.department ?? undefined,
-    semester: data.semester ?? undefined,
-    grade: data.grade ?? undefined,
-    professor: data.professor ?? undefined,
-    fileName: data.file_name,
-    fileSize: Number(data.file_size ?? 0),
-    mimeType: data.mime_type ?? undefined,
-    publicUrl: data.public_url,
-    aiStatus: data.ai_status ?? "pending",
-    createdAt: asDate(data.created_at),
-  };
+  return mapSyllabusRow(data as Record<string, unknown>);
 }
 
 async function getProjectsFromDb(): Promise<Project[]> {
@@ -5760,6 +6042,11 @@ export const api = {
   syllabi: {
     search: searchSyllabiFromDb,
     getById: getSyllabusByIdFromDb,
+    upload: uploadSyllabusFileInDb,
+    extract: extractSyllabusInDb,
+    previewDedup: previewSyllabusDedupFromDb,
+    createOrJoin: createOrJoinFromSyllabusInDb,
+    joinMatchedCourse: joinCourseFromSyllabusInDb,
   },
   projects: {
     getAll: getProjectsFromDb,
