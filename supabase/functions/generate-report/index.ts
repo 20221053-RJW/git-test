@@ -41,16 +41,29 @@ type GenerateRequest = {
 /** 리포트 한 섹션 (프로젝트별 제목 + 본문) */
 type ReportSection = { title: string; body: string };
 
+/** AI가 생성한 프로젝트별 상세 분석 */
+type PerProject = {
+  team_id?: string;
+  project_title: string;
+  overview: string;
+  core_value: string;
+  my_experience: string;
+  eval_summary: string;
+};
+
 /** 최종적으로 웹앱에 돌려주는 리포트 JSON 구조 */
 type ReportResponse = {
-  summary: string; // 한 줄~몇 줄 요약
-  problems_solved: string[]; // 해결한 문제 목록
-  technologies: string[]; // 사용 기술·스택
-  role_description: string; // 팀에서 한 역할
-  growth_reflection: string; // 성장·회고
-  sections?: ReportSection[]; // 프로젝트별 상세
-  generated_at: string; // 생성 시각 (ISO 문자열)
-  model?: string; // "draft-db-only" | "gemini-..." | "gpt-4o-mini" 등
+  summary: string;
+  problems_solved: string[];
+  technologies: string[];
+  role_description: string;
+  growth_reflection: string;
+  sections?: ReportSection[];
+  per_project?: PerProject[];
+  problem_discovery_pattern?: string;
+  resolution_style?: string;
+  generated_at: string;
+  model?: string;
 };
 
 /** JSON 응답을 브라우저에 보내기 위한 공통 포맷 (상태 코드 + CORS 헤더) */
@@ -200,6 +213,7 @@ async function gatherContext(supabase: ReturnType<typeof createClient>, userId: 
     peerResult,
     profStudentResult,
     profProjectResult,
+    aiMemoryResult,
   ] = await Promise.all([
     supabase
       .from("ai_teams")
@@ -209,6 +223,7 @@ async function gatherContext(supabase: ReturnType<typeof createClient>, userId: 
       .from("ai_team_detail_troubleshooting_logs")
       .select("id, team_id, problem, plan, solution, status")
       .in("team_id", teamIds)
+      .eq("author_user_id", userId)
       .order("sort_order", { ascending: true }),
     supabase.from("ai_team_deliverables").select("team_id").in("team_id", teamIds),
     supabase
@@ -235,6 +250,10 @@ async function gatherContext(supabase: ReturnType<typeof createClient>, userId: 
       .from("ai_team_detail_professor_project_evals")
       .select("team_id, completion_comment, problem_solving_comment, holistic_comment")
       .in("team_id", teamIds),
+    supabase
+      .from("ai_team_detail_ai_memory")
+      .select("team_id, memory_markdown")
+      .in("team_id", teamIds),
   ]);
 
   // 치명적 오류는 throw; "테이블 없음"은 해당 항목만 0건 처리
@@ -255,6 +274,19 @@ async function gatherContext(supabase: ReturnType<typeof createClient>, userId: 
   }
   if (profProjectResult.error && !isMissingRelationError(profProjectResult.error)) {
     throw profProjectResult.error;
+  }
+
+  // ③-b AI 메모리에서 project_content / project_value 추출
+  const aiMemoryRows = (aiMemoryResult.error ? [] : (aiMemoryResult.data ?? []));
+  const projectContentByTeam = new Map<string, string>();
+  const projectValueByTeam = new Map<string, string>();
+  for (const row of aiMemoryRows) {
+    const tid = row.team_id as string;
+    const md = (row.memory_markdown as string) ?? "";
+    const contentMatch = md.match(/##\s*프로젝트 내용\s*\n([\s\S]*?)(?=\n##|\s*$)/);
+    const valueMatch = md.match(/##\s*프로젝트 핵심 가치\s*\n([\s\S]*?)(?=\n##|\s*$)/);
+    if (contentMatch?.[1]?.trim()) projectContentByTeam.set(tid, contentMatch[1].trim());
+    if (valueMatch?.[1]?.trim()) projectValueByTeam.set(tid, valueMatch[1].trim());
   }
 
   // ④ 팀별로 피드백·회고·동료평가를 Map에 정리 (team_id → 요약 문자열)
@@ -325,34 +357,53 @@ async function gatherContext(supabase: ReturnType<typeof createClient>, userId: 
   );
 
   // ⑥ 팀 하나당 리포트에 쓸 객체로 합치기 (AI·초안 공통 형식)
-  const teams = (teamsResult.data ?? []).map((team) => ({
-    teamId: team.id,
-    teamName: team.name,
-    projectTitle: team.project_title ?? team.name,
-    courseName: courseNameById.get(team.course_id) ?? "수업",
-    memberRole: roleByTeam.get(team.id) ?? "팀원",
-    progress: team.progress ?? 0,
-    troubleshootingCount: (logsResult.data ?? []).filter((l) => l.team_id === team.id).length,
-    deliverableCount: (deliverablesResult.data ?? []).filter((d) => d.team_id === team.id)
-      .length,
-    feedbackSubmitted: feedbackTeamIds.has(team.id),
-    feedbackSnippet: feedbackSnippetByTeam.get(team.id),
-    retrospectiveSubmitted: retroTeamIds.has(team.id),
-    retrospectiveSnippet: retroSnippetByTeam.get(team.id),
-    peerReviewsSubmitted: peerCountByTeam.get(team.id) ?? 0,
-    peerReviewSnippet: peerSnippetByTeam.get(team.id),
-    professorStudentEvalReceived: profStudentCommentByTeam.has(team.id),
-    professorProjectEvalReceived: profProjectTeamIds.has(team.id),
-    professorFeedbackSnippet: (() => {
-      const parts = [
-        profStudentCommentByTeam.get(team.id),
-        profProjectRows.find((r) => r.team_id === team.id)?.holistic_comment?.trim(),
-      ].filter(Boolean) as string[];
-      if (parts.length === 0) return undefined;
-      const joined = parts.join(" · ");
-      return joined.length > 120 ? `${joined.slice(0, 120)}…` : joined;
-    })(),
-  }));
+  const teams = (teamsResult.data ?? []).map((team) => {
+    const profEvalRow = profProjectRows.find((r) => r.team_id === team.id);
+    const studentComment = profStudentCommentByTeam.get(team.id);
+    const holistic = profEvalRow?.holistic_comment?.trim();
+    const completion = profEvalRow?.completion_comment?.trim();
+    const problemSolving = profEvalRow?.problem_solving_comment?.trim();
+
+    // 교수 피드백 — 디스플레이용 (짧게) vs LLM용 (더 길게)
+    const profSnippetParts = [studentComment, holistic].filter(Boolean) as string[];
+    const profFullParts = [
+      studentComment ? `학생 평가: ${studentComment}` : "",
+      completion ? `완성도: ${completion}` : "",
+      problemSolving ? `문제해결: ${problemSolving}` : "",
+      holistic ? `종합: ${holistic}` : "",
+    ].filter(Boolean) as string[];
+
+    return {
+      teamId: team.id,
+      teamName: team.name,
+      projectTitle: team.project_title ?? team.name,
+      courseName: courseNameById.get(team.course_id) ?? "수업",
+      memberRole: roleByTeam.get(team.id) ?? "팀원",
+      progress: team.progress ?? 0,
+      troubleshootingCount: (logsResult.data ?? []).filter((l) => l.team_id === team.id).length,
+      deliverableCount: (deliverablesResult.data ?? []).filter((d) => d.team_id === team.id).length,
+      feedbackSubmitted: feedbackTeamIds.has(team.id),
+      feedbackSnippet: feedbackSnippetByTeam.get(team.id),
+      retrospectiveSubmitted: retroTeamIds.has(team.id),
+      retrospectiveSnippet: retroSnippetByTeam.get(team.id),
+      /** LLM용 회고록 원문 (잘리지 않음) */
+      retrospectiveFull: retroSnippetByTeam.get(team.id),
+      peerReviewsSubmitted: peerCountByTeam.get(team.id) ?? 0,
+      peerReviewSnippet: peerSnippetByTeam.get(team.id),
+      professorStudentEvalReceived: profStudentCommentByTeam.has(team.id),
+      professorProjectEvalReceived: profProjectTeamIds.has(team.id),
+      professorFeedbackSnippet: (() => {
+        if (profSnippetParts.length === 0) return undefined;
+        const joined = profSnippetParts.join(" · ");
+        return joined.length > 120 ? `${joined.slice(0, 120)}…` : joined;
+      })(),
+      /** LLM용 교수 피드백 원문 (항목 구분) */
+      professorFeedbackFull: profFullParts.length > 0 ? profFullParts.join(" / ") : undefined,
+      /** recommend-troubleshooting 메모리에서 추출한 프로젝트 설명 */
+      projectContent: projectContentByTeam.get(team.id),
+      projectValue: projectValueByTeam.get(team.id),
+    };
+  });
 
   // 트러블슈팅은 최대 12건만, problem이 비어 있지 않은 것만
   const logs = (logsResult.data ?? [])
@@ -380,6 +431,23 @@ async function gatherContext(supabase: ReturnType<typeof createClient>, userId: 
 
 /** gatherContext가 돌려주는 객체의 타입 (TypeScript 자동 추론) */
 type EdgeGatherContext = Awaited<ReturnType<typeof gatherContext>>;
+
+/** teams 배열 원소 타입 (buildDraftReportFromEdgeContext 내 캐스팅용) */
+type TeamShape = {
+  teamId: string;
+  teamName: string;
+  projectTitle: string;
+  courseName: string;
+  memberRole: string;
+  progress: number;
+  troubleshootingCount: number;
+  deliverableCount: number;
+  feedbackSnippet?: string;
+  retrospectiveSnippet?: string;
+  peerReviewSnippet?: string;
+  peerReviewsReceived?: { text: string; count: number }[];
+  professorFeedbackSnippet?: string;
+};
 
 /**
  * buildDraftReportFromEdgeContext — AI API 키가 없을 때 쓰는 "DB만" 초안
@@ -423,14 +491,7 @@ function buildDraftReportFromEdgeContext(ctx: EdgeGatherContext): ReportResponse
     teamCount > 0
       ? ctx.teams
           .map((t) => {
-            const team = t as {
-              courseName: string;
-              projectTitle: string;
-              memberRole: string;
-              progress: number;
-              troubleshootingCount: number;
-              deliverableCount: number;
-            };
+            const team = t as TeamShape;
             return `${team.courseName} · ${team.projectTitle} (${team.memberRole}, 진행 ${team.progress}%, 트러블슈팅 ${team.troubleshootingCount}건, 산출물 ${team.deliverableCount}건)`;
           })
           .join("\n")
@@ -438,41 +499,24 @@ function buildDraftReportFromEdgeContext(ctx: EdgeGatherContext): ReportResponse
 
   const growthLines: string[] = [];
   for (const t of ctx.teams) {
-    const team = t as {
-      projectTitle: string;
-      retrospectiveSnippet?: string;
-      professorFeedbackSnippet?: string;
-      feedbackSnippet?: string;
-      peerReviewSnippet?: string;
-    };
+    const team = t as TeamShape;
     const parts: string[] = [];
     if (team.retrospectiveSnippet) parts.push(`회고 — ${team.retrospectiveSnippet}`);
     if (team.professorFeedbackSnippet) parts.push(`교수 평가 — ${team.professorFeedbackSnippet}`);
     if (team.feedbackSnippet) parts.push(`팀 피드백 — ${team.feedbackSnippet}`);
     if (team.peerReviewSnippet) parts.push(`동료평가 — ${team.peerReviewSnippet}`);
-    if (parts.length > 0) {
-      growthLines.push(`[${team.projectTitle}] ${parts.join(" / ")}`);
-    }
+    if (parts.length > 0) growthLines.push(`[${team.projectTitle}] ${parts.join(" / ")}`);
   }
 
   const growth_reflection =
     growthLines.length > 0
-      ? `${growthLines.join("\n")}\n\n(DB 활동 기반 초안입니다. Supabase Secret GEMINI_API_KEY 등록 H-002 후 AI가 문단을 다듬습니다.)`
+      ? `${growthLines.join("\n")}\n\n(DB 활동 기반 초안입니다. GEMINI_API_KEY 등록 후 AI가 문단을 다듬습니다.)`
       : logCount > 0
-        ? `트러블슈팅 ${logCount}건이 기록되어 있습니다. (H-002 Gemini Secret 후 AI 문단 생성)`
+        ? `트러블슈팅 ${logCount}건이 기록되어 있습니다. (GEMINI_API_KEY 등록 후 AI 문단 생성)`
         : "팀 활동·회고·평가 기록을 쌓으면 성장 회고 초안이 채워집니다.";
 
   const sections = ctx.teams.map((t) => {
-    const team = t as {
-      projectTitle: string;
-      courseName: string;
-      memberRole: string;
-      troubleshootingCount: number;
-      deliverableCount: number;
-      feedbackSnippet?: string;
-      retrospectiveSnippet?: string;
-      professorFeedbackSnippet?: string;
-    };
+    const team = t as TeamShape;
     return {
       title: String(team.projectTitle),
       body: [
@@ -488,6 +532,45 @@ function buildDraftReportFromEdgeContext(ctx: EdgeGatherContext): ReportResponse
     };
   });
 
+  // per_project 드래프트 (AI 없이 DB 데이터로 구성)
+  const per_project: PerProject[] = ctx.teams.map((t) => {
+    const team = t as TeamShape;
+    const peerKeywords = (team.peerReviewsReceived ?? []) as { text: string; count: number }[];
+    const evalParts: string[] = [];
+    if (team.professorFeedbackSnippet) evalParts.push(`교수: ${team.professorFeedbackSnippet}`);
+    if (peerKeywords.length > 0) {
+      evalParts.push(`동료 키워드: ${peerKeywords.map((k) => `${k.text}(${k.count})`).join(", ")}`);
+    } else if (team.peerReviewSnippet) {
+      evalParts.push(`동료평가: ${team.peerReviewSnippet}`);
+    }
+
+    return {
+      team_id: String(team.teamId ?? ""),
+      project_title: String(team.projectTitle),
+      overview: `${team.courseName}에서 진행한 ${team.projectTitle}. 진행률 ${team.progress}%, 산출물 ${team.deliverableCount}건.`,
+      core_value: team.retrospectiveSnippet
+        ? team.retrospectiveSnippet
+        : `트러블슈팅 ${team.troubleshootingCount}건 해결을 통한 실전 경험 축적.`,
+      my_experience: `역할: ${team.memberRole}. 트러블슈팅 ${team.troubleshootingCount}건, 산출물 ${team.deliverableCount}건 기여.${team.feedbackSnippet ? ` 팀 피드백: ${team.feedbackSnippet}` : ""}`,
+      eval_summary: evalParts.length > 0 ? evalParts.join(" / ") : "평가 기록 없음.",
+    };
+  });
+
+  // problem_discovery_pattern 드래프트
+  const resolvedLogs = ctx.logs.filter((l) => String(l.status) === "resolved");
+  const problem_discovery_pattern =
+    logCount > 0
+      ? `총 ${logCount}건의 문제를 발굴·기록했습니다. 주요 문제: ${ctx.logs.slice(0, 3).map((l) => truncateText(String(l.problem ?? ""), 50)).join(" / ")}.`
+      : "트러블슈팅 로그가 없습니다.";
+
+  // resolution_style 드래프트
+  const resolution_style =
+    resolvedLogs.length > 0
+      ? `${logCount}건 중 ${resolvedLogs.length}건 해결(${Math.round((resolvedLogs.length / logCount) * 100)}%). problem → plan → solution 구조로 접근.`
+      : logCount > 0
+        ? `${logCount}건 진행 중. (GEMINI_API_KEY 등록 후 AI가 해결 패턴을 분석합니다.)`
+        : "해결 이력이 없습니다.";
+
   return {
     summary,
     problems_solved,
@@ -495,6 +578,9 @@ function buildDraftReportFromEdgeContext(ctx: EdgeGatherContext): ReportResponse
     role_description,
     growth_reflection,
     sections: sections.length > 0 ? sections : undefined,
+    per_project: per_project.length > 0 ? per_project : undefined,
+    problem_discovery_pattern,
+    resolution_style,
     generated_at: new Date().toISOString(),
     model: "draft-db-only",
   };
@@ -512,7 +598,11 @@ function buildLlmReportPayload(context: EdgeGatherContext) {
       major: context.user.major,
       skills: asStringArray(context.user.skills),
     },
-    teams: context.teams,
+    teams: context.teams.map((t) => ({
+      ...t,
+      project_content: (t as Record<string, unknown>).projectContent ?? null,
+      project_value: (t as Record<string, unknown>).projectValue ?? null,
+    })),
     troubleshooting_logs: context.logs,
     deliverable_count: context.deliverableCount,
     feedback_count: context.feedbackCount,
@@ -526,7 +616,37 @@ function buildLlmReportPayload(context: EdgeGatherContext) {
 /** AI에게 주는 "시스템 지시" — JSON만, 사실만, 키 이름 고정 */
 function buildReportSystemPrompt(locale: "ko" | "en"): string {
   const lang = locale === "en" ? "English" : "Korean";
-  return `You write university team-project portfolio reports. Respond in ${lang}. Return JSON only with keys: summary (string), problems_solved (string[]), technologies (string[]), role_description (string), growth_reflection (string), sections (array of {title, body}). Be factual; use only provided data. teams may include feedbackSubmitted, feedbackSnippet, retrospectiveSubmitted, retrospectiveSnippet, peerReviewsSubmitted, peerReviewSnippet, professorStudentEvalReceived, professorProjectEvalReceived, professorFeedbackSnippet per team.`;
+  return `You are an expert at writing university student portfolio reports. Respond in ${lang}. Return ONLY valid JSON with exactly these keys:
+
+{
+  "summary": string,                  // 2-3 sentences: overall participation and highlights
+  "problems_solved": string[],        // each item: "[ProjectTitle] problem — action — result"
+  "technologies": string[],           // tech stack and tools used
+  "role_description": string,         // one line per team: "CourseName · ProjectTitle (role, progress%, X troubleshootings, Y deliverables)"
+  "growth_reflection": string,        // 2-3 sentences synthesizing retrospectives, feedback, and peer reviews
+  "sections": [{"title": string, "body": string}],  // one section per team
+  "per_project": [                    // one object per team — MUST echo team_id from input
+    {
+      "team_id": string,
+      "project_title": string,
+      "overview": "2 sentences describing the project context, goal, and outcome",
+      "core_value": "1-2 sentences: what key value or learning this project provided",
+      "my_experience": "2-3 sentences: the student's specific role, contributions, and what they personally did",
+      "eval_summary": "1-2 sentences synthesizing peer review keywords + professor feedback for this project"
+    }
+  ],
+  "problem_discovery_pattern": string,  // 2-3 sentences: what types of problems this student tends to identify and tackle
+  "resolution_style": string            // 2-3 sentences: how this student characteristically solves problems (methodology, thoroughness, speed)
+}
+
+Rules:
+- Use ONLY data provided. Do not invent facts.
+- per_project must have one entry per team in the input teams array.
+- team_id in per_project must exactly match the teamId field from the input teams array.
+- If retrospectiveFull or professorFeedbackFull fields exist in a team, prefer those over snippet fields for richer analysis.
+- If a team has project_content or project_value fields, use them as primary sources for the per_project.overview and per_project.core_value fields. These were extracted from actual uploaded documents (PDFs, slides, docs).
+- problem_discovery_pattern and resolution_style must be based on the troubleshooting_logs array.
+- If troubleshooting_logs is empty, say so honestly.`;
 }
 
 /** AI가 준 JSON을 ReportResponse 형태로 정리 (빈 필드는 기본값) */
@@ -535,6 +655,16 @@ function mapParsedReport(
   context: EdgeGatherContext,
   model: string
 ): ReportResponse {
+  const validPerProject = Array.isArray(parsed.per_project)
+    ? (parsed.per_project as unknown[]).filter(
+        (p): p is PerProject =>
+          Boolean(p) &&
+          typeof p === "object" &&
+          typeof (p as PerProject).project_title === "string" &&
+          typeof (p as PerProject).overview === "string"
+      )
+    : undefined;
+
   return {
     summary: parsed.summary ?? `${context.user.name}님의 팀 활동 리포트입니다.`,
     problems_solved: asStringArray(parsed.problems_solved),
@@ -553,6 +683,13 @@ function mapParsedReport(
             typeof (s as ReportSection).body === "string"
         )
       : undefined,
+    per_project: validPerProject && validPerProject.length > 0 ? validPerProject : undefined,
+    problem_discovery_pattern:
+      typeof parsed.problem_discovery_pattern === "string"
+        ? parsed.problem_discovery_pattern
+        : undefined,
+    resolution_style:
+      typeof parsed.resolution_style === "string" ? parsed.resolution_style : undefined,
     generated_at: new Date().toISOString(),
     model,
   };

@@ -44,10 +44,22 @@ type ProgressInsightResponse = {
   next_steps: string[];
   architecture_risks: string[];
   improvements: string[];
+  /** 프로젝트가 무엇인지 — 문서·코드 전체 기반 */
+  project_content?: string;
+  /** 이 프로젝트의 핵심 가치·목표 */
+  project_value?: string;
   generated_at: string;
   model: string;
   used_memory?: boolean;
   new_deliverables_analyzed?: number;
+};
+
+/** Gemini inline_data 멀티모달 파트 */
+type BinaryPart = {
+  file_name: string;
+  mime_type: string;
+  base64: string;
+  size: number;
 };
 
 type DeliverableRow = {
@@ -95,6 +107,8 @@ type TeamContext = {
     is_new_since_memory: boolean;
   }>;
   source_snippets: SourceSnippet[];
+  /** PDF·이미지 등 바이너리 문서 — Gemini inline_data로 전달 */
+  binary_document_parts: BinaryPart[];
   chat_snippets: string[];
   feedback_count: number;
   project_memory_markdown: string;
@@ -103,6 +117,8 @@ type TeamContext = {
 
 const DELIVERABLES_BUCKET = "ai_team_deliverables";
 const SOURCE_EXTS = /\.(ts|tsx|js|jsx|py|java|go|rs|sql|md|txt|json|yaml|yml|html|css)$/i;
+const BINARY_EXTS = /\.(pdf|png|jpg|jpeg|webp|gif|heic|heif)$/i;
+const OFFICE_EXTS = /\.(pptx|docx)$/i;
 const MAX_SOURCE_BYTES = 120_000;
 const MAX_ZIP_BYTES = 80_000_000;
 const MAX_SNIPPET_CHARS = 3500;
@@ -113,6 +129,108 @@ const MAX_SOURCE_SNIPPETS_TROUBLESHOOT = 6;
 const TROUBLESHOOTING_ALWAYS_SAMPLE_LATEST_FILES = 2;
 const PROGRESS_ALWAYS_SAMPLE_LATEST_FILES = 2;
 const EXCLUDED_DIR_NAMES = new Set(["node_modules", ".git"]);
+const MAX_BINARY_PART_BYTES = 18_000_000; // 18MB — Gemini inline_data 제한
+const MAX_BINARY_PARTS = 4;              // 요청 크기 제어
+
+// ─── 문서 파싱 헬퍼 ──────────────────────────────────────────────────────────
+
+/** ArrayBuffer → base64 (대용량 파일 스택 오버플로 방지용 청크 방식) */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const uint8 = new Uint8Array(buffer);
+  let binary = "";
+  const CHUNK = 8192;
+  for (let i = 0; i < uint8.length; i += CHUNK) {
+    binary += String.fromCharCode(...uint8.subarray(i, Math.min(i + CHUNK, uint8.length)));
+  }
+  return btoa(binary);
+}
+
+/** XML에서 특정 태그 내 텍스트 노드를 모두 추출 */
+function extractXmlTextNodes(xml: string, tag: "a:t" | "w:t"): string {
+  const re = tag === "a:t"
+    ? /<a:t[^>]*>([^<]+)<\/a:t>/g
+    : /<w:t[^>]*>([^<]+)<\/w:t>/g;
+  return [...xml.matchAll(re)].map((m) => m[1].trim()).filter(Boolean).join(" ");
+}
+
+/** PPTX → 슬라이드 텍스트 스니펫 추출 */
+async function extractPptxText(buffer: ArrayBuffer, label: string): Promise<SourceSnippet[]> {
+  try {
+    const JSZip = (await import("npm:jszip@3.10.1")).default;
+    const zip = await JSZip.loadAsync(buffer);
+    const slideFiles = Object.keys(zip.files)
+      .filter((f) => /^ppt\/slides\/slide\d+\.xml$/i.test(f))
+      .sort((a, b) => {
+        const na = parseInt(a.match(/slide(\d+)/)?.[1] ?? "0");
+        const nb = parseInt(b.match(/slide(\d+)/)?.[1] ?? "0");
+        return na - nb;
+      });
+
+    const slideTexts: string[] = [];
+    for (const sf of slideFiles.slice(0, 40)) {
+      const xml = await zip.files[sf].async("string");
+      const text = extractXmlTextNodes(xml, "a:t");
+      if (text.trim()) slideTexts.push(text.trim());
+    }
+    if (slideTexts.length === 0) return [];
+
+    return [{
+      file_name: label,
+      excerpt: truncateText(`[PPTX 슬라이드 텍스트]\n${slideTexts.join("\n\n")}`, MAX_SNIPPET_CHARS),
+    }];
+  } catch {
+    return [];
+  }
+}
+
+/** DOCX → 본문 텍스트 스니펫 추출 */
+async function extractDocxText(buffer: ArrayBuffer, label: string): Promise<SourceSnippet[]> {
+  try {
+    const JSZip = (await import("npm:jszip@3.10.1")).default;
+    const zip = await JSZip.loadAsync(buffer);
+    const docFile = zip.files["word/document.xml"];
+    if (!docFile) return [];
+    const xml = await docFile.async("string");
+    const text = extractXmlTextNodes(xml, "w:t");
+    if (!text.trim()) return [];
+    return [{
+      file_name: label,
+      excerpt: truncateText(`[DOCX 본문]\n${text}`, MAX_SNIPPET_CHARS),
+    }];
+  } catch {
+    return [];
+  }
+}
+
+/** PDF·이미지 파일을 BinaryPart로 변환 (Gemini inline_data용) */
+async function collectBinaryPart(
+  supabase: ReturnType<typeof createClient>,
+  path: string,
+  label: string,
+  size: number,
+  sourcePath: string,
+  mimeLower: string
+): Promise<BinaryPart | null> {
+  if (size > MAX_BINARY_PART_BYTES) return null;
+  try {
+    const { data, error } = await supabase.storage.from(DELIVERABLES_BUCKET).download(path);
+    if (error || !data) return null;
+    const buffer = await data.arrayBuffer();
+    const base64 = arrayBufferToBase64(buffer);
+    const mime = /\.pdf$/i.test(sourcePath) ? "application/pdf"
+      : /\.png$/i.test(sourcePath) ? "image/png"
+      : /\.jpe?g$/i.test(sourcePath) ? "image/jpeg"
+      : /\.webp$/i.test(sourcePath) ? "image/webp"
+      : /\.gif$/i.test(sourcePath) ? "image/gif"
+      : mimeLower.startsWith("image/") ? mimeLower
+      : "application/pdf";
+    return { file_name: label, mime_type: mime, base64, size };
+  } catch {
+    return null;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function normalizeArchivePath(path: string): string {
   return path.replace(/\\/g, "/").replace(/^\/+/, "");
@@ -357,6 +475,16 @@ function buildMemoryMarkdown(teamName: string, insight: ProgressInsightResponse)
     for (const item of items) lines.push(`- ${item}`);
     lines.push("");
   };
+  if (insight.project_content) {
+    lines.push("## 프로젝트 내용");
+    lines.push(insight.project_content);
+    lines.push("");
+  }
+  if (insight.project_value) {
+    lines.push("## 프로젝트 핵심 가치");
+    lines.push(insight.project_value);
+    lines.push("");
+  }
   section("강점", insight.strengths);
   section("보완", insight.gaps);
   section("다음 할 일", insight.next_steps);
@@ -651,7 +779,7 @@ async function gatherTeamContext(
   }
   const rowsToSample = sortDeliverablesForSampling([...rowsById.values()], memory.analyzed_deliverable_ids);
 
-  const { snippets: source_snippets, processedDeliverableIds } = await sampleDeliverableSourceSnippets(
+  const { snippets: source_snippets, binaryParts: binary_document_parts, processedDeliverableIds } = await sampleDeliverableSourceSnippets(
     supabase,
     rowsToSample,
     maxSnippets
@@ -697,6 +825,7 @@ async function gatherTeamContext(
       };
     }),
     source_snippets,
+    binary_document_parts,
     chat_snippets,
     feedback_count: (feedbackResult.data ?? []).length,
     project_memory_markdown: memory.memory_markdown,
@@ -806,21 +935,25 @@ async function sampleDeliverableSourceSnippets(
   supabase: ReturnType<typeof createClient>,
   rows: DeliverableRow[],
   maxSnippets: number
-): Promise<{ snippets: SourceSnippet[]; processedDeliverableIds: string[] }> {
+): Promise<{ snippets: SourceSnippet[]; binaryParts: BinaryPart[]; processedDeliverableIds: string[] }> {
   const snippets: SourceSnippet[] = [];
+  const binaryParts: BinaryPart[] = [];
   const processedDeliverableIds: string[] = [];
 
   for (const row of rows) {
-    if (snippets.length >= maxSnippets) break;
+    if (snippets.length >= maxSnippets && binaryParts.length >= MAX_BINARY_PARTS) break;
     const path = resolveDeliverableObjectPath(row) ?? "";
     if (!path || path.startsWith("link://")) continue;
 
     const name = String(row.file_name ?? "");
     const mime = row.mime_type ? String(row.mime_type) : null;
+    const mimeLower = (mime ?? "").toLowerCase();
     const innerPath = storageInnerRelativePath(path);
     const sourcePath = innerPath ?? name;
+    const label = innerPath ? `${name}::${innerPath}` : name;
     const size = Number(row.file_size ?? 0);
 
+    // ── ZIP / 아카이브 ────────────────────────────────────────────────────────
     if (deliverableRowIsZip(row)) {
       const zipLabel = deliverableZipLabel(row);
       const zipSnippets = await extractZipSourceSnippets(supabase, path, zipLabel, size);
@@ -834,24 +967,73 @@ async function sampleDeliverableSourceSnippets(
       continue;
     }
 
-    if (!SOURCE_EXTS.test(sourcePath)) {
-      const mimeLower = (mime ?? "").toLowerCase();
-      const isDocHint =
-        /\.(pdf|docx?|pptx?)$/i.test(sourcePath) ||
-        /pdf|msword|officedocument|presentation|powerpoint/.test(mimeLower);
-      if (isDocHint) {
-        snippets.push({
-          file_name: innerPath ? `${name}::${innerPath}` : name,
-          excerpt: `(문서 파일은 자동 분석이 제한됩니다 — 가능하면 .md/.txt로 변환하거나 ZIP에 포함해 업로드해 주세요)`,
-        });
-        processedDeliverableIds.push(row.id);
+    // ── PDF·이미지 → Gemini inline_data ──────────────────────────────────────
+    if (BINARY_EXTS.test(sourcePath) || /^application\/pdf$/.test(mimeLower) || /^image\//.test(mimeLower)) {
+      if (binaryParts.length < MAX_BINARY_PARTS && size > 0) {
+        if (size <= MAX_BINARY_PART_BYTES) {
+          const part = await collectBinaryPart(supabase, path, label, size, sourcePath, mimeLower);
+          if (part) {
+            binaryParts.push(part);
+            processedDeliverableIds.push(row.id);
+          }
+        } else {
+          // 크기 초과 — 파일명만 기록
+          snippets.push({
+            file_name: label,
+            excerpt: `(${name}: ${Math.round(size / 1024 / 1024)}MB — 크기 제한(18MB)으로 직접 분석 생략, 파일명만 참고)`,
+          });
+        }
       }
+      continue;
+    }
+
+    // ── PPTX → XML 텍스트 추출 ───────────────────────────────────────────────
+    if (OFFICE_EXTS.test(sourcePath) && /\.pptx$/i.test(sourcePath) ||
+        /presentationml|powerpoint/.test(mimeLower)) {
+      if (snippets.length < maxSnippets && size > 0 && size <= MAX_ZIP_BYTES) {
+        try {
+          const { data, error } = await supabase.storage.from(DELIVERABLES_BUCKET).download(path);
+          if (!error && data) {
+            const pptxSnippets = await extractPptxText(await data.arrayBuffer(), label);
+            for (const s of pptxSnippets) {
+              if (snippets.length >= maxSnippets) break;
+              snippets.push(s);
+            }
+            if (pptxSnippets.length > 0) processedDeliverableIds.push(row.id);
+          }
+        } catch { /* skip */ }
+      }
+      continue;
+    }
+
+    // ── DOCX → XML 텍스트 추출 ───────────────────────────────────────────────
+    if (OFFICE_EXTS.test(sourcePath) && /\.docx$/i.test(sourcePath) ||
+        /wordprocessingml|msword/.test(mimeLower)) {
+      if (snippets.length < maxSnippets && size > 0 && size <= MAX_ZIP_BYTES) {
+        try {
+          const { data, error } = await supabase.storage.from(DELIVERABLES_BUCKET).download(path);
+          if (!error && data) {
+            const docxSnippets = await extractDocxText(await data.arrayBuffer(), label);
+            for (const s of docxSnippets) {
+              if (snippets.length >= maxSnippets) break;
+              snippets.push(s);
+            }
+            if (docxSnippets.length > 0) processedDeliverableIds.push(row.id);
+          }
+        } catch { /* skip */ }
+      }
+      continue;
+    }
+
+    // ── 소스 코드 파일 (.ts, .md 등) ─────────────────────────────────────────
+    if (!SOURCE_EXTS.test(sourcePath)) {
+      // 위에서 처리되지 않은 알 수 없는 포맷
       continue;
     }
 
     if (size > MAX_SOURCE_BYTES) {
       snippets.push({
-        file_name: innerPath ? `${name}::${innerPath}` : name,
+        file_name: label,
         excerpt: `(파일 ${Math.round(size / 1024)}KB — 전문 미수집, 파일명·확장자만 참고)`,
       });
       continue;
@@ -864,7 +1046,7 @@ async function sampleDeliverableSourceSnippets(
       const trimmed = text.trim();
       if (!trimmed) continue;
       snippets.push({
-        file_name: innerPath ? `${name}::${innerPath}` : name,
+        file_name: label,
         excerpt: truncateText(trimmed, MAX_SNIPPET_CHARS),
       });
       processedDeliverableIds.push(row.id);
@@ -873,7 +1055,7 @@ async function sampleDeliverableSourceSnippets(
     }
   }
 
-  return { snippets, processedDeliverableIds };
+  return { snippets, binaryParts, processedDeliverableIds };
 }
 
 function parseInsightStringList(value: unknown, max: number): string[] {
@@ -989,6 +1171,11 @@ function buildLlmPayload(context: TeamContext) {
       ? truncateText(context.project_memory_markdown, 6000)
       : null,
     new_deliverables_since_memory: context.new_deliverable_count,
+    binary_documents_attached: (context.binary_document_parts ?? []).map((bp) => ({
+      name: bp.file_name,
+      mime_type: bp.mime_type,
+      size_kb: Math.round(bp.size / 1024),
+    })),
     analysis_note:
       context.new_deliverable_count > 0
         ? "source_code_samples are from NEW uploads only; merge with project_memory_markdown."
@@ -1000,20 +1187,21 @@ function buildLlmPayload(context: TeamContext) {
 
 function buildTroubleshootingSystemPrompt(locale: "ko" | "en"): string {
   const lang = locale === "en" ? "English" : "Korean";
-  return `You help university team projects pick the next troubleshooting topic to investigate. Input includes:
-- deliverables: board posts (title, subtitle, description) for the project workspace
-- source_code_samples: excerpts from the latest project ZIP/uploads (paths like "bundle.zip::src/App.tsx")
-- project_memory_markdown: saved summary of prior AI project-state review
+  return `You help university team projects identify the next troubleshooting topic. Input includes:
+- deliverables: board posts (title, subtitle, description)
+- source_code_samples: text excerpts from ZIP/source uploads and Office documents (PPTX/DOCX slides/body text)
+- binary_document_parts: embedded PDF pages or images sent as inline data — analyze their visual and textual content
+- project_memory_markdown: saved AI project-state summary (includes 프로젝트 내용 / 프로젝트 핵심 가치 sections when available)
 - troubleshooting_logs, recent_chat
 
-Respond in ${lang}. Return JSON only: problem (string, max 140 chars), rationale (optional, max 100 chars). Do NOT include plan/solution steps.
+Respond in ${lang}. Return JSON only: { problem (string, max 140 chars), rationale (string, max 100 chars) }. No plan/solution.
 
 Rules:
-- Base the recommendation on CURRENT project deliverables and source_code_samples when present—not only old logs.
-- If source_code_samples shows API/routing/state/deploy issues, suggest a concrete problem aligned with that code.
-- If deliverables exist but source_code_samples is empty, say code review is limited and point to missing upload types (e.g. zip with .ts/.py).
-- Use project_memory_markdown for context but prefer evidence from latest source_code_samples for "what to debug now".
-- Suggest ONE new problem situation (not already fully resolved in logs). Do not copy log text verbatim.`;
+- Treat ALL deliverable types equally: presentation slides, meeting notes, design docs, and source code are all valid evidence.
+- Read binary_document_parts (PDF/images) visually if provided — extract key project goals, user scenarios, and pain points from them.
+- Suggest ONE concrete problem not already resolved in logs. Prioritize user-facing or PM-perspective issues when documents reveal them.
+- If memory has 프로젝트 내용 / 핵심 가치, anchor the problem to the project's stated purpose.
+- Do NOT suggest "upload code" or "write README" as the troubleshooting topic — focus on real project challenges.`;
 }
 
 type SourceCodeSignals = {
@@ -1275,26 +1463,43 @@ function buildHeuristicProgressInsight(context: TeamContext): ProgressInsightRes
 
 function buildProgressInsightSystemPrompt(locale: "ko" | "en"): string {
   const lang = locale === "en" ? "English" : "Korean";
-  return `You are a staff engineer mentoring a university team. Review their project workspace like a Cursor agent.
+  return `You are a project mentor reviewing a university team's workspace from a PM/product perspective — not just as a code reviewer.
 
-Input: deliverable board posts, troubleshooting_logs, recent_chat, project_memory_markdown, source_code_samples (ZIP excerpts; paths like "proj.zip::src/App.tsx").
+Input includes ALL of the following:
+- deliverable board posts (title, subtitle, description)
+- source_code_samples: text from ZIP source files AND extracted PPTX slides / DOCX documents
+- binary_document_parts: PDF pages or images embedded as inline data — read them visually for project goals, user scenarios, diagrams, and design rationale
+- project_memory_markdown: prior AI summary (may include 프로젝트 내용 / 프로젝트 핵심 가치 sections)
+- troubleshooting_logs, recent_chat
 
-Respond in ${lang}. JSON only: summary, strengths, gaps, next_steps, architecture_risks, improvements.
+Respond in ${lang}. JSON only with these fields:
+{
+  "summary": "1-2 sentences (max 220 chars). Describe the project's PURPOSE and current state, not just the tech stack.",
+  "project_content": "2-4 sentences describing what this project does and who it serves, derived from documents/slides/code combined.",
+  "project_value": "1-2 sentences on the core value or problem the project solves for its users.",
+  "strengths": [],
+  "gaps": ["max 2 items — PM/product or execution gaps, not just missing README"],
+  "next_steps": ["max 2 actionable tasks aligned with project goals"],
+  "architecture_risks": ["max 1 item when evidence exists"],
+  "improvements": ["max 1 item when evidence exists"]
+}
 
-CRITICAL — summary: 1-2 short sentences (max ~220 chars). Include stack/pattern ONCE if visible in source_code_samples, one biggest gap, optional progress %. Do NOT repeat stack in strengths. Do NOT append "입니다" to sentences that already end with 다/요/습니다/하세요.
+CRITICAL RULES:
+- project_content and project_value MUST be derived from document content (slides, PDFs, docs) when binary_document_parts or PPTX/DOCX text is present. Do NOT leave them empty if documents exist.
+- summary must reflect the project's human purpose, not just list the tech stack.
+- strengths: leave [] — not shown in UI.
+- FORBIDDEN: count-only summaries; code-only analysis when documents are present; saying "코드 분석 불가" when binary documents were provided.
+- If source_code_samples is empty but documents exist, analyze the documents fully.
+- Do NOT append "입니다" to sentences already ending with 다/요/습니다/하세요.`;
+}
 
-strengths: omit entirely OR leave [] — UI does not show strengths (do not duplicate summary).
-
-gaps: max 2 items, each one line, no overlap with summary wording.
-next_steps: max 2 actionable tasks; shown in a separate UI block (do not copy into summary).
-architecture_risks: max 1 item when evidence exists.
-improvements: max 1 item when evidence exists.
-
-FORBIDDEN: count-only summaries ("산출물 N건", "소스 샘플 N건") without technical synthesis; repeating Firebase/React/Vite in both summary and strengths.
-
-If zip_inventory_notes or source paths show README (e.g. README.md), do NOT list missing README, "write a README", or "add run instructions" as a gap or next_step — only suggest improving README content if clearly incomplete.
-
-If source_code_samples is empty, use memory + metadata but state code review was limited.`;
+function buildGeminiInlineParts(binaryParts: BinaryPart[]): object[] {
+  return binaryParts.map((bp) => ({
+    inline_data: {
+      mime_type: bp.mime_type,
+      data: bp.base64,
+    },
+  }));
 }
 
 async function callGeminiProgressInsight(
@@ -1306,12 +1511,15 @@ async function callGeminiProgressInsight(
   const payload = buildLlmPayload(context);
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
+  const inlineParts = buildGeminiInlineParts(context.binary_document_parts ?? []);
+  const userParts: object[] = [{ text: JSON.stringify(payload) }, ...inlineParts];
+
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: buildProgressInsightSystemPrompt(locale) }] },
-      contents: [{ role: "user", parts: [{ text: JSON.stringify(payload) }] }],
+      contents: [{ role: "user", parts: userParts }],
       generationConfig: {
         temperature: 0.55,
         responseMimeType: "application/json",
@@ -1341,6 +1549,8 @@ async function callGeminiProgressInsight(
     next_steps: parseInsightStringList(parsed.next_steps, 3),
     architecture_risks: parseInsightStringList(parsed.architecture_risks, 2),
     improvements: parseInsightStringList(parsed.improvements, 2),
+    project_content: typeof parsed.project_content === "string" ? parsed.project_content.trim() : undefined,
+    project_value: typeof parsed.project_value === "string" ? parsed.project_value.trim() : undefined,
     generated_at: new Date().toISOString(),
     model: modelId,
   };
@@ -1361,12 +1571,15 @@ async function callGemini(
   const payload = buildLlmPayload(context);
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
+  const inlineParts = buildGeminiInlineParts(context.binary_document_parts ?? []);
+  const userParts: object[] = [{ text: JSON.stringify(payload) }, ...inlineParts];
+
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: buildTroubleshootingSystemPrompt(locale) }] },
-      contents: [{ role: "user", parts: [{ text: JSON.stringify(payload) }] }],
+      contents: [{ role: "user", parts: userParts }],
       generationConfig: {
         temperature: 0.5,
         responseMimeType: "application/json",
