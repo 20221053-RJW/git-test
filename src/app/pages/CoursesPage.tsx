@@ -259,6 +259,9 @@ export default function CoursesPage() {
             {courses.map((course) => {
               const canManageThisCourse = canManageCourses && (isAdmin || course.professorId === user?.id);
               const canArchiveCourse = canManageThisCourse && course.status === "active";
+              const isMyInstructorCourse = Boolean(
+                isProfessor && user?.id && course.professorId === user.id
+              );
 
               return (
                 <CourseListCard
@@ -267,6 +270,7 @@ export default function CoursesPage() {
                   canManageCourses={canManageCourses}
                   canArchiveCourse={canArchiveCourse}
                   canManageThisCourse={canManageThisCourse}
+                  isMyInstructorCourse={isMyInstructorCourse}
                   submitting={submitting}
                   onCopyCode={copyCourseCode}
                   onArchive={handleArchiveCourse}

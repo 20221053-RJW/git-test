@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router";
-import { Calendar, Clock, Copy, GitBranch, MapPin, User, Users } from "lucide-react";
+import { Calendar, Clock, Copy, GitBranch, GraduationCap, MapPin, User, Users } from "lucide-react";
 import { formatCoursePeriod } from "../../utils/courseDates";
 import type { Course } from "../../types";
 
@@ -9,6 +9,7 @@ type CourseListCardProps = {
   canManageCourses: boolean;
   canArchiveCourse: boolean;
   canManageThisCourse: boolean;
+  isMyInstructorCourse?: boolean;
   submitting: boolean;
   onCopyCode: (code: string) => void;
   onArchive: (course: Course) => void;
@@ -20,6 +21,7 @@ export default function CourseListCard({
   canManageCourses,
   canArchiveCourse,
   canManageThisCourse,
+  isMyInstructorCourse = false,
   submitting,
   onCopyCode,
   onArchive,
@@ -30,12 +32,22 @@ export default function CourseListCard({
   const studentLabel = course.maxStudents
     ? `${course.students}/${course.maxStudents}명`
     : `${course.students}명`;
+  const hasAssignedProfessor = Boolean(course.professorId?.trim());
+  const cardClassName = [
+    "cc-course-card m3-surface-card--elevated m3-surface-card--interactive group",
+    hasAssignedProfessor ? "cc-course-card--with-professor" : "cc-course-card--no-professor",
+    isMyInstructorCourse ? "cc-course-card--my-instructor" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <Link
       to={`/app/courses/${course.id}`}
-      className="cc-course-card m3-surface-card--elevated m3-surface-card--interactive group"
+      className={cardClassName}
       data-testid={`course-card-${course.id}`}
+      data-course-has-professor={hasAssignedProfessor ? "true" : "false"}
+      data-course-my-instructor={isMyInstructorCourse ? "true" : "false"}
     >
       <div className="cc-course-card__accent" aria-hidden />
 
@@ -43,15 +55,35 @@ export default function CourseListCard({
         <div className="cc-course-card__head">
           <div className="cc-course-card__head-row">
             <span className="cc-course-card__semester">{course.semester}</span>
-            {course.status === "archived" ? (
-              <span className="cc-badge-archived rounded-full px-2.5 py-0.5 text-[11px] font-bold">
-                종료
-              </span>
-            ) : (
-              <span className="cc-badge-success rounded-full px-2.5 py-0.5 text-[11px] font-bold">
-                진행 중
-              </span>
-            )}
+            <div className="cc-course-card__badges">
+              {hasAssignedProfessor ? (
+                <span
+                  className={`cc-course-card__professor-badge ${
+                    isMyInstructorCourse ? "cc-course-card__professor-badge--mine" : ""
+                  }`}
+                  data-testid={`course-card-professor-badge-${course.id}`}
+                >
+                  <GraduationCap className="h-3 w-3 shrink-0" aria-hidden />
+                  {isMyInstructorCourse ? "내 담당 수업" : "담당 교수 배정"}
+                </span>
+              ) : (
+                <span
+                  className="cc-course-card__professor-badge cc-course-card__professor-badge--empty"
+                  data-testid={`course-card-professor-badge-${course.id}`}
+                >
+                  교수 미배정
+                </span>
+              )}
+              {course.status === "archived" ? (
+                <span className="cc-badge-archived rounded-full px-2.5 py-0.5 text-[11px] font-bold">
+                  종료
+                </span>
+              ) : (
+                <span className="cc-badge-success rounded-full px-2.5 py-0.5 text-[11px] font-bold">
+                  진행 중
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="cc-course-card__title-row">
@@ -84,7 +116,13 @@ export default function CourseListCard({
               <User className="h-3.5 w-3.5 shrink-0" aria-hidden />
               교수
             </dt>
-            <dd className="cc-course-card__meta-value">{course.professor}</dd>
+            <dd
+              className={`cc-course-card__meta-value ${
+                hasAssignedProfessor ? "cc-course-card__meta-value--professor" : ""
+              }`}
+            >
+              {hasAssignedProfessor ? course.professor : "미배정"}
+            </dd>
           </div>
           {periodLabel ? (
             <div className="cc-course-card__meta-item">

@@ -599,6 +599,104 @@ body,
   );
 }
 
+.cc-course-card--no-professor {
+  border: 1px solid var(--cc-outline-variant);
+}
+
+.cc-course-card--no-professor .cc-course-card__accent {
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--cc-outline-variant) 0%,
+    color-mix(in srgb, var(--cc-on-surface-variant) 25%, transparent) 100%
+  );
+}
+
+.cc-course-card--with-professor {
+  border: 2px solid color-mix(in srgb, #d97706 42%, var(--cc-primary-border));
+  box-shadow:
+    var(--m3-elevation-2),
+    inset 0 0 0 1px color-mix(in srgb, #f59e0b 14%, transparent);
+}
+
+.cc-course-card--with-professor .cc-course-card__accent {
+  height: 6px;
+  background: linear-gradient(
+    90deg,
+    #b45309 0%,
+    #f59e0b 38%,
+    var(--cc-primary) 72%,
+    color-mix(in srgb, var(--cc-primary) 40%, #fbbf24) 100%
+  );
+}
+
+.cc-course-card--with-professor .cc-course-card__body {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #fffbeb 72%, var(--cc-surface)) 0%,
+    var(--cc-surface) 5.5rem
+  );
+}
+
+.cc-course-card--my-instructor {
+  border-color: color-mix(in srgb, var(--cc-primary) 72%, #d97706);
+  box-shadow:
+    var(--m3-elevation-3),
+    0 0 0 1px color-mix(in srgb, var(--cc-primary) 22%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, #f59e0b 18%, transparent);
+}
+
+.cc-course-card--my-instructor .cc-course-card__body {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--cc-primary-container) 88%, #fffbeb) 0%,
+    var(--cc-surface) 6rem
+  );
+}
+
+.cc-course-card__badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.375rem;
+}
+
+.cc-course-card__professor-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: var(--m3-shape-full);
+  padding: 0.2rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: #92400e;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #f59e0b;
+  box-shadow: 0 1px 2px rgb(180 83 9 / 0.12);
+}
+
+.cc-course-card__professor-badge--mine {
+  color: var(--cc-on-primary-container);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--cc-primary-container) 88%, #fde68a) 0%,
+    var(--cc-primary-container) 100%
+  );
+  border-color: var(--cc-primary-border);
+  box-shadow: 0 1px 3px rgb(21 93 252 / 0.16);
+}
+
+.cc-course-card__professor-badge--empty {
+  color: var(--cc-on-surface-variant);
+  background: var(--cc-surface-container);
+  border: 1px dashed var(--cc-outline-variant);
+  box-shadow: none;
+  font-weight: 700;
+}
+
 .cc-course-card__body {
   display: flex;
   flex: 1;
@@ -782,6 +880,15 @@ body,
   font-weight: 500;
   line-height: 1.4;
   color: var(--cc-text);
+}
+
+.cc-course-card__meta-value--professor {
+  font-weight: 700;
+  color: #92400e;
+}
+
+.cc-course-card--my-instructor .cc-course-card__meta-value--professor {
+  color: var(--cc-on-primary-container);
 }
 
 .cc-course-card__actions {
