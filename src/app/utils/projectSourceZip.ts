@@ -1,8 +1,8 @@
 import JSZip from "jszip";
+import { TEAM_DELIVERABLE_MAX_BYTES } from "./deliverableUploadLimits";
 
-/** 산출물 업로드 한도 (supabase-api TEAM_DELIVERABLE_MAX_BYTES 와 동일) */
-export const PROJECT_SOURCE_ZIP_MAX_BYTES = 500 * 1024 * 1024;
-export const PROJECT_FOLDER_MAX_BYTES = PROJECT_SOURCE_ZIP_MAX_BYTES;
+export const PROJECT_SOURCE_ZIP_MAX_BYTES = TEAM_DELIVERABLE_MAX_BYTES;
+export const PROJECT_FOLDER_MAX_BYTES = TEAM_DELIVERABLE_MAX_BYTES;
 export const PROJECT_FOLDER_MAX_FILES = 2000;
 
 const SCAN_FILES_BATCH_SIZE = 40;

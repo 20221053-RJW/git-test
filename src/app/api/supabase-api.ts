@@ -63,6 +63,11 @@ import {
   isDeliverableArchiveFile,
   resolveDeliverableDeployUrl,
 } from "../utils/deliverableLinks";
+import {
+  formatDeliverableStorageError,
+  TEAM_DELIVERABLE_MAX_BYTES,
+} from "../utils/deliverableUploadLimits";
+import { uploadFileToStorage } from "../utils/storageResumableUpload";
 import { buildPeerEvaluationSummary } from "../utils/peerEvaluationSummary";
 
 export { extractDeployLinkFromDescription };
@@ -3792,7 +3797,6 @@ async function getTeamDetailTroubleshootingLogsFromDb(teamId?: string): Promise<
 }
 
 const TEAM_DELIVERABLES_BUCKET = "ai_team_deliverables";
-const TEAM_DELIVERABLE_MAX_BYTES = 500 * 1024 * 1024;
 const TEAM_DELIVERABLE_ALLOWED_EXT = new Set([
   "pdf",
   "zip",
@@ -3965,16 +3969,6 @@ function resolveDeliverablePublicUrl(row: {
   return "";
 }
 
-function formatDeliverableStorageError(error: unknown): Error {
-  const message = error instanceof Error ? error.message : String(error);
-  if (/bucket|not found|404|Bucket/i.test(message)) {
-    return new Error(
-      "산출물 Storage 버킷(ai_team_deliverables)이 없습니다. Supabase에 마이그레이션을 적용해 주세요."
-    );
-  }
-  return error instanceof Error ? error : new Error(message);
-}
-
 function mapDeliverableRow(row: {
   id: string;
   team_id: string;
@@ -4092,15 +4086,18 @@ async function uploadTeamDeliverableInDb(
         ? "application/x-7z-compressed"
         : undefined);
 
-  const { error: uploadError } = await supabase.storage
-    .from(TEAM_DELIVERABLES_BUCKET)
-    .upload(storagePath, file, {
+  try {
+    await uploadFileToStorage({
+      bucket: TEAM_DELIVERABLES_BUCKET,
+      path: storagePath,
+      file,
+      contentType,
       cacheControl: "3600",
       upsert: false,
-      contentType,
     });
-
-  if (uploadError) throw formatDeliverableStorageError(uploadError);
+  } catch (uploadError) {
+    throw formatDeliverableStorageError(uploadError);
+  }
 
   const { data: urlData } = supabase.storage.from(TEAM_DELIVERABLES_BUCKET).getPublicUrl(storagePath);
   const now = new Date().toISOString();
@@ -4487,14 +4484,18 @@ async function updateTeamDeliverableInDb(
           ? "application/x-7z-compressed"
           : undefined);
 
-    const { error: uploadError } = await supabase.storage
-      .from(TEAM_DELIVERABLES_BUCKET)
-      .upload(newStoragePath, input.file, {
+    try {
+      await uploadFileToStorage({
+        bucket: TEAM_DELIVERABLES_BUCKET,
+        path: newStoragePath,
+        file: input.file,
+        contentType: replaceContentType,
         cacheControl: "3600",
         upsert: false,
-        contentType: replaceContentType,
       });
-    if (uploadError) throw formatDeliverableStorageError(uploadError);
+    } catch (uploadError) {
+      throw formatDeliverableStorageError(uploadError);
+    }
 
     const { error: removeError } = await supabase.storage
       .from(TEAM_DELIVERABLES_BUCKET)

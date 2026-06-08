@@ -4,6 +4,11 @@ import { AiGeneratingIndicator } from "./AiGeneratingIndicator";
 import AppModal from "./layout/AppModal";
 import type { TeamDeliverable } from "../types";
 import {
+  isWithinTeamDeliverableLimit,
+  teamDeliverableSizeError,
+  TEAM_DELIVERABLE_MAX_LABEL,
+} from "../utils/deliverableUploadLimits";
+import {
   formatByteSize,
   zipProjectFolderExcludingDeps,
   type ProjectSourceZipProgress,
@@ -88,6 +93,10 @@ export default function TeamDeliverableSubmitModal({
     setFolderStats(null);
     const next = isFileEdit ? ([] as File[]) : [...form.files];
     for (const file of Array.from(incoming)) {
+      if (!isWithinTeamDeliverableLimit(file.size)) {
+        alert(teamDeliverableSizeError(file.name, file.size));
+        continue;
+      }
       if (!next.some((f) => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified)) {
         next.push(file);
       }
@@ -104,6 +113,9 @@ export default function TeamDeliverableSubmitModal({
       const { zipFile, stats } = await zipProjectFolderExcludingDeps(incoming, {
         onProgress: setFolderProgress,
       });
+      if (!isWithinTeamDeliverableLimit(zipFile.size)) {
+        throw new Error(teamDeliverableSizeError(zipFile.name, zipFile.size));
+      }
       setFolderStats(stats);
       update("files", [zipFile]);
       if (!form.title.trim()) {
@@ -128,6 +140,12 @@ export default function TeamDeliverableSubmitModal({
   };
 
   const handleSubmit = async () => {
+    const oversized = form.files.find((file) => !isWithinTeamDeliverableLimit(file.size));
+    if (oversized) {
+      alert(teamDeliverableSizeError(oversized.name, oversized.size));
+      return;
+    }
+
     const linkUrl = form.linkUrl.trim();
     if (isEdit) {
       if (isLinkEdit && !linkUrl) {
@@ -366,7 +384,7 @@ export default function TeamDeliverableSubmitModal({
                 !preparingFolder && (
                   <p className="text-[11px] text-[#64748b]" data-testid="team-deliverable-upload-guide">
                     프로젝트 폴더 선택 시 <strong>node_modules</strong>·<strong>.git</strong> 을 제외하고 ZIP
-                    1개로 업로드합니다. 단일 zip·pdf 등도 가능 · 합계 최대 500MB
+                    1개로 업로드합니다. 단일 zip·pdf 등도 가능 · 파일당 최대 {TEAM_DELIVERABLE_MAX_LABEL}
                   </p>
                 )
               )}
