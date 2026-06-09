@@ -192,6 +192,11 @@ async function gatherContext(supabase: ReturnType<typeof createClient>, userId: 
 
   // 팀이 하나도 없으면 빈 컨텍스트 반환 (아래 AI/초안은 "활동 없음" 문구 사용)
   if (teamIds.length === 0) {
+    const { data: soloContext } = await supabase
+      .from("ai_user_ai_context")
+      .select("report_excerpt, context_markdown")
+      .eq("user_id", userId)
+      .maybeSingle();
     return {
       user,
       teams: [] as Array<Record<string, unknown>>,
@@ -202,6 +207,8 @@ async function gatherContext(supabase: ReturnType<typeof createClient>, userId: 
       peerReviewCount: 0,
       professorStudentEvalCount: 0,
       professorProjectEvalCount: 0,
+      userReportExcerpt: soloContext?.report_excerpt?.trim() || undefined,
+      userContextMarkdown: soloContext?.context_markdown?.trim() || undefined,
     };
   }
 
@@ -216,6 +223,7 @@ async function gatherContext(supabase: ReturnType<typeof createClient>, userId: 
     profStudentResult,
     profProjectResult,
     aiMemoryResult,
+    userContextResult,
   ] = await Promise.all([
     supabase
       .from("ai_teams")
@@ -254,8 +262,13 @@ async function gatherContext(supabase: ReturnType<typeof createClient>, userId: 
       .in("team_id", teamIds),
     supabase
       .from("ai_team_detail_ai_memory")
-      .select("team_id, memory_markdown")
+      .select("team_id, memory_markdown, workspace_excerpt")
       .in("team_id", teamIds),
+    supabase
+      .from("ai_user_ai_context")
+      .select("report_excerpt, context_markdown, updated_at")
+      .eq("user_id", userId)
+      .maybeSingle(),
   ]);
 
   // 치명적 오류는 throw; "테이블 없음"은 해당 항목만 0건 처리
@@ -418,9 +431,25 @@ async function gatherContext(supabase: ReturnType<typeof createClient>, userId: 
       status: log.status,
     }));
 
+  const userContextRow =
+    userContextResult.error && isMissingRelationError(userContextResult.error)
+      ? null
+      : userContextResult.data;
+
+  const workspaceExcerptByTeam = new Map<string, string>();
+  if (!aiMemoryResult.error) {
+    for (const row of aiMemoryResult.data ?? []) {
+      const excerpt = (row.workspace_excerpt as string | null)?.trim();
+      if (excerpt) workspaceExcerptByTeam.set(row.team_id as string, excerpt);
+    }
+  }
+
   return {
     user,
-    teams,
+    teams: teams.map((t) => ({
+      ...t,
+      workspaceExcerpt: workspaceExcerptByTeam.get(t.teamId as string),
+    })),
     logs,
     deliverableCount: (deliverablesResult.data ?? []).length,
     feedbackCount: feedbackTeamIds.size,
@@ -428,6 +457,8 @@ async function gatherContext(supabase: ReturnType<typeof createClient>, userId: 
     peerReviewCount: peerRows.length,
     professorStudentEvalCount: profStudentCommentByTeam.size,
     professorProjectEvalCount: profProjectTeamIds.size,
+    userReportExcerpt: userContextRow?.report_excerpt?.trim() || undefined,
+    userContextMarkdown: userContextRow?.context_markdown?.trim() || undefined,
   };
 }
 
@@ -464,10 +495,13 @@ function buildDraftReportFromEdgeContext(ctx: EdgeGatherContext): ReportResponse
   const teamCount = ctx.teams.length;
   const logCount = ctx.logs.length;
 
+  const memorySummary = ctx.userReportExcerpt?.trim();
   const summary =
-    teamCount > 0
-      ? `${userName}님은 ${teamCount}개 팀 프로젝트에 참여했습니다. 트러블슈팅 ${logCount}건, 산출물 ${ctx.deliverableCount}건, 팀 피드백 ${ctx.feedbackCount}건, 회고록 ${ctx.retrospectiveCount}건, 동료평가 ${ctx.peerReviewCount}건, 교수 평가(학생 ${ctx.professorStudentEvalCount}팀·프로젝트 ${ctx.professorProjectEvalCount}팀)가 기록되어 있습니다.`
-      : `${userName}님의 팀 활동 기록이 아직 없습니다. 팀에 배정된 뒤 다시 생성해 보세요.`;
+    memorySummary && memorySummary.length >= 40
+      ? memorySummary
+      : teamCount > 0
+        ? `${userName}님은 ${teamCount}개 팀 프로젝트에 참여했습니다. 트러블슈팅 ${logCount}건, 산출물 ${ctx.deliverableCount}건, 팀 피드백 ${ctx.feedbackCount}건, 회고록 ${ctx.retrospectiveCount}건, 동료평가 ${ctx.peerReviewCount}건, 교수 평가(학생 ${ctx.professorStudentEvalCount}팀·프로젝트 ${ctx.professorProjectEvalCount}팀)가 기록되어 있습니다.`
+        : `${userName}님의 팀 활동 기록이 아직 없습니다. 팀에 배정된 뒤 다시 생성해 보세요.`;
 
   const problems_solved =
     logCount > 0
@@ -586,7 +620,7 @@ function buildDraftReportFromEdgeContext(ctx: EdgeGatherContext): ReportResponse
     problem_discovery_pattern,
     resolution_style,
     generated_at: new Date().toISOString(),
-    model: "draft-db-only",
+    model: memorySummary ? "memory-compact" : "draft-db-only",
   };
 }
 
@@ -595,7 +629,13 @@ const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 
 /** AI에게 넘길 JSON payload (학생 + 팀 + 로그 + 건수) */
 function buildLlmReportPayload(context: EdgeGatherContext) {
+  const memoryFirst = Boolean(context.userContextMarkdown || context.userReportExcerpt);
   return {
+    memory_first: memoryFirst,
+    pre_compacted_report_excerpt: context.userReportExcerpt ?? null,
+    pre_compacted_context: context.userContextMarkdown
+      ? truncateText(context.userContextMarkdown, 4000)
+      : null,
     student: {
       name: context.user.name,
       email: context.user.email,
@@ -606,6 +646,7 @@ function buildLlmReportPayload(context: EdgeGatherContext) {
       ...t,
       project_content: (t as Record<string, unknown>).projectContent ?? null,
       project_value: (t as Record<string, unknown>).projectValue ?? null,
+      workspace_excerpt: (t as Record<string, unknown>).workspaceExcerpt ?? null,
     })),
     troubleshooting_logs: context.logs,
     deliverable_count: context.deliverableCount,
@@ -650,7 +691,9 @@ Rules:
 - If retrospectiveFull or professorFeedbackFull fields exist in a team, prefer those over snippet fields for richer analysis.
 - If a team has project_content or project_value fields, use them as primary sources for the per_project.overview and per_project.core_value fields. These were extracted from actual uploaded documents (PDFs, slides, docs).
 - problem_discovery_pattern and resolution_style must be based on the troubleshooting_logs array.
-- If troubleshooting_logs is empty, say so honestly.`;
+- If troubleshooting_logs is empty, say so honestly.
+- If memory_first is true, treat pre_compacted_report_excerpt and pre_compacted_context as primary sources; polish and structure, do not re-expand raw lists.
+- If workspace_excerpt exists on a team, use it in per_project.overview when project_content is missing.`;
 }
 
 /** AI가 준 JSON을 ReportResponse 형태로 정리 (빈 필드는 기본값) */

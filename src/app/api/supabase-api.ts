@@ -54,6 +54,10 @@ import {
   generateAiReport as generateAiReportFromEdge,
   mapReportContextToMyPageProjects,
 } from "./ai-report";
+import {
+  compactTeamContextIfStale,
+  compactUserContextIfStale,
+} from "./ai-compact";
 import { recommendTroubleshootingFromEdge } from "./ai-troubleshooting";
 import { DEFAULT_PEER_REVIEW_GOOD_KEYWORDS } from "../constants/peerReview";
 import {
@@ -6500,5 +6504,9 @@ export const api = {
     mapToMyPageProjects: mapReportContextToMyPageProjects,
     buildMyPageReportView,
     generateReport: generateAiReportFromEdge,
+  },
+  aiCompact: {
+    compactUserIfStale: compactUserContextIfStale,
+    compactTeamIfStale: compactTeamContextIfStale,
   },
 };

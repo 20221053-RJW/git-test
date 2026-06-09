@@ -14,6 +14,7 @@ import {
   troubleshootGeminiEnabled,
 } from "../_shared/gemini-env.ts";
 import { tryReserveGeminiCall } from "../_shared/gemini-budget.ts";
+import { compactTeamContext, compactUserContext } from "../_shared/ai-compact.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,9 +25,15 @@ const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 
 type RecommendRequest = {
   teamId?: string;
+  userId?: string;
   deliverableId?: string;
   locale?: "ko" | "en";
-  intent?: "troubleshooting" | "progress-insight" | "meeting-summary";
+  intent?:
+    | "troubleshooting"
+    | "progress-insight"
+    | "meeting-summary"
+    | "compact-user-context"
+    | "compact-team-context";
 };
 
 type MeetingSummaryResponse = {
@@ -513,18 +520,22 @@ async function saveTeamAiMemory(
   teamId: string,
   memoryMarkdown: string,
   analyzedIds: Set<string>,
-  lastSummary: string
+  lastSummary: string,
+  workspaceExcerpt?: string
 ): Promise<void> {
-  const { error } = await supabase.from("ai_team_detail_ai_memory").upsert(
-    {
-      team_id: teamId,
-      memory_markdown: memoryMarkdown,
-      analyzed_deliverable_ids: Array.from(analyzedIds),
-      last_insight_summary: lastSummary,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "team_id" }
-  );
+  const payload: Record<string, unknown> = {
+    team_id: teamId,
+    memory_markdown: memoryMarkdown,
+    analyzed_deliverable_ids: Array.from(analyzedIds),
+    last_insight_summary: lastSummary,
+    updated_at: new Date().toISOString(),
+  };
+  if (workspaceExcerpt?.trim()) {
+    payload.workspace_excerpt = workspaceExcerpt.trim();
+  }
+  const { error } = await supabase.from("ai_team_detail_ai_memory").upsert(payload, {
+    onConflict: "team_id",
+  });
   if (error && !isMissingRelationError(error)) throw error;
 }
 
@@ -2095,9 +2106,23 @@ Deno.serve(async (req: Request) => {
       return jsonResponse(result);
     }
 
+    if (body.intent === "compact-user-context") {
+      const userId = body.userId?.trim();
+      if (!userId) {
+        return jsonResponse({ error: "userId is required" }, 400);
+      }
+      const result = await compactUserContext(supabase, userId, locale);
+      return jsonResponse(result);
+    }
+
     const teamId = body.teamId?.trim();
     if (!teamId) {
       return jsonResponse({ error: "teamId is required" }, 400);
+    }
+
+    if (body.intent === "compact-team-context") {
+      const result = await compactTeamContext(supabase, teamId, locale);
+      return jsonResponse(result);
     }
 
     const intent = body.intent === "progress-insight" ? "progress-insight" : "troubleshooting";
@@ -2123,7 +2148,14 @@ Deno.serve(async (req: Request) => {
             if ((row.storage_path ?? "").startsWith("link://")) nextAnalyzed.add(row.id);
           }
           const memoryMarkdown = buildMemoryMarkdown(context.team.name, rawInsight);
-          await saveTeamAiMemory(supabase, teamId, memoryMarkdown, nextAnalyzed, insight.summary);
+          await saveTeamAiMemory(
+            supabase,
+            teamId,
+            memoryMarkdown,
+            nextAnalyzed,
+            insight.summary,
+            insight.summary
+          );
           return jsonResponse({
             ...insight,
             used_memory: Boolean(memory.memory_markdown),
@@ -2149,6 +2181,7 @@ Deno.serve(async (req: Request) => {
         teamId,
         memoryMarkdownHeuristic,
         nextAnalyzedHeuristic,
+        heuristic.summary,
         heuristic.summary
       );
       return jsonResponse({

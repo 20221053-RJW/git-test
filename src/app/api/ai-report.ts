@@ -267,12 +267,15 @@ export async function gatherAiReportContext(userId: string): Promise<AiReportCon
   }
 
   const projectValueByTeam = new Map<string, string>();
+  const workspaceExcerptByTeam = new Map<string, string>();
   if (!aiMemoryResult.error) {
     for (const row of aiMemoryResult.data ?? []) {
       const teamId = row.team_id as string;
       const markdown = (row.memory_markdown as string) ?? "";
       const value = extractProjectValueFromMemoryMarkdown(markdown);
       if (value) projectValueByTeam.set(teamId, value);
+      const excerpt = (row.workspace_excerpt as string | null)?.trim();
+      if (excerpt) workspaceExcerptByTeam.set(teamId, excerpt);
     }
   }
 
@@ -534,6 +537,7 @@ export async function gatherAiReportContext(userId: string): Promise<AiReportCon
       professorProjectEvalReceived: Boolean(projectEval),
       professorFeedbackSnippet,
       projectValue: projectValueByTeam.get(team.id),
+      workspaceExcerpt: workspaceExcerptByTeam.get(team.id),
     };
   });
 
@@ -563,6 +567,9 @@ export async function gatherAiReportContext(userId: string): Promise<AiReportCon
       .filter((name): name is string => Boolean(name?.trim())),
     userContextExcerpt: userContextRow?.report_excerpt?.trim() || undefined,
     userContextMarkdown: userContextRow?.context_markdown?.trim() || undefined,
+    userContextUpdatedAt: userContextRow?.updated_at
+      ? String(userContextRow.updated_at)
+      : undefined,
   };
 }
 
@@ -858,9 +865,11 @@ export function mapReportContextToMyPageProjects(context: AiReportContext): MyPa
             ? ["산출물 업로드"]
             : [],
       insights:
-        team.peerReviewReceivedSnippet
-          ? `동료평가 수신: ${team.peerReviewReceivedSnippet}`
-          : "참여 팀·트러블슈팅·산출물·협업 제출 메타를 자동 집계한 카드입니다.",
+        team.workspaceExcerpt?.trim()
+          ? team.workspaceExcerpt.trim()
+          : team.peerReviewReceivedSnippet
+            ? `동료평가 수신: ${team.peerReviewReceivedSnippet}`
+            : "참여 팀·트러블슈팅·산출물·협업 제출 메타를 자동 집계한 카드입니다.",
       peerReviews:
         team.peerReviewsReceived.length > 0
           ? team.peerReviewsReceived

@@ -359,6 +359,8 @@ export default function TeamDetailPage() {
       setProgressInsight(null);
 
       try {
+        void api.aiCompact.compactTeamIfStale(selectedTeamId);
+
         const cached = await loadCachedTeamProgressInsight(selectedTeamId);
         if (cancelled) return;
         if (cached) {

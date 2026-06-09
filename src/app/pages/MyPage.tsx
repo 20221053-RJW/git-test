@@ -160,10 +160,14 @@ export default function MyPage() {
     setReportLoadError(null);
     api.aiReport
       .gatherContext(user.id)
-      .then((ctx) => {
-        if (!cancelled) {
-          setReportContext(ctx);
-          setReportLoadError(null);
+      .then(async (ctx) => {
+        if (cancelled) return;
+        setReportContext(ctx);
+        setReportLoadError(null);
+        const compacted = await api.aiCompact.compactUserIfStale(ctx);
+        if (compacted && !cancelled) {
+          const refreshed = await api.aiReport.gatherContext(user.id);
+          if (!cancelled) setReportContext(refreshed);
         }
       })
       .catch((err) => {

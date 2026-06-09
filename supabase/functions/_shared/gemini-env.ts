@@ -5,6 +5,7 @@ export const MEETING_SUMMARY_USE_GEMINI_SECRET = "MEETING_SUMMARY_USE_GEMINI";
 export const AI_REPORT_USE_GEMINI_SECRET = "AI_REPORT_USE_GEMINI";
 export const AI_PROGRESS_USE_GEMINI_SECRET = "AI_PROGRESS_USE_GEMINI";
 export const AI_TROUBLESHOOT_USE_GEMINI_SECRET = "AI_TROUBLESHOOT_USE_GEMINI";
+export const AI_COMPACT_USE_GEMINI_SECRET = "AI_COMPACT_USE_GEMINI";
 export const AI_DAILY_GEMINI_BUDGET_SECRET = "AI_DAILY_GEMINI_BUDGET";
 
 export function readGeminiApiKey(): string | undefined {
@@ -39,6 +40,11 @@ export function progressInsightGeminiEnabled(): boolean {
 /** 트러블슈팅 추천 — 무료 티어 기본 off */
 export function troubleshootGeminiEnabled(): boolean {
   return readBooleanSecret(AI_TROUBLESHOOT_USE_GEMINI_SECRET, false);
+}
+
+/** Compaction Agent — 증분 압축 시 Gemini (기본 off, 휴리스틱 폴백 항상 가능) */
+export function compactGeminiEnabled(): boolean {
+  return readBooleanSecret(AI_COMPACT_USE_GEMINI_SECRET, false);
 }
 
 export function readDailyGeminiBudget(): number {

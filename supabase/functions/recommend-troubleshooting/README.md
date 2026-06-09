@@ -17,6 +17,8 @@ supabase functions deploy recommend-troubleshooting
 | (생략) `troubleshooting` | 다음 조사할 문제 제안 | `ai-troubleshooting.ts` |
 | `progress-insight` | 진행 요약·기억 저장 | `ai-team-progress.ts` |
 | `meeting-summary` | 회의록 PDF/문서 1~2문장 요약 | `ai-meeting-minutes.ts` |
+| `compact-user-context` | 학생별 압축 컨텍스트 (`ai_user_ai_context`) | `ai-compact.ts` |
+| `compact-team-context` | 팀 워크스페이스 요약 (`workspace_excerpt`) | `ai-compact.ts` |
 
 ### progress-insight
 
@@ -38,6 +40,7 @@ supabase functions deploy recommend-troubleshooting
 | `AI_PROGRESS_USE_GEMINI` | `true`일 때만 progress-insight에 Gemini (기본 off) |
 | `AI_TROUBLESHOOT_USE_GEMINI` | `true`일 때만 troubleshooting에 Gemini (기본 off) |
 | `AI_DAILY_GEMINI_BUDGET` | 일일 호출 상한 (기본 `120`) |
+| `AI_COMPACT_USE_GEMINI` | `true`일 때만 Compaction Agent에 Gemini (기본 off, 휴리스틱 항상 가능) |
 
 키 없음: troubleshooting → `draft-db-only` 200 · progress-insight → `heuristic-insight` 200 · meeting-summary → 휴리스틱 폴백
 

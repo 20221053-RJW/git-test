@@ -92,6 +92,8 @@ export interface AiReportTeamSnapshot {
   professorFeedbackSnippet?: string;
   /** AI가 산출물·트러블슈팅 분석 후 추출한 프로젝트 핵심 가치 */
   projectValue?: string;
+  /** ai_team_detail_ai_memory.workspace_excerpt (Compaction Agent) */
+  workspaceExcerpt?: string;
 }
 
 /** 리포트 3페이지용 트러블슈팅 사례 (DB 로그 기반) */
@@ -133,4 +135,6 @@ export interface AiReportContext {
   userContextExcerpt?: string;
   /** ai_user_ai_context.context_markdown 전체 */
   userContextMarkdown?: string;
+  /** ai_user_ai_context.updated_at — stale 판별용 */
+  userContextUpdatedAt?: string;
 }
