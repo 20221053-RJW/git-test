@@ -85,6 +85,21 @@ export function nameToAvatarInitial(name: string): string {
   return trimmed ? trimmed.slice(0, 1) : "?";
 }
 
+/** `ai_users.image` 등 — avatar(이니셜)와 구분해 실제 URL만 허용 */
+export function isLikelyImageUrl(value: string | null | undefined): boolean {
+  const trimmed = value?.trim();
+  if (!trimmed) return false;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return true;
+  if (trimmed.startsWith("data:image/")) return true;
+  if (trimmed.startsWith("/")) return true;
+  return false;
+}
+
+export function resolveProfileImageUrl(image: string | null | undefined): string | undefined {
+  const trimmed = image?.trim();
+  return trimmed && isLikelyImageUrl(trimmed) ? trimmed : undefined;
+}
+
 export function normalizeStudentTags(tags: string[], skills?: string[]): string[] {
   const fromSkills = (skills ?? []).map((skill) =>
     skill.startsWith("#") ? skill : `#${skill}`,

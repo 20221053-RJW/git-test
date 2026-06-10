@@ -4,10 +4,6 @@
 INSERT INTO ai_team_detail_peer_reviews (
   id, team_id, reviewer_user_id, teammate_id, good_keywords, bad_keywords, comment, contribution_rating, updated_at
 ) VALUES
-  ('pr-cc-kim-lee', 'team-swe-schedule', '673b60f9-3c6c-4ed4-847a-e24536c472a5', 'a355e683-3699-4b79-9673-6ac2c7f313cd',
-   '["협업","UI"]'::jsonb, '[]'::jsonb, '동료평가 화면과 채팅 연동을 꼼꼼히 챙겨줬습니다.', 4, '2025-12-10 10:00:00+00'),
-  ('pr-cc-lee-kim', 'team-swe-schedule', 'a355e683-3699-4b79-9673-6ac2c7f313cd', '673b60f9-3c6c-4ed4-847a-e24536c472a5',
-   '["디자인을 잘 해요","문서화를 잘 해요"]'::jsonb, '[]'::jsonb, '서비스 방향을 명확히 잡고 회의·기획 문서를 잘 정리해 팀 진행을 안정화했습니다.', 5, '2025-12-10 10:05:00+00'),
   ('pr-cc-park-kim', 'team-swe-schedule', '5f2a9b43-f497-4d7d-8053-c051a3bba96e', '673b60f9-3c6c-4ed4-847a-e24536c472a5',
    '["다시 팀하고 싶어요","문제해결"]'::jsonb, '[]'::jsonb, '기획 단계 의견 충돌 시 중재하고 개발 일정에 맞춰 디자인을 빠르게 수정해 줬습니다.', 5, '2025-12-11 09:00:00+00'),
   ('pr-cc-kim-park', 'team-swe-schedule', '673b60f9-3c6c-4ed4-847a-e24536c472a5', '5f2a9b43-f497-4d7d-8053-c051a3bba96e',

@@ -75,7 +75,7 @@ import {
 import { uploadFileToStorage } from "../utils/storageResumableUpload";
 import { defaultNewCourseDates } from "../utils/courseDates";
 import { buildPeerEvaluationSummary } from "../utils/peerEvaluationSummary";
-import { parsePortfolioFile, serializePortfolioFile } from "../utils/studentNetworkDisplay";
+import { parsePortfolioFile, resolveProfileImageUrl, serializePortfolioFile } from "../utils/studentNetworkDisplay";
 import {
   appendMeetingSummaryLine,
   isMeetingMinutesDeliverable,
@@ -142,9 +142,8 @@ type CourseQueryOptions = {
   status?: CourseStatus | "all";
 };
 
-function resolveUserImageUrl(user: Pick<AiUser, "image" | "avatar">): string | undefined {
-  const url = user.image?.trim() || user.avatar?.trim();
-  return url || undefined;
+function resolveUserImageUrl(user: Pick<AiUser, "image">): string | undefined {
+  return resolveProfileImageUrl(user.image);
 }
 
 function toStudentProfile(user: AiUser): StudentProfile {

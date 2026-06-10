@@ -23,6 +23,7 @@ import {
   displayMajor,
   nameToAvatarInitial,
   normalizeStudentTags,
+  isLikelyImageUrl,
   resolveStudentExtra,
   tagsFromEditHints,
   type ResolvedStudentExtra,
@@ -313,10 +314,11 @@ function StudentAvatar({ student, size = "md" }: { student: Student; size?: "sm"
   const sizeClass = size === "sm" ? "w-10 h-10" : size === "lg" ? "w-20 h-20" : "w-16 h-16";
   const textClass = size === "sm" ? "text-base" : size === "lg" ? "text-3xl" : "text-2xl";
   const initial = student.avatar?.trim() || nameToAvatarInitial(student.name);
-  if (student.image) {
+  const imageUrl = student.image?.trim();
+  if (imageUrl && isLikelyImageUrl(imageUrl)) {
     return (
       <div className={`${sizeClass} rounded-full overflow-hidden flex-shrink-0`}>
-        <img src={student.image} alt={student.name} className="w-full h-full object-cover" />
+        <img src={imageUrl} alt={student.name} className="w-full h-full object-cover" />
       </div>
     );
   }
@@ -1220,7 +1222,7 @@ function StudentCard({
         }`}
       >
         <p
-          className={`break-keep text-xs text-center leading-[1.6] ${
+          className={`line-clamp-3 break-keep text-xs text-center leading-[1.6] ${
             bioIsPlaceholder ? "text-[#9ca3af] italic" : "text-[#1c398e]"
           }`}
         >
