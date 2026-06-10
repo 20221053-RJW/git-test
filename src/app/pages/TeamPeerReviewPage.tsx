@@ -110,7 +110,7 @@ export default function TeamPeerReviewPage() {
         submitted: true,
       },
     }));
-    alert("동료평가가 성공적으로 반영되었습니다.");
+    alert("동료 피드백이 성공적으로 반영되었습니다.");
   };
 
   const handleSubmitPeerReview = async (memberId: string) => {
@@ -137,9 +137,9 @@ export default function TeamPeerReviewPage() {
           return;
         }
       } catch (verifyError) {
-        console.warn("동료평가 저장 확인 실패:", verifyError);
+        console.warn("동료 피드백 저장 확인 실패:", verifyError);
       }
-      alert(error instanceof Error ? error.message : "동료평가 저장에 실패했습니다.");
+      alert(error instanceof Error ? error.message : "동료 피드백 저장에 실패했습니다.");
     } finally {
       setSubmittingPeerReviewId(null);
     }

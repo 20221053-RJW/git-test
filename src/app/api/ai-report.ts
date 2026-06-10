@@ -107,6 +107,54 @@ function flattenRetrospectiveSnippet(sections: unknown): string {
   return truncateSnippet(parts.join(" · "), 200);
 }
 
+const RETROSPECTIVE_MY_EXPERIENCE_LABELS: Record<
+  (typeof RETROSPECTIVE_SECTION_KEYS)[number],
+  string
+> = {
+  role: "역할",
+  strengths: "잘한 점",
+  regrets: "아쉬운 점",
+  growth: "발전한 점",
+};
+
+function patchPerProjectMyExperienceFromRetrospective(
+  context: AiReportContext,
+  details: Record<string, AiReportPerProject>
+): void {
+  for (const team of context.teams) {
+    const experience = buildMyExperienceFromRetrospective(team.retrospectiveSections);
+    if (!experience) continue;
+    const existing = details[team.teamId];
+    if (existing) {
+      details[team.teamId] = { ...existing, my_experience: experience };
+    } else {
+      details[team.teamId] = {
+        team_id: team.teamId,
+        project_title: team.projectTitle,
+        overview: `${team.courseName}에서 진행한 ${team.projectTitle}.`,
+        core_value: team.retrospectiveSnippet ?? "",
+        my_experience: experience,
+        eval_summary: "",
+      };
+    }
+  }
+}
+
+/** vision #165 — 회고록 직접입력 4섹션을 「내가 한 경험」 문단으로 합성 */
+export function buildMyExperienceFromRetrospective(sections: unknown): string {
+  if (!sections || typeof sections !== "object") return "";
+  const record = sections as Record<string, unknown>;
+  const parts: string[] = [];
+  for (const key of RETROSPECTIVE_SECTION_KEYS) {
+    const section = record[key];
+    if (!section || typeof section !== "object") continue;
+    const content = section as Record<string, unknown>;
+    const custom = typeof content.custom === "string" ? content.custom.trim() : "";
+    if (custom) parts.push(`${RETROSPECTIVE_MY_EXPERIENCE_LABELS[key]}: ${custom}`);
+  }
+  return parts.join(" · ");
+}
+
 function hasProjectEvalContent(row: {
   completion_comment?: string | null;
   problem_solving_comment?: string | null;
@@ -383,6 +431,7 @@ export async function gatherAiReportContext(userId: string): Promise<AiReportCon
     includedTeamIds.has(row.team_id)
   );
   const retroSnippetByTeam = new Map<string, string>();
+  const retroSectionsByTeam = new Map<string, unknown>();
   const retroTeamIds = new Set<string>();
   for (const row of retroRows) {
     const tid = row.team_id as string;
@@ -392,6 +441,9 @@ export async function gatherAiReportContext(userId: string): Promise<AiReportCon
       retroSnippetByTeam.set(tid, snippet);
     } else if (row.sections && typeof row.sections === "object") {
       retroTeamIds.add(tid);
+    }
+    if (row.sections && typeof row.sections === "object") {
+      retroSectionsByTeam.set(tid, row.sections);
     }
   }
   const peerRows = (peerResult.error ? [] : (peerResult.data ?? [])).filter((row) =>
@@ -529,6 +581,7 @@ export async function gatherAiReportContext(userId: string): Promise<AiReportCon
       feedbackSnippet: feedbackSnippetByTeam.get(team.id),
       retrospectiveSubmitted: retroTeamIds.has(team.id),
       retrospectiveSnippet: retroSnippetByTeam.get(team.id),
+      retrospectiveSections: retroSectionsByTeam.get(team.id),
       peerReviewsSubmitted: peerCountByTeam.get(team.id) ?? 0,
       peerReviewSnippet: peerSnippetByTeam.get(team.id),
       peerReviewsReceived: peerReceivedKeywordsByTeam.get(team.id) ?? [],
@@ -1052,6 +1105,7 @@ export function buildMyPageReportView(
       if (match) perProjectDetails[team.teamId] = match;
     }
   }
+  patchPerProjectMyExperienceFromRetrospective(context, perProjectDetails);
 
   const aiCases = mapAiProblemsToCases(context, effective.problems_solved);
   const troubleshootingCases =
@@ -1116,7 +1170,9 @@ export function buildDraftReportFromContext(
         : t.retrospectiveSnippet
           ? t.retrospectiveSnippet
           : `트러블슈팅 ${t.troubleshootingCount}건 해결을 통한 실전 경험 축적.`,
-      my_experience: `역할: ${t.memberRole}. 트러블슈팅 ${t.troubleshootingCount}건, 산출물 ${t.deliverableCount}건 기여.${t.feedbackSnippet ? ` 팀 피드백: ${t.feedbackSnippet}` : ""}`,
+      my_experience:
+        buildMyExperienceFromRetrospective(t.retrospectiveSections) ||
+        `역할: ${t.memberRole}. 트러블슈팅 ${t.troubleshootingCount}건, 산출물 ${t.deliverableCount}건 기여.${t.feedbackSnippet ? ` 팀 피드백: ${t.feedbackSnippet}` : ""}`,
       eval_summary: evalParts.length > 0 ? evalParts.join(" / ") : "평가 기록 없음.",
     };
   });

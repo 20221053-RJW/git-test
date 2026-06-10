@@ -13,7 +13,7 @@ const TITLE_BY_PATH: Array<{ match: (path: string) => boolean; title: string }> 
   { match: (p) => p.endsWith("/teams"), title: "팀 목록" },
   { match: (p) => p.includes("/students"), title: "수강생 네트워크" },
   { match: (p) => p.includes("/announcements"), title: "공지사항" },
-  { match: (p) => p.includes("/peer-reviews"), title: "동료평가" },
+  { match: (p) => p.includes("/peer-reviews"), title: "동료 피드백" },
   { match: (p) => p.includes("/my-team/manage"), title: "팀 관리" },
   { match: (p) => p.startsWith("/app/courses/"), title: "수업" },
 ];

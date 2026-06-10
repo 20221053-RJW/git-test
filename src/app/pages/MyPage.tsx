@@ -552,7 +552,7 @@ export default function MyPage() {
                 ) : null}
                 {user?.role === "student" ? (
                   <div className="space-y-1 sm:col-span-2">
-                    <p className="m3-label-large text-[var(--cc-on-surface-variant)]">동료평가 한줄 요약</p>
+                    <p className="m3-label-large text-[var(--cc-on-surface-variant)]">동료 피드백 한줄 요약</p>
                     <div className="rounded-[var(--m3-shape-medium)] border border-[#bedbff] bg-[#eff6ff] px-4 py-3">
                       {myPeerSummary ? (
                         <>
@@ -561,7 +561,7 @@ export default function MyPage() {
                         </>
                       ) : (
                         <p className="text-xs text-[#64748b]">
-                          동료 평가가 쌓이면 전체 수업 기준 한줄 요약이 표시됩니다.
+                          동료 피드백이 쌓이면 전체 수업 기준 한줄 요약이 표시됩니다.
                         </p>
                       )}
                     </div>
@@ -719,7 +719,7 @@ export default function MyPage() {
                   팀 프로젝트 종합 역량 리포트
                 </h2>
                 <p className="mt-2 max-w-xl text-[11px] leading-5 text-slate-300">
-                  수강 이력, 팀 배정, 프로젝트 산출물, 트러블슈팅 로그, 동료평가, 교수 피드백을 종합하여
+                  수강 이력, 팀 배정, 프로젝트 산출물, 트러블슈팅 로그, 동료 피드백, 교수 피드백을 종합하여
                   학생의 수행 역량과 성장 가능성을 정리한 요약 보고서입니다.
                 </p>
               </div>
@@ -817,7 +817,7 @@ export default function MyPage() {
                       </div>
 
                       <div>
-                        <p className="text-[10px] font-black text-[#155dfc]">동료들의 평가</p>
+                        <p className="text-[10px] font-black text-[#155dfc]">동료들의 피드백</p>
                         {allPeerKeywords.length > 0 ? (
                           <div className="mt-1.5 flex flex-wrap gap-1.5">
                             {allPeerKeywords.map((kw) => (
@@ -831,7 +831,7 @@ export default function MyPage() {
                           </div>
                         ) : (
                           <p className="mt-1.5 text-[11px] text-[#64748b]">
-                            동료 평가가 쌓이면 여기에 표시됩니다.
+                            동료 피드백이 쌓이면 여기에 표시됩니다.
                           </p>
                         )}
                       </div>
@@ -997,13 +997,13 @@ export default function MyPage() {
                               )}
                               {team.peerReviewsSubmitted > 0 && (
                                 <span className="rounded-full bg-[#f5f3ff] px-2 py-0.5 text-[9px] font-bold text-[#6d28d9]">
-                                  동료평가 {team.peerReviewsSubmitted}
+                                  동료 피드백 {team.peerReviewsSubmitted}
                                 </span>
                               )}
                               {(team.professorStudentEvalReceived ||
                                 team.professorProjectEvalReceived) && (
                                 <span className="rounded-full bg-[#fff7ed] px-2 py-0.5 text-[9px] font-bold text-[#c2410c]">
-                                  교수평가 ✓
+                                  교수 피드백 ✓
                                 </span>
                               )}
                             </p>
@@ -1175,7 +1175,7 @@ export default function MyPage() {
             <p className="text-[11px] font-black text-[#155dfc]">PROFESSOR DASHBOARD</p>
             <h2 className="mt-2 text-[22px] font-black text-[#0f172a]">교수 마이페이지</h2>
             <p className="mt-3 text-[13px] leading-6 text-[#475569]">
-              학생용 팀플 리포트는 학생 계정에서만 열람할 수 있습니다. 아래에서 소속·연구 정보를 확인하고 수업·평가
+              학생용 팀플 리포트는 학생 계정에서만 열람할 수 있습니다. 아래에서 소속·연구 정보를 확인하고 수업·피드백
               메뉴로 이동하세요.
             </p>
             <dl className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -1323,7 +1323,7 @@ export default function MyPage() {
             )}
             {selectedReportTeam.peerReviewsReceived.length > 0 && (
               <div>
-                <p className="mb-2 text-sm font-bold text-[#101828]">받은 동료평가</p>
+                <p className="mb-2 text-sm font-bold text-[#101828]">받은 동료 피드백</p>
                 <div className="flex flex-wrap gap-2">
                   {selectedReportTeam.peerReviewsReceived.map((review) => (
                     <span
@@ -1338,7 +1338,7 @@ export default function MyPage() {
             )}
             {selectedReportTeam.professorFeedbackSnippet && (
               <div className="rounded-xl border border-[#e5e7eb] bg-[#f8fafc] p-4">
-                <p className="mb-1 text-sm font-bold text-[#101828]">교수 평가</p>
+                <p className="mb-1 text-sm font-bold text-[#101828]">교수 피드백</p>
                 <p className="text-sm leading-relaxed text-[#475569]">
                   {selectedReportTeam.professorFeedbackSnippet}
                 </p>
@@ -1357,7 +1357,7 @@ export default function MyPage() {
                     <p className="text-sm leading-relaxed text-[#4c1d95]">{detail.my_experience}</p>
                   </div>
                   <div className="rounded-xl border border-[#fef3c7] bg-[#fffbeb] p-4">
-                    <p className="mb-1 text-[10px] font-black text-[#92400e]">동료·교수 평가 요약</p>
+                    <p className="mb-1 text-[10px] font-black text-[#92400e]">동료·교수 피드백 요약</p>
                     <p className="text-sm leading-relaxed text-[#78350f]">{detail.eval_summary}</p>
                   </div>
                 </div>
@@ -1469,9 +1469,9 @@ export default function MyPage() {
                 </p>
               </div>
 
-              {/* 동료평가 */}
+              {/* 동료 피드백 */}
               <div className="bg-[#eff6ff] rounded-[10px] p-6">
-                <h4 className="text-[20px] font-bold text-[#101828] mb-4">동료평가</h4>
+                <h4 className="text-[20px] font-bold text-[#101828] mb-4">동료 피드백</h4>
                 <div className="flex flex-wrap gap-3">
                   {selectedProject.peerReviews.map((review, i) => (
                     <div
@@ -1492,9 +1492,9 @@ export default function MyPage() {
                 </div>
               </div>
 
-              {/* 교수평가 */}
+              {/* 교수 피드백 */}
               <div className="bg-[#eff6ff] rounded-[10px] p-6">
-                <h4 className="text-[20px] font-bold text-[#101828] mb-4">교수평가</h4>
+                <h4 className="text-[20px] font-bold text-[#101828] mb-4">교수 피드백</h4>
                 <div className="bg-white rounded-[10px] shadow-[2px_4px_4px_2px_rgba(0,0,0,0.15)] px-6 py-4">
                   <p className="text-[17px] font-medium text-black leading-relaxed">
                     {selectedProject.professorReview}

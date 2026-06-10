@@ -92,18 +92,22 @@ export default function TeamRetrospectivePage() {
       <div className="space-y-6">
         {(
           [
-            { key: "role" as const, title: "본인이 한 역할" },
-            { key: "strengths" as const, title: "잘한점" },
-            { key: "regrets" as const, title: "아쉬운 점" },
-            { key: "growth" as const, title: "발전한 점" },
+            { key: "role" as const, title: "본인이 한 역할", showAuto: false },
+            { key: "strengths" as const, title: "잘한점", showAuto: true },
+            { key: "regrets" as const, title: "아쉬운 점", showAuto: false },
+            { key: "growth" as const, title: "발전한 점", showAuto: false },
           ] as const
-        ).map(({ key, title }) => (
+        ).map(({ key, title, showAuto }) => (
           <div key={key} className="rounded-[10px] bg-[#eff6ff] p-6 shadow-md">
             <p className="mb-4 text-xl font-medium text-black">{title}</p>
-            <div className="mb-4 rounded bg-white p-4 shadow">
-              <p className="mb-2 text-sm font-semibold text-black">자동연동</p>
-              <p className="whitespace-pre-wrap text-sm text-black">{retrospectiveSections[key].auto || "—"}</p>
-            </div>
+            {showAuto && (
+              <div className="mb-4 rounded bg-white p-4 shadow">
+                <p className="mb-2 text-sm font-semibold text-black">자동연동 (트러블슈팅)</p>
+                <p className="whitespace-pre-wrap text-sm text-black">
+                  {retrospectiveSections[key].auto || "—"}
+                </p>
+              </div>
+            )}
             <div className="rounded bg-white p-4 shadow">
               <p className="mb-2 text-sm font-semibold text-black">직접입력</p>
               <input

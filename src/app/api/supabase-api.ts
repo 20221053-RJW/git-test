@@ -3263,36 +3263,34 @@ export function buildRetrospectiveAutoHints(
 ): Record<(typeof RETROSPECTIVE_SECTION_KEYS)[number], string> {
   const mine = logs.filter((log) => log.author === authorName);
   const resolved = mine.filter((log) => log.status === "resolved");
-  const open = mine.filter((log) => log.status !== "resolved");
 
-  const roleFromResolved = resolved
-    .map((log) => log.problem)
+  const strengthLines = resolved
+    .map((log) => {
+      const problem = log.problem?.trim();
+      const solution = (log.solution || log.plan)?.trim();
+      if (problem && solution) return `${problem} → ${solution}`;
+      return problem || solution || "";
+    })
     .filter(Boolean)
-    .slice(0, 3)
-    .join(" / ");
-  const roleFromOpen = open
-    .map((log) => log.problem)
-    .filter(Boolean)
-    .slice(0, 2)
-    .join(" / ");
+    .slice(0, 3);
 
   return {
-    role: roleFromResolved || roleFromOpen || "등록한 트러블슈팅이 없습니다.",
-    strengths: resolved.length
-      ? resolved
-          .map((log) => log.solution || log.plan)
-          .filter(Boolean)
-          .slice(0, 2)
-          .join(" / ")
-      : "—",
-    regrets: open.length
-      ? open
-          .map((log) => log.problem)
-          .filter(Boolean)
-          .slice(0, 2)
-          .join(" / ")
-      : "—",
-    growth: resolved.length ? `문제 해결 완료 ${resolved.length}건` : "—",
+    role: "",
+    strengths: strengthLines.length > 0 ? strengthLines.join("\n") : "—",
+    regrets: "",
+    growth: "",
+  };
+}
+
+function mergeRetrospectiveWithFreshAuto(
+  saved: TeamRetrospectiveSections,
+  auto: Record<(typeof RETROSPECTIVE_SECTION_KEYS)[number], string>
+): TeamRetrospectiveSections {
+  return {
+    role: { auto: "", custom: saved.role.custom },
+    strengths: { auto: auto.strengths, custom: saved.strengths.custom },
+    regrets: { auto: "", custom: saved.regrets.custom },
+    growth: { auto: "", custom: saved.growth.custom },
   };
 }
 
@@ -3348,12 +3346,15 @@ async function getTeamRetrospectiveDraftFromDb(
 
   if (data) {
     return {
-      sections: parseRetrospectiveSections((data as TeamRetrospectiveRow).sections),
+      sections: mergeRetrospectiveWithFreshAuto(
+        parseRetrospectiveSections((data as TeamRetrospectiveRow).sections),
+        auto
+      ),
       submitted: true,
     };
   }
 
-  return { sections: sectionsFromAutoHints(auto), submitted: false };
+  return { sections: mergeRetrospectiveWithFreshAuto(sectionsFromAutoHints(auto), auto), submitted: false };
 }
 
 async function submitTeamRetrospectiveInDb(
@@ -4001,11 +4002,15 @@ async function submitPeerReviewInDb(
     throw error;
   }
 
-  await adjustMannerTemperatureFromPeerReview(
-    teammateId,
-    goodKeywords.length * POSITIVE_PEER_REVIEW_DELTA,
-    badKeywords.length * NEGATIVE_PEER_REVIEW_DELTA
-  );
+  try {
+    await adjustMannerTemperatureFromPeerReview(
+      teammateId,
+      goodKeywords.length * POSITIVE_PEER_REVIEW_DELTA,
+      badKeywords.length * NEGATIVE_PEER_REVIEW_DELTA
+    );
+  } catch (mannerError) {
+    console.warn("동료 피드백 저장 후 manner temperature 반영 실패:", mannerError);
+  }
 }
 
 async function adjustMannerTemperatureFromPeerReview(

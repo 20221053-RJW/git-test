@@ -413,17 +413,52 @@ export default function TeamDetailPage() {
 
   const handleSaveStudentEvals = async () => {
     if (!selectedTeamId || savingProfessorEval) return;
+    const entries = Object.entries(studentEvalInputs).filter(([, comment]) => comment.trim());
+    if (entries.length === 0) {
+      setShowStudentEvalModal(false);
+      return;
+    }
     setSavingProfessorEval(true);
     try {
-      await Promise.all(
-        Object.entries(studentEvalInputs).map(([studentRowId, comment]) =>
+      const results = await Promise.allSettled(
+        entries.map(([studentRowId, comment]) =>
           api.teamDetail.saveProfessorStudentEval(selectedTeamId, studentRowId, comment)
         )
       );
-      setShowStudentEvalModal(false);
+      const rejected = results.filter((result) => result.status === "rejected");
+      if (rejected.length === 0) {
+        setShowStudentEvalModal(false);
+        return;
+      }
+      const saved = await api.teamDetail.getProfessorStudentEvals(selectedTeamId);
+      const allPersisted = entries.every(
+        ([studentRowId, comment]) => (saved[studentRowId] ?? "").trim() === comment.trim()
+      );
+      if (allPersisted) {
+        setShowStudentEvalModal(false);
+        return;
+      }
+      const firstError = rejected[0];
+      const message =
+        firstError.status === "rejected" && firstError.reason instanceof Error
+          ? firstError.reason.message
+          : "학생 피드백 저장에 실패했습니다.";
+      alert(message);
     } catch (error) {
       console.error(error);
-      alert(error instanceof Error ? error.message : "학생 평가 저장에 실패했습니다.");
+      try {
+        const saved = await api.teamDetail.getProfessorStudentEvals(selectedTeamId);
+        const allPersisted = entries.every(
+          ([studentRowId, comment]) => (saved[studentRowId] ?? "").trim() === comment.trim()
+        );
+        if (allPersisted) {
+          setShowStudentEvalModal(false);
+          return;
+        }
+      } catch (verifyError) {
+        console.warn("학생 피드백 저장 확인 실패:", verifyError);
+      }
+      alert(error instanceof Error ? error.message : "학생 피드백 저장에 실패했습니다.");
     } finally {
       setSavingProfessorEval(false);
     }
@@ -437,7 +472,7 @@ export default function TeamDetailPage() {
       setShowEvalModal(false);
     } catch (error) {
       console.error(error);
-      alert(error instanceof Error ? error.message : "프로젝트 평가 저장에 실패했습니다.");
+      alert(error instanceof Error ? error.message : "프로젝트 피드백 저장에 실패했습니다.");
     } finally {
       setSavingProfessorEval(false);
     }
@@ -746,7 +781,7 @@ export default function TeamDetailPage() {
           return next;
         });
       } else {
-        console.warn("평가 대상 학생 로드 실패:", reviewStudentsResult.reason);
+        console.warn("피드백 대상 학생 로드 실패:", reviewStudentsResult.reason);
       }
 
       if (troubleshootingLogsResult.status === "fulfilled") {
@@ -835,7 +870,7 @@ export default function TeamDetailPage() {
         setProjectEval(savedProjectEval);
       })
       .catch((error) => {
-        console.warn("교수 평가 초안 로드 실패:", error);
+        console.warn("교수 피드백 초안 로드 실패:", error);
       });
   }, [selectedTeamId, isProfessor, isAdmin]);
 
@@ -889,10 +924,10 @@ export default function TeamDetailPage() {
     isProfessor && isEvaluationOpen ? (
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <M3Button variant="outlined" type="button" onClick={() => setShowStudentEvalModal(true)}>
-          학생 평가
+          학생 피드백
         </M3Button>
         <M3Button variant="filled" type="button" onClick={() => setShowEvalModal(true)}>
-          프로젝트 평가
+          프로젝트 피드백
         </M3Button>
         {courseId ? (
           <M3Button
@@ -900,13 +935,13 @@ export default function TeamDetailPage() {
             to={`/app/courses/${courseId}/peer-reviews`}
             data-testid="course-peer-reviews-overview-link"
           >
-            동료평가 전체
+            동료 피드백 전체
           </M3Button>
         ) : null}
       </div>
     ) : isProfessor ? (
       <span className="m3-body-medium cc-badge-warning inline-flex items-center rounded-[var(--m3-shape-medium)] px-4 py-2 font-medium">
-        수업 종료 후 평가 가능
+        수업 종료 후 피드백 가능
       </span>
     ) : isStudent && isEvaluationOpen ? (
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -916,7 +951,7 @@ export default function TeamDetailPage() {
           onClick={() => setShowPeerReviewModal(true)}
           data-testid="team-peer-review-modal-open"
         >
-          조원평가
+          조원 피드백
         </M3Button>
         <M3Button
           variant="filled"
@@ -1628,13 +1663,13 @@ export default function TeamDetailPage() {
         open={Boolean(isProfessor && isEvaluationOpen && showEvalModal)}
         onClose={() => setShowEvalModal(false)}
         testId="professor-project-eval-modal-overlay"
-        ariaLabel="학생 및 프로젝트 평가"
+        ariaLabel="학생 및 프로젝트 피드백"
         panelClassName="!p-0 relative max-w-[1191px] w-full overflow-y-auto rounded-[10px] shadow-2xl"
       >
             {/* 헤더 */}
             <div className="sticky top-0 bg-white flex justify-between items-center p-6 border-b border-gray-200 rounded-t-[10px] z-10">
               <h2 className="text-xl font-bold text-black sm:text-2xl">
-                학생 및 프로젝트 평가
+                학생 및 프로젝트 피드백
               </h2>
               <button
                 onClick={() => setShowEvalModal(false)}
@@ -1665,7 +1700,7 @@ export default function TeamDetailPage() {
                           completionComment: e.target.value,
                         }))
                       }
-                      placeholder="평가를 입력하세요."
+                      placeholder="피드백을 입력하세요."
                       data-testid="professor-eval-completion"
                       className="w-full h-[96px] text-[17px] text-[#595959] placeholder:text-[#595959] outline-none resize-none"
                     />
@@ -1715,7 +1750,7 @@ export default function TeamDetailPage() {
                           problemSolvingComment: e.target.value,
                         }))
                       }
-                      placeholder="평가를 입력하세요."
+                      placeholder="피드백을 입력하세요."
                       data-testid="professor-eval-problem-solving"
                       className="w-full h-[98px] text-[17px] text-[#595959] placeholder:text-[#595959] outline-none resize-none"
                     />
@@ -1723,10 +1758,10 @@ export default function TeamDetailPage() {
                 </div>
               </div>
 
-              {/* 3. 총체적 평가 */}
+              {/* 3. 총체적 피드백 */}
               <div className="space-y-4">
                 <h3 className="text-center text-lg font-medium text-black sm:text-xl">
-                  총체적 평가
+                  총체적 피드백
                 </h3>
                 <div className="bg-[#eff6ff] rounded-[10px] shadow-md p-4">
                   {/* 평가 입력란 (큰 텍스트 영역) */}
@@ -1739,7 +1774,7 @@ export default function TeamDetailPage() {
                           holisticComment: e.target.value,
                         }))
                       }
-                      placeholder="평가를 입력하세요."
+                      placeholder="피드백을 입력하세요."
                       data-testid="professor-eval-holistic"
                       className="w-full h-[333px] text-[17px] text-[#595959] placeholder:text-[#595959] outline-none resize-none"
                     />
@@ -1765,7 +1800,7 @@ export default function TeamDetailPage() {
         open={Boolean(isProfessor && isEvaluationOpen && showStudentEvalModal)}
         onClose={() => setShowStudentEvalModal(false)}
         testId="professor-student-eval-modal-overlay"
-        ariaLabel="학생 평가"
+        ariaLabel="학생 피드백"
         panelClassName="!p-0 max-w-[780px] w-full overflow-y-auto rounded-[10px] shadow-2xl"
       >
             {/* 헤더 */}
@@ -1783,7 +1818,7 @@ export default function TeamDetailPage() {
             <div className="px-6 py-5 space-y-7">
               {allStudents.length === 0 && (
                 <p className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-4 py-6 text-center text-sm text-gray-600">
-                  이 팀에 등록된 팀원이 없습니다. 팀 멤버가 배정된 뒤 학생 평가를 작성할 수 있습니다.
+                  이 팀에 등록된 팀원이 없습니다. 팀 멤버가 배정된 뒤 학생 피드백을 작성할 수 있습니다.
                 </p>
               )}
               {allStudents.map((student) => (
@@ -1799,7 +1834,7 @@ export default function TeamDetailPage() {
 
                   {/* 역할 및 동료평가 참고 카드 */}
                   <div className="bg-[#eff6ff] rounded-[10px] shadow-sm p-4 space-y-3">
-                    <p className="text-sm font-medium text-black">역할 및 동료평가 - 참고</p>
+                    <p className="text-sm font-medium text-black">역할 및 동료 피드백 - 참고</p>
 
                     {/* 키워드 + 코멘트 영역 */}
                     <div className="bg-white border-2 border-[rgba(59,128,255,0.32)] rounded-[10px] p-3 space-y-2">
@@ -1833,7 +1868,7 @@ export default function TeamDetailPage() {
                     </div>
                   </div>
 
-                  {/* 교수 평가 입력 */}
+                  {/* 교수 피드백 입력 */}
                   <div className="bg-white border border-gray-200 rounded-[10px] px-4 py-3">
                     <textarea
                       value={studentEvalInputs[student.id]}
@@ -1843,7 +1878,7 @@ export default function TeamDetailPage() {
                           [student.id]: e.target.value,
                         }))
                       }
-                      placeholder="평가를 입력하세요."
+                      placeholder="피드백을 입력하세요."
                       rows={2}
                       className="w-full text-sm text-[#364153] placeholder:text-[#9d9d9d] outline-none bg-transparent resize-none"
                     />
@@ -1916,7 +1951,7 @@ export default function TeamDetailPage() {
         open={showPeerReviewModal}
         onClose={() => setShowPeerReviewModal(false)}
         testId="team-peer-review-modal"
-        ariaLabel="동료 평가"
+        ariaLabel="동료 피드백"
         panelClassName="max-h-[92vh] max-w-4xl overflow-y-auto rounded-xl p-4 shadow-xl"
       >
             <div className="mb-3 flex justify-end">

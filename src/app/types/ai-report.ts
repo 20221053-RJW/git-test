@@ -76,6 +76,8 @@ export interface AiReportTeamSnapshot {
   retrospectiveSubmitted: boolean;
   /** 회고록 본문 요약 (sections JSON, 최대 ~200자) */
   retrospectiveSnippet?: string;
+  /** 회고록 sections 원본 (마이페이지 「내가 한 경험」용) */
+  retrospectiveSections?: unknown;
   /** 본인이 제출한 동료평가 건수 (H-008) */
   peerReviewsSubmitted: number;
   /** 동료평가 요약 (키워드·코멘트) */

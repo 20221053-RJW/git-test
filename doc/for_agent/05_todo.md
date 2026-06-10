@@ -1,7 +1,7 @@
 ﻿# 05 — TODO (우선순위)
 
 > **관련:** `02_current_state.md` · `17_handoff.md` · `28_human_action_items.md`  
-> **마지막 갱신:** 2026-05-23
+> **마지막 갱신:** 2026-06-09
 
 ## 상태 표기
 
@@ -237,7 +237,19 @@
 | — | #83 강의자료 버킷 | [o] | T-204 · MCP 원격 적용 |
 | — | #84 교수 네비 | [o] | T-203 |
 
+### vision #164~#169 (2026-06-09)
+
+| ID | vision | 상태 | 비고 |
+|----|--------|------|------|
+| T-205 | #164 회고록 자동연동 변경 | [o] | `buildRetrospectiveAutoHints` · `TeamRetrospectivePage` |
+| T-206 | #165 마이페이지 「내가 한 경험」← 회고록 | [o] | `buildMyExperienceFromRetrospective` · `ai-report.ts` |
+| T-207 | #166 평가→피드백 워딩 | [o] | `TeamDetailPage` · `MyPage` · `TeamPeerReviewPage` |
+| T-208 | #167·#168 저장 실패 UX | [o] | professor `allSettled`+verify · peer manner temp non-fatal |
+| T-209 | #169 산출물 등록 예시 | [o] | `TeamDeliverableSubmitModal` 회의록·txt 안내 |
+
 ## 완료됨 (최근)
+
+- [o] T-205~T-209 vision #164~#169 (2026-06-09, plans/260609-1.md)
 
 - [o] T-203~T-204 vision #83·#84 (2026-05-23, plans/260523-4.md)
 - [o] T-200~T-202 vision #81·#82·#80 (2026-05-23, plans/260523-3.md)
