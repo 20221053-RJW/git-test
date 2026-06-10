@@ -110,6 +110,17 @@ export default function CoursesPage() {
 
   const handleCatalogJoin = async (entry: CourseCatalogEntry) => {
     if (catalogJoiningId) return;
+
+    if (
+      isProfessor &&
+      entry.professorId &&
+      user?.id &&
+      entry.professorId !== user.id
+    ) {
+      alert("이미 다른 교수가 담당 중인 수업입니다. 입장할 수 없습니다.");
+      return;
+    }
+
     setCatalogJoiningId(entry.id);
     setErrorMessage("");
 
@@ -121,7 +132,12 @@ export default function CoursesPage() {
       ]);
       navigate(`/app/courses/${result.courseId}`);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "강의 입장에 실패했습니다.");
+      const message = error instanceof Error ? error.message : "강의 입장에 실패했습니다.";
+      if (message.includes("다른 교수")) {
+        alert(message);
+      } else {
+        setErrorMessage(message);
+      }
     } finally {
       setCatalogJoiningId(null);
     }
@@ -262,6 +278,12 @@ export default function CoursesPage() {
               const isMyInstructorCourse = Boolean(
                 isProfessor && user?.id && course.professorId === user.id
               );
+              const isOtherInstructorCourse = Boolean(
+                isProfessor &&
+                  user?.id &&
+                  course.professorId &&
+                  course.professorId !== user.id
+              );
 
               return (
                 <CourseListCard
@@ -271,6 +293,8 @@ export default function CoursesPage() {
                   canArchiveCourse={canArchiveCourse}
                   canManageThisCourse={canManageThisCourse}
                   isMyInstructorCourse={isMyInstructorCourse}
+                  isOtherInstructorCourse={isOtherInstructorCourse}
+                  viewerIsProfessor={isProfessor}
                   submitting={submitting}
                   onCopyCode={copyCourseCode}
                   onArchive={handleArchiveCourse}
@@ -326,6 +350,12 @@ export default function CoursesPage() {
                   const isMyInstructorCourse = Boolean(
                     isProfessor && user?.id && entry.professorId === user.id
                   );
+                  const isOtherInstructorCourse = Boolean(
+                    isProfessor &&
+                      user?.id &&
+                      entry.professorId &&
+                      entry.professorId !== user.id
+                  );
 
                   return (
                     <CatalogCourseCard
@@ -333,6 +363,7 @@ export default function CoursesPage() {
                       entry={entry}
                       joining={catalogJoiningId === entry.id}
                       isMyInstructorCourse={isMyInstructorCourse}
+                      isOtherInstructorCourse={isOtherInstructorCourse}
                       onJoin={handleCatalogJoin}
                     />
                   );

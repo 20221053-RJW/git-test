@@ -247,8 +247,17 @@
 | T-208 | #167·#168 저장 실패 UX | [o] | professor `allSettled`+verify · peer manner temp non-fatal |
 | T-209 | #169 산출물 등록 예시 | [o] | `TeamDeliverableSubmitModal` 회의록·txt 안내 |
 
+### vision #170~#172 (2026-06-09)
+
+| ID | vision | 상태 | 비고 |
+|----|--------|------|------|
+| T-210 | #170 교수·타인 담당 수업 카드 디자인 | [o] | `cc-course-card--other-instructor` |
+| T-211 | #171 입장 시 alert (배너 대신) | [o] | `CoursesPage` · `CourseListCard` |
+| T-212 | #172 교수 프로필 사진 변경 | [o] | `ProfessorProfilePage` · `updateAvatar` |
+
 ## 완료됨 (최근)
 
+- [o] T-210~T-212 vision #170~#172 (2026-06-09, plans/260609-2.md)
 - [o] T-205~T-209 vision #164~#169 (2026-06-09, plans/260609-1.md)
 
 - [o] T-203~T-204 vision #83·#84 (2026-05-23, plans/260523-4.md)

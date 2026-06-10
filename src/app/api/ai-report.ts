@@ -9,6 +9,10 @@ import {
   normalizeMeetingText,
   parseMeetingSummariesFromDescription,
 } from "../utils/meetingMinutes";
+import {
+  buildKimStudentDemoReport,
+  shouldUseKimStudentDemoReport,
+} from "../data/kimStudentDemoReport";
 import type {
   AiReportContext,
   AiReportGenerateRequest,

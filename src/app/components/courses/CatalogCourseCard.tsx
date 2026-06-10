@@ -6,6 +6,7 @@ type Props = {
   entry: CourseCatalogEntry;
   joining: boolean;
   isMyInstructorCourse?: boolean;
+  isOtherInstructorCourse?: boolean;
   onJoin: (entry: CourseCatalogEntry) => void;
 };
 
@@ -13,6 +14,7 @@ export default function CatalogCourseCard({
   entry,
   joining,
   isMyInstructorCourse = false,
+  isOtherInstructorCourse = false,
   onJoin,
 }: Props) {
   const departmentLabel = [
@@ -28,6 +30,7 @@ export default function CatalogCourseCard({
     "cc-course-card cc-catalog-card m3-surface-card--elevated flex h-full flex-col",
     hasAssignedProfessor ? "cc-course-card--with-professor" : "cc-course-card--no-professor",
     isMyInstructorCourse ? "cc-course-card--my-instructor" : "",
+    isOtherInstructorCourse ? "cc-course-card--other-instructor" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -38,6 +41,7 @@ export default function CatalogCourseCard({
       data-testid={`catalog-course-${entry.id}`}
       data-course-has-professor={hasAssignedProfessor ? "true" : "false"}
       data-course-my-instructor={isMyInstructorCourse ? "true" : "false"}
+      data-course-other-instructor={isOtherInstructorCourse ? "true" : "false"}
     >
       <div className="cc-course-card__accent" aria-hidden />
 
@@ -49,12 +53,20 @@ export default function CatalogCourseCard({
               {hasAssignedProfessor ? (
                 <span
                   className={`cc-course-card__professor-badge ${
-                    isMyInstructorCourse ? "cc-course-card__professor-badge--mine" : ""
+                    isMyInstructorCourse
+                      ? "cc-course-card__professor-badge--mine"
+                      : isOtherInstructorCourse
+                        ? "cc-course-card__professor-badge--other"
+                        : ""
                   }`}
                   data-testid={`catalog-course-professor-badge-${entry.id}`}
                 >
                   <GraduationCap className="h-3 w-3 shrink-0" aria-hidden />
-                  {isMyInstructorCourse ? "내 담당 수업" : "담당 교수 배정"}
+                  {isMyInstructorCourse
+                    ? "내 담당 수업"
+                    : isOtherInstructorCourse
+                      ? "다른 교수 담당"
+                      : "담당 교수 배정"}
                 </span>
               ) : (
                 <span

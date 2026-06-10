@@ -1,5 +1,5 @@
 import React from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Calendar, Clock, Copy, GitBranch, GraduationCap, MapPin, User, Users } from "lucide-react";
 import { formatCoursePeriod } from "../../utils/courseDates";
 import type { Course } from "../../types";
@@ -10,6 +10,8 @@ type CourseListCardProps = {
   canArchiveCourse: boolean;
   canManageThisCourse: boolean;
   isMyInstructorCourse?: boolean;
+  isOtherInstructorCourse?: boolean;
+  viewerIsProfessor?: boolean;
   submitting: boolean;
   onCopyCode: (code: string) => void;
   onArchive: (course: Course) => void;
@@ -22,11 +24,14 @@ export default function CourseListCard({
   canArchiveCourse,
   canManageThisCourse,
   isMyInstructorCourse = false,
+  isOtherInstructorCourse = false,
+  viewerIsProfessor = false,
   submitting,
   onCopyCode,
   onArchive,
   onDelete,
 }: CourseListCardProps) {
+  const navigate = useNavigate();
   const periodLabel = formatCoursePeriod(course.startDate, course.endDate);
   const stageCount = course.stageCount ?? course.stages?.length ?? 0;
   const studentLabel = course.maxStudents
@@ -37,9 +42,20 @@ export default function CourseListCard({
     "cc-course-card m3-surface-card--elevated m3-surface-card--interactive group",
     hasAssignedProfessor ? "cc-course-card--with-professor" : "cc-course-card--no-professor",
     isMyInstructorCourse ? "cc-course-card--my-instructor" : "",
+    isOtherInstructorCourse ? "cc-course-card--other-instructor" : "",
   ]
     .filter(Boolean)
     .join(" ");
+
+  const handleEnterCourse = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!viewerIsProfessor || !isOtherInstructorCourse) return;
+    event.preventDefault();
+    const professorLabel = course.professor?.trim() || "다른 교수";
+    alert(
+      `${professorLabel} 님이 담당 중인 수업입니다. 조회 목적으로만 입장할 수 있으며 수업 관리 권한은 없습니다.`
+    );
+    navigate(`/app/courses/${course.id}`);
+  };
 
   return (
     <Link
@@ -48,6 +64,8 @@ export default function CourseListCard({
       data-testid={`course-card-${course.id}`}
       data-course-has-professor={hasAssignedProfessor ? "true" : "false"}
       data-course-my-instructor={isMyInstructorCourse ? "true" : "false"}
+      data-course-other-instructor={isOtherInstructorCourse ? "true" : "false"}
+      onClick={handleEnterCourse}
     >
       <div className="cc-course-card__accent" aria-hidden />
 
@@ -59,12 +77,20 @@ export default function CourseListCard({
               {hasAssignedProfessor ? (
                 <span
                   className={`cc-course-card__professor-badge ${
-                    isMyInstructorCourse ? "cc-course-card__professor-badge--mine" : ""
+                    isMyInstructorCourse
+                      ? "cc-course-card__professor-badge--mine"
+                      : isOtherInstructorCourse
+                        ? "cc-course-card__professor-badge--other"
+                        : ""
                   }`}
                   data-testid={`course-card-professor-badge-${course.id}`}
                 >
                   <GraduationCap className="h-3 w-3 shrink-0" aria-hidden />
-                  {isMyInstructorCourse ? "내 담당 수업" : "담당 교수 배정"}
+                  {isMyInstructorCourse
+                    ? "내 담당 수업"
+                    : isOtherInstructorCourse
+                      ? "다른 교수 담당"
+                      : "담당 교수 배정"}
                 </span>
               ) : (
                 <span
